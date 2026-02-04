@@ -1,15 +1,23 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { MdExpandMore, MdChevronRight, MdArrowForwardIos } from "react-icons/md";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { navTree } from "@/lib/navTree";
 import "./_components/Mobile.scss";
 
+type NavNode = {
+  key: string;
+  label: string;
+  href: string;
+  children?: readonly NavNode[];
+};
+
 interface MobileDrawerProps {
-  // keep it for now so Header doesn't break, but we won't use it here
-  navigateTo?: (id: string) => (e?: React.MouseEvent<HTMLAnchorElement>) => void;
+  // NOTE: legacy prop from the old single-page hash navigation.
+  // We'll keep it so nothing breaks upstream, but we won't use it.
+  navigateTo: (id: string) => (e?: React.MouseEvent<HTMLAnchorElement>) => void;
+
   session: any;
   onClose: () => void;
 }
@@ -18,9 +26,11 @@ export default function MobileDrawer({ session, onClose }: MobileDrawerProps) {
   const router = useRouter();
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // track expanded keys independently (supports multi-level)
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  // Track expanded items (supports multi-level)
+  const [expandedKeys, setExpandedKeys] = useState<Record<string, boolean>>({});
   const [isClosing, setIsClosing] = useState(false);
+
+  const tree = useMemo(() => navTree as unknown as readonly NavNode[], []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -32,124 +42,72 @@ export default function MobileDrawer({ session, onClose }: MobileDrawerProps) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const toggleExpand = (key: string) => {
-    setExpanded((prev) => ({ ...prev, [key]: !prev[key] }));
-  };
-
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     setIsClosing(true);
     setTimeout(() => {
       setIsClosing(false);
       onClose();
     }, 400);
-  };
+  }, [onClose]);
 
-  const go = (href: string) => (e?: React.MouseEvent) => {
-    e?.preventDefault();
-    router.push(href);
-    handleClose();
-  };
+  const toggleExpand = useCallback((key: string) => {
+    setExpandedKeys((prev) => ({ ...prev, [key]: !prev[key] }));
+  }, []);
 
-  const renderNode = (node: any, level: number = 0) => {
-    const hasChildren = Array.isArray(node.children) && node.children.length > 0;
-    const isOpen = !!expanded[node.key];
+  const goHref = useCallback(
+    (href: string) => (e: React.MouseEvent<HTMLAnchorElement>) => {
+      e.preventDefault();
+      router.push(href);
+      handleClose();
+    },
+    [router, handleClose]
+  );
 
-    // styles per level
-    const itemClass =
-      level === 0
-        ? "mobile-menu-item"
-        : level === 1
-        ? "submenu-link"
-        : "submenu-link pl-8";
+  const renderNodes = (nodes: readonly NavNode[], depth = 0) => {
+    return nodes.map((node) => {
+      const hasChildren = !!node.children?.length;
+      const isExpanded = !!expandedKeys[node.key];
 
-    const wrapperClass =
-      level === 0 ? "" : level === 1 ? "mobile-submenu" : "mobile-submenu";
-
-    return (
-      <div key={node.key}>
-        <div className={`${itemClass} text-foreground hover:bg-secondary`}>
-          {/* Use href now (Shopify-style routing) */}
-          <a
-            href={node.href}
-            onClick={go(node.href)}
-            className="menu-link focus:outline-none text-foreground no-underline flex-1"
-          >
-            {node.label}
-          </a>
-
-          {hasChildren ? (
-            <button
-              onClick={() => toggleExpand(node.key)}
-              className="menu-toggle text-foreground"
-              aria-label={`Toggle ${node.label}`}
-              type="button"
+      return (
+        <div key={node.key} className={`dcg-mobile-item dcg-depth-${depth}`}>
+          <div className="mobile-menu-item text-foreground hover:bg-secondary">
+            <a
+              href={node.href}
+              onClick={goHref(node.href)}
+              className="menu-link focus:outline-none text-foreground no-underline"
             >
-              {isOpen ? <MdExpandMore size={20} /> : <MdChevronRight size={20} />}
-            </button>
-          ) : (
-            <MdArrowForwardIos size={14} className="ml-2 text-muted-foreground" />
+              {node.label}
+            </a>
+
+            {hasChildren ? (
+              <button
+                type="button"
+                onClick={() => toggleExpand(node.key)}
+                className="menu-toggle text-foreground"
+                aria-label={`Toggle ${node.label}`}
+                aria-expanded={isExpanded}
+              >
+                {isExpanded ? <MdExpandMore size={20} /> : <MdChevronRight size={20} />}
+              </button>
+            ) : (
+              <MdArrowForwardIos size={14} className="ml-2 text-muted-foreground" />
+            )}
+          </div>
+
+          {hasChildren && isExpanded && (
+            <div className="mobile-submenu bg-background">
+              {renderNodes(node.children!, depth + 1)}
+            </div>
           )}
         </div>
-
-        {hasChildren && isOpen && (
-          <div className={`${wrapperClass} bg-background`}>
-            {node.children.map((child: any) => (
-              <div key={child.key}>
-                {/* Child row */}
-                <div className="submenu-link text-foreground hover:bg-secondary flex items-center justify-between">
-                  <a
-                    href={child.href}
-                    onClick={go(child.href)}
-                    className="no-underline text-foreground flex-1"
-                  >
-                    {child.label}
-                  </a>
-
-                  {child.children?.length ? (
-                    <button
-                      onClick={() => toggleExpand(child.key)}
-                      className="menu-toggle text-foreground"
-                      aria-label={`Toggle ${child.label}`}
-                      type="button"
-                    >
-                      {!!expanded[child.key] ? (
-                        <MdExpandMore size={18} />
-                      ) : (
-                        <MdChevronRight size={18} />
-                      )}
-                    </button>
-                  ) : null}
-                </div>
-
-                {/* Grandchildren */}
-                {child.children?.length && expanded[child.key] ? (
-                  <div className="mobile-submenu bg-background">
-                    {child.children.map((grand: any) => (
-                      <a
-                        key={grand.key}
-                        href={grand.href}
-                        onClick={go(grand.href)}
-                        className="submenu-link pl-8 text-foreground hover:bg-secondary no-underline block"
-                      >
-                        {grand.label}
-                      </a>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    );
+      );
+    });
   };
 
   return (
     <div
       ref={menuRef}
-      className={`drawer-content md:hidden ${
-        isClosing ? "animate-slide-up" : "animate-slide-down"
-      }`}
+      className={`drawer-content md:hidden ${isClosing ? "animate-slide-up" : "animate-slide-down"}`}
       style={{
         position: "absolute",
         top: "100%",
@@ -163,13 +121,17 @@ export default function MobileDrawer({ session, onClose }: MobileDrawerProps) {
       }}
     >
       <div className="mobile-menu-container bg-background border-b border-border shadow-lg rounded-b-xl">
-        {navTree.map((node) => renderNode(node, 0))}
+        {renderNodes(tree)}
 
         <div className="mobile-auth-section border-t border-border bg-background">
           {!session ? (
             <a
               href="/sign-in"
-              onClick={go("/sign-in")}
+              onClick={(e) => {
+                e.preventDefault();
+                router.push("/sign-in");
+                handleClose();
+              }}
               className="auth-button text-accent hover:bg-secondary no-underline"
             >
               Sign In
@@ -177,11 +139,10 @@ export default function MobileDrawer({ session, onClose }: MobileDrawerProps) {
           ) : (
             <button
               onClick={() => {
-                router.push("/auth/logout");
+                window.location.href = "/auth/logout";
                 handleClose();
               }}
               className="auth-button text-destructive hover:bg-secondary"
-              type="button"
             >
               Log Out
             </button>
