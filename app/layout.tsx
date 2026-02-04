@@ -1,4 +1,4 @@
-// app/layout.tsx - UPDATED WITH ENHANCED METADATA
+// app/layout.tsx - UPDATED BRANDING FOR DESERT COWGIRL
 import { Providers } from "./provider";
 import Nav from "@/components/nav";
 import Footer from "@/components/footer";
@@ -7,95 +7,89 @@ import "./globals.css";
 import type { Metadata } from "next";
 import ClientLayoutWrapper from "@/components/ClientLayout";
 
-// ✅ UPDATED: Enhanced metadata with SEO and social media tags
+// ✅ UPDATED: Metadata for Desert Cowgirl (western-inspired clothing storefront)
 export const metadata: Metadata = {
   title: {
-    template: '%s | Desert Area Resources and Training',
-    default: 'Desert Area Resources and Training - Disability Services & Support Organization in Ridgecrest California, 93555',
+    template: "%s | Desert Cowgirl",
+    default: "Desert Cowgirl | Western-Inspired Pants & Shirts",
   },
-  description: 'From support services, career opportunities, fun events, and business services, discover all Desert Area Resources and Training has to offer! Start Here. Desert Area Resources and Training serves people in Southern California with comprehensive disability support services.',
-  metadataBase: new URL('https://schedual-five.vercel.app'), // Update this to your actual domain when ready
-  
+  description:
+    "Desert Cowgirl offers western-inspired pants and shirts with a warm, modern rustic aesthetic—quality staples made for everyday wear.",
+
+  // ✅ Update when domain is live (recommended): https://desertcowgirl.co
+  metadataBase: new URL("https://desertcowgirl.co"),
+
   // ✅ Keywords for SEO
   keywords: [
-    'disability services',
-    'support organization', 
-    'Ridgecrest California',
-    'career opportunities',
-    'business services',
-    'Southern California',
-    'resources',
-    'training',
-    'accessibility',
-    'community support'
+    "Desert Cowgirl",
+    "western inspired clothing",
+    "western clothing",
+    "western pants",
+    "western shirts",
+    "denim",
+    "heritage style",
+    "rustic fashion",
+    "desert style",
+    "boutique clothing",
+    "online clothing store",
+    "women's western clothing",
+    "men's western clothing",
   ],
-  
+
   // ✅ Authors and creator info
-  authors: [{ name: 'Desert Area Resources and Training' }],
-  creator: 'Desert Area Resources and Training',
-  publisher: 'Desert Area Resources and Training',
-  
-  // ✅ Open Graph (Facebook) Meta Tags
+  authors: [{ name: "Desert Cowgirl" }],
+  creator: "Desert Cowgirl",
+  publisher: "Desert Cowgirl",
+
+  // ✅ Open Graph Meta Tags
   openGraph: {
-    type: 'website',
-    locale: 'en_US',
-    url: 'https://schedual-five.vercel.app/', // Update to your actual domain
-    siteName: 'Desert Area Resources and Training',
-    title: 'Desert Area Resources and Training - Disability Services & Support Organization in Ridgecrest California',
-    description: 'From support services, career opportunities, fun events, and business services, discover all Desert Area Resources and Training has to offer! Start Here. Desert Area Resources and Training serves people in Southern California with comprehensive disability support services.',
+    type: "website",
+    locale: "en_US",
+    url: "https://desertcowgirl.co/",
+    siteName: "Desert Cowgirl",
+    title: "Desert Cowgirl | Western-Inspired Pants & Shirts",
+    description:
+      "Shop western-inspired pants and shirts with a warm, modern rustic look—quality staples made for everyday wear.",
     images: [
       {
-        url: '/og-image.jpg', // Add your actual image path
+        url: "/og-image.jpg", // TODO: replace with your actual OG image
         width: 1200,
         height: 630,
-        alt: 'Desert Area Resources and Training - Disability Services & Support',
+        alt: "Desert Cowgirl storefront preview",
       },
     ],
   },
-  
+
   // ✅ Twitter Meta Tags
   twitter: {
-    card: 'summary_large_image',
-    site: '@DesertAreaRT', // Update with your actual Twitter handle
-    creator: '@DesertAreaRT', // Update with your actual Twitter handle
-    title: 'Desert Area Resources and Training - Disability Services & Support Organization in Ridgecrest California',
-    description: 'From support services, career opportunities, fun events, and business services, discover all Desert Area Resources and Training has to offer! Start Here. Desert Area Resources and Training serves people in Southern California with comprehensive disability support services.',
-    images: ['/twitter-image.jpg'], // Add your actual image path
+    card: "summary_large_image",
+    title: "Desert Cowgirl | Western-Inspired Pants & Shirts",
+    description:
+      "Shop western-inspired pants and shirts with a warm, modern rustic look—quality staples made for everyday wear.",
+    images: ["/og-image.jpg"], // TODO: replace with your actual image
   },
-  
-  // ✅ Additional SEO improvements
+
+  // ✅ Robots
   robots: {
     index: true,
     follow: true,
     googleBot: {
       index: true,
       follow: true,
-      'max-video-preview': -1,
-      'max-image-preview': 'large',
-      'max-snippet': -1,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
     },
   },
-  
-  // ✅ Verification (add when you have these)
-  // verification: {
-  //   google: 'your-google-verification-code',
-  //   yandex: 'your-yandex-verification-code',
-  //   yahoo: 'your-yahoo-verification-code',
-  // },
-  
+
   // ✅ App-specific metadata
-  applicationName: 'Desert Area Resources and Training',
-  referrer: 'origin-when-cross-origin',
-  category: 'Disability Services',
-  
-  // ✅ Contact and organization info
+  applicationName: "Desert Cowgirl",
+  referrer: "origin-when-cross-origin",
+  category: "Apparel",
+
+  // ✅ Contact info placeholders (fill when ready)
   other: {
-    'contact:phone_number': '+1-760-375-9787', // Add your actual phone
-    'contact:email': 'info@desertareart.org', // Add your actual email
-    'business:contact_data:locality': 'Ridgecrest',
-    'business:contact_data:region': 'California',
-    'business:contact_data:postal_code': '93555',
-    'business:contact_data:country_name': 'United States',
+    "contact:email": "support@desertcowgirl.co",
   },
 };
 
@@ -108,67 +102,47 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* ✅ Additional head elements */}
-        <meta name="theme-color" content="#ffffff" />
+        {/* ✅ Theme color matches your light palette background */}
+        <meta name="theme-color" content="#faf8f5" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="format-detection" content="telephone=no" />
-        
+
         {/* ✅ Favicon and app icons */}
         <link rel="icon" href="/favicon.ico" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <link rel="manifest" href="/manifest.json" />
-        
-        {/* ✅ Preconnect for performance */}
+
+        {/* ✅ Preconnect for performance (keep only if you actually use Google Fonts) */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-        
+
         {/* ✅ Canonical URL */}
-        <link rel="canonical" href="https://schedual-five.vercel.app/" />
-        
-        {/* ✅ Geographic targeting */}
-        <meta name="geo.region" content="US-CA" />
-        <meta name="geo.placename" content="Ridgecrest" />
-        <meta name="geo.position" content="35.6225;-117.6709" />
-        <meta name="ICBM" content="35.6225, -117.6709" />
-        
-        {/* ✅ Organization schema (helps with local SEO) */}
+        <link rel="canonical" href="https://desertcowgirl.co/" />
+
+        {/* ✅ Store schema (helps SEO for ecommerce) */}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
             __html: JSON.stringify({
               "@context": "https://schema.org",
-              "@type": "Organization",
-              "name": "Desert Area Resources and Training",
-              "description": "Disability services and support organization serving Southern California",
-              "url": "https://schedual-five.vercel.app/",
-              "logo": "https://schedual-five.vercel.app/logo.png",
-              "contactPoint": {
-                "@type": "ContactPoint",
-                "telephone": "+1-760-XXX-XXXX",
-                "contactType": "Customer Service",
-                "availableLanguage": ["English", "Spanish"]
-              },
-              "address": {
-                "@type": "PostalAddress",
-                "addressLocality": "Ridgecrest",
-                "addressRegion": "CA",
-                "postalCode": "93555",
-                "addressCountry": "US"
-              },
-              "sameAs": [
-                "https://facebook.com/your-page",
-                "https://twitter.com/your-handle",
-                "https://linkedin.com/company/your-company"
-              ]
-            })
+              "@type": "Brand",
+              name: "Desert Cowgirl",
+              description:
+                "Western-inspired pants and shirts with a warm, modern rustic aesthetic.",
+              url: "https://desertcowgirl.co/",
+              logo: "https://desertcowgirl.co/logo.png",
+              sameAs: [
+                // Add socials when ready:
+                // "https://instagram.com/your-handle",
+                // "https://tiktok.com/@your-handle"
+              ],
+            }),
           }}
         />
       </head>
       <body className="min-h-screen font-[var(--font-sans)]">
         <Providers>
-          <ClientLayoutWrapper>
-            {children}
-          </ClientLayoutWrapper>
+          <ClientLayoutWrapper>{children}</ClientLayoutWrapper>
         </Providers>
       </body>
     </html>
