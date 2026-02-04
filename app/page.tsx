@@ -3,19 +3,34 @@ import Home from "@/components/home/Home";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Home | Desert Area Resources and Training",
-  description: "Welcome to Desert Area Resources and Training.",
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://schedual-five.vercel.app'),
+  title: "Home | Desert Cowgirl",
+  description:
+    "Western-inspired pants and shirts with a warm, modern rustic aesthetic. Thoughtfully designed staples made for everyday wear.",
+
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL || "https://desertcowgirl.co"
+  ),
+
   openGraph: {
-    title: "Desert Area Resources and Training",
-    description: "Welcome to Desert Area Resources and Training.",
+    title: "Desert Cowgirl | Western-Inspired Pants & Shirts",
+    description:
+      "Shop western-inspired pants and shirts with a warm, modern rustic look—quality staples made for everyday wear.",
     type: "website",
-    images: ["/opengraph-image.png"], // Simple version - no dimensions needed
+    url: "https://desertcowgirl.co/",
+    siteName: "Desert Cowgirl",
+    images: [
+      {
+        url: "/opengraph-image.png",
+        alt: "Desert Cowgirl storefront preview",
+      },
+    ],
   },
+
   twitter: {
     card: "summary_large_image",
-    title: "Desert Area Resources and Training",
-    description: "Welcome to Desert Area Resources and Training.",
+    title: "Desert Cowgirl | Western-Inspired Pants & Shirts",
+    description:
+      "Western-inspired pants and shirts with a warm, modern rustic aesthetic.",
     images: ["/twitter-image.png"],
   },
 };
