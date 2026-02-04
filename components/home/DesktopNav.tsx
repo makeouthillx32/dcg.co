@@ -1,233 +1,296 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { navTree } from "@/lib/navTree";
 import "./_components/Desktop.scss";
 
+type NavNode = {
+  key: string;
+  label: string;
+  href: string;
+  children?: readonly NavNode[];
+};
+
 interface DesktopNavProps {
+  // legacy prop from hash-navigation (keep so header doesn’t break)
   navigateTo: (key: string) => (e?: React.MouseEvent) => void;
 }
 
-export default function DesktopNav({ navigateTo }: DesktopNavProps) {
+export default function DesktopNav(_: DesktopNavProps) {
+  const router = useRouter();
+
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [hoverTimeout, setHoverTimeout] = useState<NodeJS.Timeout | null>(null);
+
+  // refs for alignment + outside click
   const navRefs = useRef<(HTMLElement | null)[]>([]);
   const dropdownRefs = useRef<(HTMLDivElement | null)[]>([]);
 
+  const tree = useMemo(() => navTree as unknown as readonly NavNode[], []);
+
   // Smart dropdown positioning
   const getDropdownAlignment = (index: number) => {
-    if (typeof window === 'undefined') return 'dropdown-align-center';
-    
+    if (typeof window === "undefined") return "dcg-dropdown-align-center";
+
     const navItem = navRefs.current[index];
-    if (!navItem) return 'dropdown-align-center';
-    
+    if (!navItem) return "dcg-dropdown-align-center";
+
     const rect = navItem.getBoundingClientRect();
     const viewportWidth = window.innerWidth;
-    
-    // If we're close to the right edge, right-align
-    if (rect.right > viewportWidth - 200) {
-      return 'dropdown-align-right';
-    }
-    
-    // If we're close to the left edge, left-align
-    if (rect.left < 200) {
-      return 'dropdown-align-left';
-    }
-    
-    // Otherwise, center-align
-    return 'dropdown-align-center';
+
+    if (rect.right > viewportWidth - 240) return "dcg-dropdown-align-right";
+    if (rect.left < 240) return "dcg-dropdown-align-left";
+    return "dcg-dropdown-align-center";
   };
 
   // Close dropdown when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      const isClickInsideNav = navRefs.current.some(ref => 
+      const isClickInsideNav = navRefs.current.some((ref) =>
         ref?.contains(event.target as Node)
       );
-      const isClickInsideDropdown = dropdownRefs.current.some(ref => 
+      const isClickInsideDropdown = dropdownRefs.current.some((ref) =>
         ref?.contains(event.target as Node)
       );
-      
+
       if (!isClickInsideNav && !isClickInsideDropdown) {
         setOpenKey(null);
       }
     }
-    
+
     document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Handle mouse enter with slight delay to prevent flicker
+  const goHref = useCallback(
+    (href: string) => (e: React.MouseEvent) => {
+      e.preventDefault();
+      router.push(href);
+      setOpenKey(null);
+    },
+    [router]
+  );
+
+  // Hover open/close (prevents flicker)
   const handleMouseEnter = (key: string) => {
-    if (hoverTimeout) {
-      clearTimeout(hoverTimeout);
-    }
+    if (hoverTimeout) clearTimeout(hoverTimeout);
     setOpenKey(key);
   };
 
-  // Handle mouse leave with delay to allow moving to dropdown
   const handleMouseLeave = () => {
-    const timeout = setTimeout(() => {
-      setOpenKey(null);
-    }, 150); // Small delay to allow moving to dropdown
+    const timeout = setTimeout(() => setOpenKey(null), 150);
     setHoverTimeout(timeout);
   };
 
-  // Handle dropdown mouse enter to cancel closing
   const handleDropdownMouseEnter = () => {
-    if (hoverTimeout) {
-      clearTimeout(hoverTimeout);
-    }
+    if (hoverTimeout) clearTimeout(hoverTimeout);
   };
 
-  // Handle dropdown mouse leave
   const handleDropdownMouseLeave = () => {
-    const timeout = setTimeout(() => {
-      setOpenKey(null);
-    }, 100);
+    const timeout = setTimeout(() => setOpenKey(null), 100);
     setHoverTimeout(timeout);
   };
 
-  // Handle main nav click - close dropdown if open, open if closed
-  const handleNavClick = (key: string, hasChildren: boolean) => (e: React.MouseEvent) => {
-    if (hasChildren) {
+  // Click behavior:
+  // - if has children: toggle dropdown (don’t navigate)
+  // - if no children: navigate immediately
+  const handleTopClick = (node: NavNode) => (e: React.MouseEvent) => {
+    if (node.children?.length) {
       e.preventDefault();
-      setOpenKey(openKey === key ? null : key);
-    } else {
-      navigateTo(key)(e);
-      setOpenKey(null);
+      setOpenKey(openKey === node.key ? null : node.key);
+      return;
     }
+    goHref(node.href)(e);
   };
 
-  // Handle submenu item click
-  const handleSubmenuClick = (key: string) => (e: React.MouseEvent) => {
-    navigateTo(key)(e);
-    setOpenKey(null); // Always close after selection
-  };
-
-  // Keyboard navigation
+  // Keyboard navigation (top-level only)
   const handleKeyDown = (e: React.KeyboardEvent, index: number) => {
-    const node = navTree[index];
-    
+    const node = tree[index];
+
     switch (e.key) {
       case "ArrowDown":
         e.preventDefault();
-        if (node.children) {
+        if (node.children?.length) {
           setOpenKey(node.key);
-          // Focus first dropdown item
           setTimeout(() => {
-            const firstItem = document.querySelector(`[data-parent="${node.key}"] a`) as HTMLElement;
+            const firstItem = document.querySelector(
+              `[data-parent="${node.key}"] a`
+            ) as HTMLElement | null;
             firstItem?.focus();
           }, 10);
         }
         break;
-      case "ArrowRight":
+
+      case "ArrowRight": {
         e.preventDefault();
-        const nextIndex = index < navTree.length - 1 ? index + 1 : 0;
+        const nextIndex = index < tree.length - 1 ? index + 1 : 0;
         navRefs.current[nextIndex]?.focus();
         break;
-      case "ArrowLeft":
+      }
+
+      case "ArrowLeft": {
         e.preventDefault();
-        const prevIndex = index > 0 ? index - 1 : navTree.length - 1;
+        const prevIndex = index > 0 ? index - 1 : tree.length - 1;
         navRefs.current[prevIndex]?.focus();
         break;
+      }
+
       case "Escape":
         e.preventDefault();
         setOpenKey(null);
         break;
+
       case "Enter":
-      case " ":
-        if (node.children) {
+      case " ": {
+        if (node.children?.length) {
           e.preventDefault();
           setOpenKey(openKey === node.key ? null : node.key);
+        } else {
+          // navigate on Enter for leaf nodes
+          // (space should still toggle only if it has children)
+          if (e.key === "Enter") {
+            router.push(node.href);
+            setOpenKey(null);
+          }
         }
         break;
+      }
     }
   };
 
   // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
-      if (hoverTimeout) {
-        clearTimeout(hoverTimeout);
-      }
+      if (hoverTimeout) clearTimeout(hoverTimeout);
     };
   }, [hoverTimeout]);
 
+  // --- 2-level dropdown layout renderer (Shopify-like) ---
+  // 1st level: dropdown shows category list
+  // 2nd level: if child has children, show flyout panel to the right
+  const renderDropdown = (parent: NavNode, parentIndex: number) => {
+    if (!parent.children?.length) return null;
+
+    return (
+      <div
+        ref={(el) => {
+          dropdownRefs.current[parentIndex] = el;
+        }}
+        className={`dcg-nav-dropdown ${getDropdownAlignment(parentIndex)} ${
+          openKey === parent.key ? "dcg-open" : "dcg-closed"
+        }`}
+        data-parent={parent.key}
+        onMouseEnter={handleDropdownMouseEnter}
+        onMouseLeave={handleDropdownMouseLeave}
+        role="menu"
+        aria-label={`${parent.label} submenu`}
+      >
+        <div className="dcg-dropdown-inner">
+          <ul className="dcg-dropdown-col" role="none">
+            {parent.children.map((child) => {
+              const hasFlyout = !!child.children?.length;
+
+              return (
+                <li
+                  key={child.key}
+                  className={`dcg-dropdown-item ${hasFlyout ? "dcg-has-flyout" : ""}`}
+                  role="none"
+                >
+                  <a
+                    href={child.href}
+                    onClick={goHref(child.href)}
+                    className="dcg-sub-link"
+                    role="menuitem"
+                    tabIndex={openKey === parent.key ? 0 : -1}
+                    onMouseEnter={() => {
+                      // only open flyouts on hover for items that have children
+                      // keep parent dropdown open
+                    }}
+                  >
+                    {child.label}
+                  </a>
+
+                  {hasFlyout ? (
+                    <div className="dcg-flyout" role="menu" aria-label={`${child.label} flyout`}>
+                      <div className="dcg-flyout-inner">
+                        {child.children!.map((grand) => (
+                          <a
+                            key={grand.key}
+                            href={grand.href}
+                            onClick={goHref(grand.href)}
+                            className="dcg-flyout-link"
+                            role="menuitem"
+                            tabIndex={openKey === parent.key ? 0 : -1}
+                          >
+                            {grand.label}
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      </div>
+    );
+  };
+
   return (
-    <nav className="nav-container">
-      <div className="nav-menu">
-        {navTree.map((node, index) => (
-          <div
-            key={node.key}
-            className="nav-item relative"
-            onMouseEnter={() => node.children && handleMouseEnter(node.key)}
-            onMouseLeave={node.children ? handleMouseLeave : undefined}
-          >
-            {node.children ? (
-              <>
-                <button
-                  ref={el => { navRefs.current[index] = el; }}
-                  className="nav-top-link text-foreground hover:text-primary bg-transparent border-none cursor-pointer transition-colors duration-200 px-4 py-2 rounded-md hover:bg-muted/50"
-                  onClick={handleNavClick(node.key, true)}
+    <nav className="dcg-nav-container">
+      <div className="dcg-nav-menu">
+        {tree.map((node, index) => {
+          const hasChildren = !!node.children?.length;
+
+          return (
+            <div
+              key={node.key}
+              className="dcg-nav-item"
+              onMouseEnter={() => (hasChildren ? handleMouseEnter(node.key) : undefined)}
+              onMouseLeave={hasChildren ? handleMouseLeave : undefined}
+            >
+              {hasChildren ? (
+                <>
+                  <button
+                    ref={(el) => {
+                      navRefs.current[index] = el;
+                    }}
+                    className="dcg-nav-top-link"
+                    onClick={handleTopClick(node)}
+                    onKeyDown={(e) => handleKeyDown(e, index)}
+                    aria-expanded={openKey === node.key}
+                    aria-haspopup="true"
+                    tabIndex={0}
+                    data-state={openKey === node.key ? "open" : "closed"}
+                    type="button"
+                  >
+                    {node.label}
+                    <span className={`dcg-caret ${openKey === node.key ? "dcg-rot" : ""}`}>
+                      ▼
+                    </span>
+                  </button>
+
+                  {renderDropdown(node, index)}
+                </>
+              ) : (
+                <a
+                  ref={(el) => {
+                    navRefs.current[index] = el;
+                  }}
+                  href={node.href}
+                  onClick={goHref(node.href)}
+                  className="dcg-nav-top-link dcg-as-link"
                   onKeyDown={(e) => handleKeyDown(e, index)}
-                  aria-expanded={openKey === node.key}
-                  aria-haspopup="true"
                   tabIndex={0}
-                  data-state={openKey === node.key ? "open" : "closed"}
                 >
                   {node.label}
-                  <span className={`ml-1 inline-block transition-transform duration-200 ${
-                    openKey === node.key ? 'rotate-180' : 'rotate-0'
-                  }`}>
-                    ▼
-                  </span>
-                </button>
-                
-                <div
-                  ref={el => { dropdownRefs.current[index] = el; }}
-                  className={`nav-dropdown bg-popover border border-border shadow-lg rounded-md ${getDropdownAlignment(index)} ${
-                    openKey === node.key ? "block animate-fade-in" : "hidden"
-                  }`}
-                  data-state={openKey === node.key ? "open" : "closed"}
-                  data-parent={node.key}
-                  onMouseEnter={handleDropdownMouseEnter}
-                  onMouseLeave={handleDropdownMouseLeave}
-                  role="menu"
-                  aria-label={`${node.label} submenu`}
-                >
-                  <div className="p-2 min-w-[12rem]">
-                    {node.children.map((child, childIndex) => (
-                      <a
-                        key={child.key}
-                        href={`#${child.key}`}
-                        onClick={handleSubmenuClick(child.key)}
-                        className="nav-sub-link block text-popover-foreground hover:text-primary hover:bg-muted/50 no-underline px-3 py-2 rounded-sm transition-colors duration-150 text-sm"
-                        role="menuitem"
-                        tabIndex={openKey === node.key ? 0 : -1}
-                      >
-                        {child.label}
-                      </a>
-                    ))}
-                  </div>
-                </div>
-              </>
-            ) : (
-              <a
-                ref={el => { navRefs.current[index] = el; }}
-                href={`#${node.key}`}
-                onClick={handleNavClick(node.key, false)}
-                className="nav-top-link text-foreground hover:text-primary no-underline transition-colors duration-200 px-4 py-2 rounded-md hover:bg-muted/50 inline-block"
-                onKeyDown={(e) => handleKeyDown(e, index)}
-                tabIndex={0}
-              >
-                {node.label}
-              </a>
-            )}
-          </div>
-        ))}
+                </a>
+              )}
+            </div>
+          );
+        })}
       </div>
     </nav>
   );
