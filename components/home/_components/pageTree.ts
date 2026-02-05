@@ -3,28 +3,28 @@
 // Only the "meaning" / comments are being rebranded to storefront concepts.
 // Component file names will be swapped later (we'll keep imports stable for now).
 
-import HomePage from "@/components/home/Landing";                // Storefront Landing
-import AboutUsPage from "@/components/home/AboutUs";            // Brand Story / About
-import BoardPage from "@/components/home/BoardofDirectors";     // (Placeholder: Brand / Policies / Info)
-import Title9Page from "@/components/home/Title9Information";   // (Placeholder: Store Policies)
-import Careers from "@/components/home/About/Careers";          // (Placeholder: Contact / Help hub)
-import JobsPage from "@/components/home/Jobs";                  // (Placeholder: Help / FAQ)
+import HomePage from "@/components/home/Landing"; // Storefront Landing
+import AboutUsPage from "@/components/home/AboutUs"; // Brand Story / About
+import BoardPage from "@/components/home/BoardofDirectors"; // Placeholder page
+import Title9Page from "@/components/home/Title9Information"; // Placeholder page
+import Careers from "@/components/home/About/Careers"; // Placeholder page
+import JobsPage from "@/components/home/Jobs"; // Placeholder page
 import ProgramsAndServices from "@/components/home/ProgramsandServices/programsndseevices"; // SHOP hub
-import Transportation from "@/components/home/services/Transportation"; // Collection page placeholder
-import EarlyChildhood from "@/components/home/services/EarlyChildhood"; // Collection page placeholder
-import SupportedLiving from "@/components/home/services/SupportedLiving"; // Collection page placeholder
-import Artists from "@/components/home/services/Artists";       // Collection page placeholder
-import AutismDayCamp from "@/components/home/LearnAndConnect/AutismDayCamp"; // Collection page placeholder
-import Employment from "@/components/home/services/Employment"; // Collection page placeholder
-import BusinessServices from "@/components/home/BusinessServices/main"; // Special Page placeholder (New Releases)
-import CMSPage from "@/components/home/BusinessServices/cms";   // Special Page placeholder (Restocks)
-import Pickup from "@/components/home/BusinessServices/pickup"; // Cowkids hub placeholder
-import CARF from "@/components/home/services/CARF";             // Cowboy Valentine page placeholder
-import ThriftStore from "@/components/home/services/ThriftStore"; // Occasions hub placeholder
-import Shredding from "@/components/home/BusinessServices/Shredding"; // Gift Card page placeholder
-import GetInvolved from "@/components/home/GetInvolved/main";   // Best Sellers page placeholder
-import DonateNow from "@/components/home/GetInvolved/donatenow"; // Currency / Region selector placeholder
-import LearnConnect from "@/components/home/LearnAndConnect/main"; // Account/Sign-in placeholder
+import Transportation from "@/components/home/services/Transportation"; // Placeholder collection page
+import EarlyChildhood from "@/components/home/services/EarlyChildhood"; // Placeholder collection page
+import SupportedLiving from "@/components/home/services/SupportedLiving"; // Placeholder collection page
+import Artists from "@/components/home/services/Artists"; // Placeholder collection page
+import AutismDayCamp from "@/components/home/LearnAndConnect/AutismDayCamp"; // Placeholder collection page
+import Employment from "@/components/home/services/Employment"; // Placeholder collection page
+import BusinessServices from "@/components/home/BusinessServices/main"; // Special page placeholder
+import CMSPage from "@/components/home/BusinessServices/cms"; // Special page placeholder
+import Pickup from "@/components/home/BusinessServices/pickup"; // Special page placeholder
+import CARF from "@/components/home/services/CARF"; // Special page placeholder
+import ThriftStore from "@/components/home/services/ThriftStore"; // Special page placeholder
+import Shredding from "@/components/home/BusinessServices/Shredding"; // Special page placeholder
+import GetInvolved from "@/components/home/GetInvolved/main"; // Special page placeholder
+import DonateNow from "@/components/home/GetInvolved/donatenow"; // Special page placeholder
+import LearnConnect from "@/components/home/LearnAndConnect/main"; // Special page placeholder
 import TermsPage from "@/components/home/TermsPage";
 import PrivacyPolicy from "@/components/home/PrivacyPolicy";
 
@@ -50,7 +50,6 @@ export const pageTree: Record<string, PageConfig> = {
   home: { Component: HomePage },
 
   // ✅ Shop hub (category browser)
-  // (Currently mapped to ProgramsAndServices component until we swap files)
   shop: {
     Component: ProgramsAndServices,
     backKey: "home",
@@ -72,7 +71,7 @@ export const pageTree: Record<string, PageConfig> = {
     anchorId: "restocks",
   },
 
-  // ✅ Cowkids (hub page)
+  // ✅ Cowkids hub
   cowkids: {
     Component: Pickup,
     backKey: "home",
@@ -80,7 +79,7 @@ export const pageTree: Record<string, PageConfig> = {
     anchorId: "cowkids",
   },
 
-  // ✅ Cowboy Valentine (single page)
+  // ✅ Cowboy Valentine page
   "cowboy-valentine": {
     Component: CARF,
     backKey: "home",
@@ -88,7 +87,7 @@ export const pageTree: Record<string, PageConfig> = {
     anchorId: "cowboy-valentine",
   },
 
-  // ✅ Shop Occasions (hub page)
+  // ✅ Shop Occasions hub
   occasions: {
     Component: ThriftStore,
     backKey: "home",
@@ -120,7 +119,7 @@ export const pageTree: Record<string, PageConfig> = {
     anchorId: "region",
   },
 
-  // ✅ Account / Sign-in hub placeholder (optional)
+  // ✅ Account hub placeholder (optional)
   account: {
     Component: LearnConnect,
     backKey: "home",
@@ -128,7 +127,7 @@ export const pageTree: Record<string, PageConfig> = {
     anchorId: "account",
   },
 
-  // ✅ Brand/info pages (we’ll rename later; kept for structure)
+  // ✅ Brand/info placeholder (kept)
   about: {
     Component: AboutUsPage,
     backKey: "home",
@@ -136,13 +135,22 @@ export const pageTree: Record<string, PageConfig> = {
     anchorId: "about",
   },
 
-  // ✅ Legal pages stay as-is
-  terms: { Component: TermsPage, backKey: "home", backLabel: "Back to Home", anchorId: "terms" },
-  privacy: { Component: PrivacyPolicy, backKey: "home", backLabel: "Back to Home", anchorId: "privacy" },
+  // ✅ Legal pages
+  terms: {
+    Component: TermsPage,
+    backKey: "home",
+    backLabel: "Back to Home",
+    anchorId: "terms",
+  },
+  privacy: {
+    Component: PrivacyPolicy,
+    backKey: "home",
+    backLabel: "Back to Home",
+    anchorId: "privacy",
+  },
 
   // ------------------------------------------------------------------
   // ✅ SHOP: Category/collection pages (placeholders using existing components)
-  // These will become real collection pages later.
   // ------------------------------------------------------------------
 
   // Shop → Desert Girl Exclusives
@@ -458,7 +466,7 @@ export const pageTree: Record<string, PageConfig> = {
     backLabel: "Back to Shop Occasions",
     anchorId: "date-night",
   },
-  denim-edit: {
+  "denim-edit": {
     Component: CMSPage,
     backKey: "occasions",
     backLabel: "Back to Shop Occasions",
@@ -481,7 +489,6 @@ export const pageTree: Record<string, PageConfig> = {
 /**
  * Hash → canonical page keys
  * These should match nav keys + your router behavior.
- * (Kept export name same; updated values to storefront keys.)
  */
 export const sectionId: Record<string, string> = {
   home: "home",
@@ -546,24 +553,22 @@ export const sectionId: Record<string, string> = {
   "sale-christmas": "sale-christmas",
   "sale-sweater": "sale-sweater",
 
-  // Cowkids subpages
+  // Cowkids
   "kids-graphics": "kids-graphics",
   "mini-darlins": "mini-darlins",
   "mini-buckarros": "mini-buckarros",
   "kids-swim": "kids-swim",
   "kids-home-accessories": "kids-home-accessories",
 
-  // Occasions subpages
+  // Occasions
   galentine: "galentine",
   "date-night": "date-night",
   "denim-edit": "denim-edit",
   "spring-transition": "spring-transition",
   "luck-of-the-cowboy": "luck-of-the-cowboy",
 
-  // Legal
+  // Legal + brand placeholder
   terms: "terms",
   privacy: "privacy",
-
-  // Brand/info (kept)
   about: "about",
 };
