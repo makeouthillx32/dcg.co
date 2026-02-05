@@ -1,10 +1,10 @@
-// app/sign-up/opengraph-image.tsx
+// app/(auth-pages)/sign-up/opengraph-image.tsx
 
 import { ImageResponse } from "next/og";
-import { createServerComponentClient } from "@supabase/auth-helpers-nextjs";
 import { cookies } from "next/headers";
+import { createClient } from "@/utils/supabase/server";
 
-// Settings for OpenGraph size
+// OpenGraph size
 export const size = {
   width: 1200,
   height: 630,
@@ -13,36 +13,50 @@ export const size = {
 // Tell Next.js this is an OpenGraph handler
 export const contentType = "image/png";
 
-export default async function OGImage({ searchParams }: { searchParams: { invite?: string } }) {
-  const cookieStore = cookies();
-  const supabase = createServerComponentClient({ cookies: () => cookieStore });
+type SearchParams = { invite?: string };
 
-  const inviteCode = searchParams?.invite;
+const SITE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  process.env.NEXT_PUBLIC_VERCEL_URL?.startsWith("http")
+    ? process.env.NEXT_PUBLIC_VERCEL_URL
+    : process.env.NEXT_PUBLIC_VERCEL_URL
+    ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
+    : "http://localhost:3000";
 
-  let imageUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/images/default-invite.png`; // fallback image
+const roleToImageMap: Record<string, string> = {
+  admin: "/images/admin-invite.jpg",
+  member: "/images/member-invite.jpg",
+  guest: "/images/guest-invite.jpg",
+};
+
+export default async function OGImage({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}) {
+  // Ensure cookies are available (needed by your server client helper)
+  await cookies();
+
+  const supabase = await createClient();
+  const inviteCode = searchParams?.invite?.trim();
+
+  let imagePath = "/images/default-invite.png";
 
   if (inviteCode) {
-    const { data: invite } = await supabase
+    const { data: invite, error } = await supabase
       .from("invites")
       .select("role_id")
       .eq("code", inviteCode)
       .maybeSingle();
 
-    if (invite?.role_id) {
-      // Map role_id to an image
-      const roleToImageMap: Record<string, string> = {
-        admin1: "/images/admin-invite.jpg",
-        job_coach1: "/images/jobcoach-invite.jpg",
-        client1: "/images/client-invite.jpg",
-        anonymous1: "/images/anonymous-invite.jpg",
-      };
-
-      const matchedImage = roleToImageMap[invite.role_id];
-      if (matchedImage) {
-        imageUrl = `${process.env.NEXT_PUBLIC_SITE_URL}${matchedImage}`;
-      }
+    if (!error && invite?.role_id) {
+      const role = String(invite.role_id);
+      const mapped = roleToImageMap[role];
+      if (mapped) imagePath = mapped;
     }
   }
+
+  const imageUrl = `${SITE_URL}${imagePath}`;
 
   return new ImageResponse(
     (
@@ -53,15 +67,12 @@ export default async function OGImage({ searchParams }: { searchParams: { invite
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "#f9fafb",
-          fontSize: 48,
-          color: "#111827",
+          backgroundColor: "#f9fafb",
           backgroundImage: `url(${imageUrl})`,
           backgroundSize: "cover",
           backgroundPosition: "center",
         }}
-      >
-      </div>
+      />
     ),
     size
   );
