@@ -1,3 +1,4 @@
+// app/(auth-pages)/sign-up/page.tsx
 import { signUpAction } from "@/app/actions";
 import { FormMessage, Message } from "@/components/form-message";
 import { SubmitButton } from "@/components/submit-button";
@@ -5,7 +6,7 @@ import { Input } from "@/components/Layouts/appheader/input";
 import { Label } from "@/components/ui/label";
 import SignInWithGoogle from "@/components/ui/SignInWithGoogle";
 import Link from "next/link";
-import { Mail, Lock, Ticket } from "lucide-react";
+import { Mail, Lock } from "lucide-react";
 import { cookies } from "next/headers";
 import type { Metadata } from "next";
 
@@ -14,25 +15,26 @@ export const metadata: Metadata = {
   description: "Create a new account to access your dashboard.",
 };
 
+type SearchParams = Message & {
+  invite?: string;
+};
+
 export default async function Signup({
   searchParams,
 }: {
-  searchParams: Promise<Message & { invite?: string }>;
+  searchParams: SearchParams;
 }) {
-  const resolvedSearchParams = await searchParams;
-  const cookieData = await cookies();
+  const cookieStore = await cookies();
 
-  // Prefer URL param; fallback to cookie
-  const inviteFromQuery =
-    "invite" in resolvedSearchParams ? (resolvedSearchParams.invite as string | undefined) : undefined;
-
-  const inviteFromCookie = cookieData.get("invite")?.value;
+  // Invite is ONLY via URL; cookie fallback is optional
+  const inviteFromQuery = typeof searchParams?.invite === "string" ? searchParams.invite : "";
+  const inviteFromCookie = cookieStore.get("invite")?.value ?? "";
   const invite = inviteFromQuery || inviteFromCookie || "";
 
-  if ("message" in resolvedSearchParams) {
+  if ("message" in searchParams) {
     return (
       <div className="w-full flex-1 flex items-center min-h-screen justify-center gap-2 p-4">
-        <FormMessage message={resolvedSearchParams} />
+        <FormMessage message={searchParams} />
       </div>
     );
   }
@@ -55,31 +57,8 @@ export default async function Signup({
         </div>
 
         <form className="space-y-6" action={signUpAction}>
-          {/* If invite exists, keep it hidden so actions can use it */}
+          {/* ✅ Hidden invite only (no manual entry) */}
           <input type="hidden" name="invite" value={invite} />
-
-          {/* Optional manual invite field (won’t hurt if empty) */}
-          <div className="space-y-2">
-            <Label
-              htmlFor="invite"
-              className="font-[var(--font-sans)] text-[hsl(var(--foreground))]"
-            >
-              Invite code (optional)
-            </Label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))]">
-                <Ticket size={18} />
-              </span>
-              <Input
-                id="invite"
-                name="invite"
-                type="text"
-                defaultValue={invite}
-                placeholder="Paste invite code if you have one"
-                className="pl-10 border-[hsl(var(--border))] bg-[hsl(var(--input))] text-[hsl(var(--foreground))] font-[var(--font-sans)] rounded-[var(--radius)] focus:ring-[hsl(var(--sidebar-ring))] focus:border-[hsl(var(--sidebar-primary))]"
-              />
-            </div>
-          </div>
 
           <div className="space-y-2">
             <Label
@@ -133,7 +112,7 @@ export default async function Signup({
             Create Account
           </SubmitButton>
 
-          <FormMessage message={resolvedSearchParams} />
+          <FormMessage message={searchParams} />
         </form>
 
         <p className="text-center text-sm mt-6 text-[hsl(var(--muted-foreground))] font-[var(--font-sans)] leading-[1.5]">
@@ -148,11 +127,17 @@ export default async function Signup({
 
         <p className="mt-4 text-center text-xs text-[hsl(var(--muted-foreground))] font-[var(--font-sans)] leading-[1.5]">
           By signing up, you agree to our{" "}
-          <Link href="/terms" className="underline hover:text-[hsl(var(--sidebar-primary))] transition-colors duration-200">
+          <Link
+            href="/terms"
+            className="underline hover:text-[hsl(var(--sidebar-primary))] transition-colors duration-200"
+          >
             Terms
           </Link>{" "}
           and{" "}
-          <Link href="/privacy" className="underline hover:text-[hsl(var(--sidebar-primary))] transition-colors duration-200">
+          <Link
+            href="/privacy"
+            className="underline hover:text-[hsl(var(--sidebar-primary))] transition-colors duration-200"
+          >
             Privacy Policy
           </Link>
           .
