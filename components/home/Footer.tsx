@@ -1,196 +1,108 @@
-//can delete not in use anymore
-
+// can delete not in use anymore
 "use client";
 
 import useLoginSession from "@/lib/useLoginSession";
 import Link from "next/link";
 import { FaInstagram, FaTiktok, FaYoutube, FaLinkedinIn } from "react-icons/fa";
 import { tools } from "@/lib/toolsConfig";
-import { useUserRole } from "@/hooks/useUserRole"; // Use the simpler role hook
+import { useUserRole } from "@/hooks/useUserRole";
 import { useTheme } from "@/app/provider";
 import { useMemo } from "react";
 
 const socialLinks = [
-  { icon: <FaInstagram className="size-5" />, href: 'https://instagram.com/YourPage', label: 'Instagram' },
-  { icon: <FaTiktok className="size-5" />, href: 'https://tiktok.com/@YourPage', label: 'TikTok' },
-  { icon: <FaYoutube className="size-5" />, href: 'https://youtube.com/YourPage', label: 'YouTube' },
-  { icon: <FaLinkedinIn className="size-5" />, href: 'https://linkedin.com/company/YourPage', label: 'LinkedIn' },
+  { icon: <FaInstagram className="size-5" />, href: "https://instagram.com/YourPage", label: "Instagram" },
+  { icon: <FaTiktok className="size-5" />, href: "https://tiktok.com/@YourPage", label: "TikTok" },
+  { icon: <FaYoutube className="size-5" />, href: "https://youtube.com/YourPage", label: "YouTube" },
+  { icon: <FaLinkedinIn className="size-5" />, href: "https://linkedin.com/company/YourPage", label: "LinkedIn" },
 ];
 
 const Footer: React.FC = () => {
   const session = useLoginSession();
   const { themeType } = useTheme();
-  
-  // ✅ Use the simpler useUserRole hook instead of useHallMonitor
-  // This avoids the database schema issues in HallMonitorFactory
+
+  // Kept (per your request) but not used for storefront footer logic
   const { role, isLoading, error } = useUserRole(session?.user?.id);
 
-  console.log('[Footer] Session state:', { 
-    hasSession: !!session,
-    hasUser: !!session?.user,
-    userId: session?.user?.id 
-  });
-
-  console.log('[Footer] UserRole state:', { 
-    role, 
-    isLoading, 
-    error
-  });
-
-  // ✅ Memoize the user section data based on role
-  const userSectionData = useMemo(() => {
-    // No session = no user sections
-    if (!session?.user?.id) {
-      console.log('[Footer] No user session, returning null');
-      return null;
-    }
-
-    // Loading state
-    if (isLoading) {
-      console.log('[Footer] Still loading user data');
-      return {
-        sectionTitle: "Loading...",
-        dashboardText: "Loading Dashboard...",
-        dashboardHref: "/dashboard/me"
-      };
-    }
-
-    // Error or no role
-    if (error || !role) {
-      console.log('[Footer] Error or no role:', { error, role });
-      return {
-        sectionTitle: "For Users",
-        dashboardText: "Dashboard",
-        dashboardHref: "/dashboard/me"
-      };
-    }
-
-    console.log('[Footer] ✅ Role loaded successfully:', role);
-
-    // Return role-specific data using role name from useUserRole
-    switch (role) {
-      case 'admin':
-        return {
-          sectionTitle: "For Admins",
-          dashboardText: "Admin Dashboard",
-          dashboardHref: "/dashboard/me"
-        };
-      case 'jobcoach':
-        return {
-          sectionTitle: "For Job Coaches", 
-          dashboardText: "Coach Dashboard",
-          dashboardHref: "/dashboard/me"
-        };
-      case 'client':
-        return {
-          sectionTitle: "For Clients",
-          dashboardText: "Client Dashboard", 
-          dashboardHref: "/dashboard/me"
-        };
-      case 'user':
-        return {
-          sectionTitle: "For Users",
-          dashboardText: "User Dashboard",
-          dashboardHref: "/dashboard/me"
-        };
-      default:
-        console.log('[Footer] Unknown role, using default:', role);
-        return {
-          sectionTitle: "For Users",
-          dashboardText: "Dashboard",
-          dashboardHref: "/dashboard/me"
-        };
-    }
-  }, [session?.user?.id, isLoading, error, role]); // ✅ Proper dependencies
-
-  // ✅ Define sections based on user session and data
-  const getSections = useMemo(() => {
-    const baseSections = [
+  // Shopify-style link groups
+  const footerSections = useMemo(() => {
+    return [
       {
-        title: "Resources",
+        title: "Shop",
         links: [
-          { name: "Help Center", href: "/help" },
-          { name: "Contact Us", href: "/contact" },
-          { name: "About DART", href: "/about" },
-          { name: "Career Services", href: "/services" },
+          { name: "New Arrivals", href: "/collections/new" },
+          { name: "Best Sellers", href: "/collections/best-sellers" },
+          { name: "Shop All", href: "/collections/all" },
+          { name: "Sale", href: "/collections/sale" },
         ],
       },
+      {
+        title: "Customer Care",
+        links: [
+          { name: "Contact", href: "/contact" },
+          { name: "Shipping", href: "/policies/shipping" },
+          { name: "Returns", href: "/policies/returns" },
+          { name: "FAQ", href: "/faq" },
+        ],
+      },
+      {
+        title: "About",
+        links: [
+          { name: "Our Story", href: "/about" },
+          { name: "Size Guide", href: "/size-guide" },
+          { name: "Store Policies", href: "/policies" },
+        ],
+      },
+      {
+        title: "Account",
+        links: session
+          ? [
+              { name: "My Account", href: "/account" },
+              { name: "Orders", href: "/account/orders" },
+              { name: "Log Out", href: "/auth/logout" },
+            ]
+          : [
+              { name: "Sign In", href: "/sign-in" },
+              { name: "Create Account", href: "/sign-up" },
+              { name: "Track Order", href: "/track" },
+            ],
+      },
     ];
-
-    // ✅ Only show user sections when logged in AND we have role data
-    if (session?.user?.id && userSectionData && userSectionData.sectionTitle !== "Loading...") {
-      console.log('[Footer] Building sections with user data:', userSectionData);
-      
-      return [
-        {
-          title: userSectionData.sectionTitle,
-          links: [
-            { name: "CMS App", href: "/CMS" },
-            { name: userSectionData.dashboardText, href: userSectionData.dashboardHref },
-          ],
-        },
-        {
-          title: "Tools",
-          links: tools.map(({ name, path }) => ({ name, href: path })),
-        },
-        ...baseSections,
-      ];
-    }
-
-    console.log('[Footer] No user data or still loading, returning base sections only');
-    return baseSections;
-  }, [session?.user?.id, userSectionData]);
+  }, [session]);
 
   const legalLinks = [
-    { name: "Privacy Policy", href: "/privacy" },
-    { name: "Terms & Conditions", href: "/terms" },
+    { name: "Privacy Policy", href: "/policies/privacy" },
+    { name: "Terms", href: "/policies/terms" },
   ];
 
-  console.log('[footer] Final render state:', {
-    hasSession: !!session,
-    hasUserData: !!userSectionData,
-    sectionsCount: getSections.length,
-    userSectionData,
-    isLoading,
-    role
-  });
-
   return (
-    <section className="py-16 bg-[var(--background)] text-[var(--foreground)] border-t border-gray-200">
-      <div className="container max-w-7xl mx-auto px-6 sm:px-8 md:px-12 lg:px-16 xl:px-20">
-        <div className="flex w-full flex-col justify-between gap-10 lg:flex-row lg:items-start lg:text-left">
-          {/* Logo and Description Section */}
-          <div className="flex w-full flex-col justify-between gap-6 lg:items-start">
-            {/* Logo */}
-            <div className="flex items-center gap-3 lg:justify-start">
-              <div className="flex items-center">
-                <img
-                  src={
-                    themeType === "dark"
-                      ? "/images/home/dartlogowhite.svg"
-                      : "/images/home/dartlogo.svg"
-                  }
-                  alt="DART Logo"
-                  className="h-12 w-auto"
-                />
-              </div>
+    <footer className="bg-[var(--background)] text-[var(--foreground)] border-t border-[var(--border)]">
+      <div className="mx-auto max-w-7xl px-6 sm:px-8 md:px-12 lg:px-16 xl:px-20">
+        {/* Top */}
+        <div className="grid gap-10 py-14 md:grid-cols-2 lg:grid-cols-5">
+          {/* Brand */}
+          <div className="lg:col-span-1">
+            <div className="flex items-center gap-3">
+              <img
+                src={themeType === "dark" ? "/images/home/dartlogowhite.svg" : "/images/home/dartlogo.svg"}
+                alt="Brand Logo"
+                className="h-10 w-auto"
+              />
             </div>
-            
-            {/* Description */}
-            <p className="max-w-[70%] text-sm text-muted-foreground">
-              Desert Area Resources and Training - Empowering individuals through comprehensive career services and job training programs.
+
+            <p className="mt-4 text-sm text-[var(--muted-foreground)] max-w-sm">
+              Boutique-inspired styles with a desert edge—made for everyday wear, comfort, and confidence.
             </p>
-            
-            {/* Social Links */}
-            <ul className="flex items-center space-x-6 text-muted-foreground">
+
+            {/* Social */}
+            <ul className="mt-5 flex items-center gap-4 text-[var(--muted-foreground)]">
               {socialLinks.map((social, idx) => (
-                <li key={idx} className="font-medium hover:text-primary transition-colors">
-                  <a 
-                    href={social.href} 
+                <li key={idx} className="transition-colors hover:text-[var(--foreground)]">
+                  <a
+                    href={social.href}
                     aria-label={social.label}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+                    className="inline-flex items-center justify-center rounded-full p-2 hover:bg-[var(--accent)] transition-colors"
                   >
                     {social.icon}
                   </a>
@@ -199,18 +111,17 @@ const Footer: React.FC = () => {
             </ul>
           </div>
 
-          {/* Navigation Sections */}
-          <div className="grid w-full gap-6 md:grid-cols-2 lg:grid-cols-3 lg:gap-12">
-            {getSections.map((section, sectionIdx) => (
-              <div key={sectionIdx}>
-                <h3 className="mb-4 font-bold text-[var(--foreground)]">{section.title}</h3>
-                <ul className="space-y-3 text-sm text-muted-foreground">
+          {/* Link columns */}
+          <div className="grid gap-8 md:grid-cols-2 lg:col-span-4 lg:grid-cols-4">
+            {footerSections.map((section, idx) => (
+              <div key={idx}>
+                <h3 className="mb-4 text-sm font-semibold tracking-wide text-[var(--foreground)]">
+                  {section.title}
+                </h3>
+                <ul className="space-y-3 text-sm text-[var(--muted-foreground)]">
                   {section.links.map((link, linkIdx) => (
-                    <li
-                      key={linkIdx}
-                      className="font-medium hover:text-primary transition-colors"
-                    >
-                      <Link href={link.href} className="hover:underline">
+                    <li key={linkIdx} className="hover:text-[var(--foreground)] transition-colors">
+                      <Link href={link.href} className="hover:underline underline-offset-4">
                         {link.name}
                       </Link>
                     </li>
@@ -219,17 +130,47 @@ const Footer: React.FC = () => {
               </div>
             ))}
           </div>
+
+          {/* Newsletter (very Shopify) */}
+          <div className="md:col-span-2 lg:col-span-5 border-t border-[var(--border)] pt-10">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <h4 className="text-sm font-semibold text-[var(--foreground)]">Get updates</h4>
+                <p className="mt-1 text-sm text-[var(--muted-foreground)]">
+                  New drops, restocks, and exclusive offers—no spam.
+                </p>
+              </div>
+
+              <form
+                onSubmit={(e) => e.preventDefault()}
+                className="flex w-full max-w-xl flex-col gap-3 sm:flex-row"
+              >
+                <input
+                  type="email"
+                  placeholder="Email address"
+                  className="w-full rounded-lg border border-[var(--input)] bg-[var(--card)] px-4 py-2 text-sm text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                />
+                <button
+                  type="submit"
+                  className="rounded-lg bg-[var(--primary)] px-5 py-2 text-sm font-semibold text-[var(--primary-foreground)] hover:opacity-95 transition-opacity"
+                >
+                  Subscribe
+                </button>
+              </form>
+            </div>
+          </div>
         </div>
 
-        {/* Bottom Section - Copyright and Legal Links */}
-        <div className="mt-12 flex flex-col justify-between gap-4 border-t border-gray-200 py-8 text-xs font-medium text-muted-foreground md:flex-row md:items-center md:text-left">
-          <p className="order-2 lg:order-1">
-            © {new Date().getFullYear()} Desert Area Resources and Training (DART). All rights reserved.
+        {/* Bottom */}
+        <div className="flex flex-col gap-4 border-t border-[var(--border)] py-8 text-xs text-[var(--muted-foreground)] md:flex-row md:items-center md:justify-between">
+          <p>
+            © {new Date().getFullYear()} DesertCowgirl. All rights reserved.
           </p>
-          <ul className="order-1 flex flex-col gap-4 md:order-2 md:flex-row md:gap-6">
+
+          <ul className="flex flex-col gap-3 md:flex-row md:gap-6">
             {legalLinks.map((link, idx) => (
-              <li key={idx} className="hover:text-primary transition-colors">
-                <Link href={link.href} className="hover:underline">
+              <li key={idx} className="hover:text-[var(--foreground)] transition-colors">
+                <Link href={link.href} className="hover:underline underline-offset-4">
                   {link.name}
                 </Link>
               </li>
@@ -237,7 +178,7 @@ const Footer: React.FC = () => {
           </ul>
         </div>
       </div>
-    </section>
+    </footer>
   );
 };
 
