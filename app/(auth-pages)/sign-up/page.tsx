@@ -1,10 +1,10 @@
 // app/(auth-pages)/sign-up/page.tsx
 import { signUpAction } from "@/app/actions";
-import { FormMessage, Message } from "@/components/form-message";
 import { SubmitButton } from "@/components/submit-button";
 import { Input } from "@/components/Layouts/appheader/input";
 import { Label } from "@/components/ui/label";
 import SignInWithGoogle from "@/components/ui/SignInWithGoogle";
+import AuthToasts from "@/components/auth/AuthToasts";
 import Link from "next/link";
 import { Mail, Lock } from "lucide-react";
 import { cookies } from "next/headers";
@@ -15,23 +15,21 @@ export const metadata: Metadata = {
   description: "Create a new account to access your dashboard.",
 };
 
-// ✅ Next App Router: searchParams is an object, not a Promise
-type SearchParams = Message & { invite?: string };
+type SearchParams = { invite?: string; error?: string; success?: string };
 
-export default async function Signup({
-  searchParams,
-}: {
-  searchParams: SearchParams;
-}) {
+export default async function Signup({ searchParams }: { searchParams: SearchParams }) {
   const cookieStore = await cookies();
 
-  // Invite is ONLY via URL; cookie fallback is optional
+  // Invite is ONLY via URL (cookie fallback optional)
   const inviteFromQuery = typeof searchParams?.invite === "string" ? searchParams.invite : "";
   const inviteFromCookie = cookieStore.get("invite")?.value ?? "";
   const invite = inviteFromQuery || inviteFromCookie || "";
 
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-[hsl(var(--background))] via-[hsl(var(--muted))] to-[hsl(var(--accent))] px-4 md:px-6 lg:px-12">
+      {/* ✅ Convert ?success= / ?error= into react-hot-toast and then clean the URL */}
+      <AuthToasts />
+
       <div className="mx-auto w-full max-w-2xl rounded-[var(--radius)] bg-[hsl(var(--card))] shadow-[var(--shadow-xl)] p-8 md:p-10">
         <h1 className="text-3xl md:text-4xl font-[var(--font-serif)] font-bold text-center text-[hsl(var(--sidebar-primary))] mb-6 leading-[1.2]">
           Create an Account
@@ -52,10 +50,7 @@ export default async function Signup({
           <input type="hidden" name="invite" value={invite} />
 
           <div className="space-y-2">
-            <Label
-              htmlFor="email"
-              className="font-[var(--font-sans)] text-[hsl(var(--foreground))]"
-            >
+            <Label htmlFor="email" className="font-[var(--font-sans)] text-[hsl(var(--foreground))]">
               Email address
             </Label>
             <div className="relative">
@@ -74,10 +69,7 @@ export default async function Signup({
           </div>
 
           <div className="space-y-2">
-            <Label
-              htmlFor="password"
-              className="font-[var(--font-sans)] text-[hsl(var(--foreground))]"
-            >
+            <Label htmlFor="password" className="font-[var(--font-sans)] text-[hsl(var(--foreground))]">
               Password
             </Label>
             <div className="relative">
@@ -102,34 +94,22 @@ export default async function Signup({
           >
             Create Account
           </SubmitButton>
-
-          {/* ✅ Always render so redirects show messages without layout switching */}
-          <FormMessage message={searchParams} />
         </form>
 
         <p className="text-center text-sm mt-6 text-[hsl(var(--muted-foreground))] font-[var(--font-sans)] leading-[1.5]">
           Already have an account?{" "}
-          <Link
-            href="/sign-in"
-            className="text-[hsl(var(--sidebar-primary))] hover:underline transition-all duration-200"
-          >
+          <Link href="/sign-in" className="text-[hsl(var(--sidebar-primary))] hover:underline transition-all duration-200">
             Sign in
           </Link>
         </p>
 
         <p className="mt-4 text-center text-xs text-[hsl(var(--muted-foreground))] font-[var(--font-sans)] leading-[1.5]">
           By signing up, you agree to our{" "}
-          <Link
-            href="/terms"
-            className="underline hover:text-[hsl(var(--sidebar-primary))] transition-colors duration-200"
-          >
+          <Link href="/terms" className="underline hover:text-[hsl(var(--sidebar-primary))] transition-colors duration-200">
             Terms
           </Link>{" "}
           and{" "}
-          <Link
-            href="/privacy"
-            className="underline hover:text-[hsl(var(--sidebar-primary))] transition-colors duration-200"
-          >
+          <Link href="/privacy" className="underline hover:text-[hsl(var(--sidebar-primary))] transition-colors duration-200">
             Privacy Policy
           </Link>
           .
