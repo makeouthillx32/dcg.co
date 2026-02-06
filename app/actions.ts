@@ -2,9 +2,9 @@
 
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
+import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
 import { encodedRedirect } from "@/utils/utils";
-import { cookies } from "next/headers";
 import { sendNotification } from "@/lib/notifications";
 
 const VALID_ROLES = ["admin", "member", "guest"] as const;
@@ -54,7 +54,6 @@ const populateUserCookies = async (userId: string, remember: boolean = false) =>
     const store = await cookies();
     const cookieOptions = await getCookieOptions(remember);
 
-    // ✅ Only select fields you actually need
     const { data: profileData, error: profileError } = await supabase
       .from("profiles")
       .select("role, display_name, department")
@@ -107,7 +106,6 @@ const populateUserCookies = async (userId: string, remember: boolean = false) =>
 export const signUpAction = async (formData: FormData) => {
   const email = formData.get("email")?.toString().trim();
   const password = formData.get("password")?.toString();
-  const inviteCode = formData.get("invite")?.toString().trim();
 
   if (!email || !password) {
     return encodedRedirect("error", "/sign-up", "Email and password are required.");
@@ -117,13 +115,11 @@ export const signUpAction = async (formData: FormData) => {
   const headerList = await headers();
   const origin = headerList.get("origin") || "";
 
-  // 1) Create auth user
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
       emailRedirectTo: `${origin}/auth/callback/oauth`,
-      data: inviteCode ? { invite: inviteCode } : {},
     },
   });
 
@@ -134,45 +130,24 @@ export const signUpAction = async (formData: FormData) => {
 
   const userId = data.user.id;
 
-  // 2) Decide role (default member)
-  let finalRole: ValidRole = "member";
-
-  if (inviteCode) {
-    const { data: inviteData, error: inviteError } = await supabase
-      .from("invites")
-      .select("role_id")
-      .eq("code", inviteCode)
-      .maybeSingle();
-
-    if (!inviteError && inviteData?.role_id) {
-      finalRole = normalizeRole(inviteData.role_id);
-    }
-  }
-
-  // 3) Ensure profile exists + role set
-  // ✅ NO avatar_url, no images
+  // Create/ensure profile row with DEFAULT role that matches your CHECK constraint.
+  // NOTE: your DB constraint only allows admin/member/guest.
   const { error: profileUpsertError } = await supabase
     .from("profiles")
     .upsert(
       {
         id: userId,
-        role: finalRole,
+        role: "member" as ValidRole,
       },
       { onConflict: "id" }
     );
 
   if (profileUpsertError) {
     console.error("[Auth] ❌ Profile upsert failed:", profileUpsertError.message);
-    // IMPORTANT: stop here so you *see* the DB issue
     return encodedRedirect("error", "/sign-up", profileUpsertError.message);
   }
 
-  // 4) Consume invite if used
-  if (inviteCode) {
-    await supabase.from("invites").delete().eq("code", inviteCode);
-  }
-
-  // 5) Optional notification (✅ no subtitle/imageUrl)
+  // Optional notification (no subtitle/image)
   try {
     await sendNotification({
       title: `${email} signed up`,
@@ -180,23 +155,25 @@ export const signUpAction = async (formData: FormData) => {
     });
   } catch (err) {
     console.error("[Auth] ⚠️ Notification failed:", err);
-    // do not fail signup for notifications
   }
 
+  // ✅ send them to sign-in, not back to sign-up
+  // If email verification is ON, this message is correct.
   return encodedRedirect(
     "success",
-    "/sign-up",
-    "Thanks for signing up! Please check your email to verify your account."
+    "/sign-in",
+    "Account created. Please check your email to verify, then sign in."
   );
 };
 
 export const signInAction = async (formData: FormData) => {
   const email = formData.get("email")?.toString().trim() || "";
   const password = formData.get("password")?.toString() || "";
+
+  // Checkbox should be: name="remember" value="true"
   const remember = formData.get("remember") === "true";
 
   const supabase = await createClient();
-
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
