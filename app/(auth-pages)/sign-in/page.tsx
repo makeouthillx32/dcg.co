@@ -8,20 +8,17 @@ import { Label } from "@/components/ui/label";
 import SignInWithGoogle from "@/components/ui/SignInWithGoogle";
 import { Mail, Lock } from "lucide-react";
 
+type SearchParams = Message;
+
 export default async function SignInPage({
   searchParams,
 }: {
-  searchParams: Promise<Message>;
+  searchParams: SearchParams;
 }) {
-  const resolvedSearchParams = await searchParams;
-
-  // ✅ Keep FormMessage rendered on the page so redirects like:
-  // /sign-in?success=... or /sign-in?error=...
-  // show the toast/message without changing layout.
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-[hsl(var(--background))] via-[hsl(var(--muted))] to-[hsl(var(--accent))] px-4 md:px-6 lg:px-12">
-      <div className="mx-auto w-full max-w-2xl rounded-[var(--radius)] bg-[hsl(var(--card))] shadow-[var(--shadow-xl)] p-8 md:p-10">
-        <h1 className="text-3xl md:text-4xl font-[var(--font-serif)] font-bold text-center text-[hsl(var(--sidebar-primary))] mb-6 leading-[1.2]">
+      <div className="mx-auto w-full max-w-md rounded-[var(--radius)] bg-[hsl(var(--card))] shadow-[var(--shadow-xl)] p-6 md:p-8">
+        <h1 className="text-2xl md:text-3xl font-[var(--font-serif)] font-bold text-center text-[hsl(var(--foreground))] mb-6 leading-[1.2]">
           Welcome Back
         </h1>
 
@@ -35,13 +32,13 @@ export default async function SignInPage({
           <div className="flex-grow border-t border-[hsl(var(--border))]" />
         </div>
 
-        <form className="space-y-6" action={signInAction}>
+        <form className="space-y-5" action={signInAction}>
           <div className="space-y-2">
             <Label
               htmlFor="email"
               className="font-[var(--font-sans)] text-[hsl(var(--foreground))]"
             >
-              Email address
+              Email
             </Label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))]">
@@ -80,7 +77,6 @@ export default async function SignInPage({
             </div>
           </div>
 
-          {/* IMPORTANT: name must be "remember" to match signInAction */}
           <div className="flex items-center justify-between">
             <label className="flex items-center gap-2 text-sm font-[var(--font-sans)] text-[hsl(var(--muted-foreground))]">
               <input
@@ -107,11 +103,11 @@ export default async function SignInPage({
             Sign in
           </SubmitButton>
 
-          {/* ✅ Always render so success/error from redirect shows */}
-          <FormMessage message={resolvedSearchParams} />
+          {/* ✅ Always show messages (error/success) from the URL */}
+          <FormMessage message={searchParams} />
         </form>
 
-        <p className="text-center text-sm mt-6 text-[hsl(var(--muted-foreground))] font-[var(--font-sans)] leading-[1.5]">
+        <p className="mt-6 text-center text-sm text-[hsl(var(--muted-foreground))] font-[var(--font-sans)] leading-[1.5]">
           Don&apos;t have an account?{" "}
           <Link
             href="/sign-up"
@@ -127,10 +123,7 @@ export default async function SignInPage({
             Terms
           </Link>{" "}
           and{" "}
-          <Link
-            href="/privacy"
-            className="underline hover:text-[hsl(var(--sidebar-primary))]"
-          >
+          <Link href="/privacy" className="underline hover:text-[hsl(var(--sidebar-primary))]">
             Privacy Policy
           </Link>
           .
