@@ -1,22 +1,17 @@
-// app/(auth-pages)/sign-in/page.tsx
 import Link from "next/link";
 import { signInAction } from "@/app/actions";
-import { FormMessage, Message } from "@/components/form-message";
 import { SubmitButton } from "@/components/submit-button";
 import { Input } from "@/components/Layouts/appheader/input";
 import { Label } from "@/components/ui/label";
 import SignInWithGoogle from "@/components/ui/SignInWithGoogle";
 import { Mail, Lock } from "lucide-react";
+import AuthToasts from "@/components/auth/AuthToasts";
 
-type SearchParams = Message;
-
-export default async function SignInPage({
-  searchParams,
-}: {
-  searchParams: SearchParams;
-}) {
+export default async function SignInPage() {
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-[hsl(var(--background))] via-[hsl(var(--muted))] to-[hsl(var(--accent))] px-4 md:px-6 lg:px-12">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[hsl(var(--background))] via-[hsl(var(--muted))] to-[hsl(var(--accent))] px-4 md:px-6 lg:px-12">
+      <AuthToasts />
+
       <div className="mx-auto w-full max-w-md rounded-[var(--radius)] bg-[hsl(var(--card))] shadow-[var(--shadow-xl)] p-6 md:p-8">
         <h1 className="text-2xl md:text-3xl font-[var(--font-serif)] font-bold text-center text-[hsl(var(--foreground))] mb-6 leading-[1.2]">
           Welcome Back
@@ -34,10 +29,7 @@ export default async function SignInPage({
 
         <form className="space-y-5" action={signInAction}>
           <div className="space-y-2">
-            <Label
-              htmlFor="email"
-              className="font-[var(--font-sans)] text-[hsl(var(--foreground))]"
-            >
+            <Label htmlFor="email" className="font-[var(--font-sans)] text-[hsl(var(--foreground))]">
               Email
             </Label>
             <div className="relative">
@@ -56,10 +48,7 @@ export default async function SignInPage({
           </div>
 
           <div className="space-y-2">
-            <Label
-              htmlFor="password"
-              className="font-[var(--font-sans)] text-[hsl(var(--foreground))]"
-            >
+            <Label htmlFor="password" className="font-[var(--font-sans)] text-[hsl(var(--foreground))]">
               Password
             </Label>
             <div className="relative">
@@ -79,12 +68,7 @@ export default async function SignInPage({
 
           <div className="flex items-center justify-between">
             <label className="flex items-center gap-2 text-sm font-[var(--font-sans)] text-[hsl(var(--muted-foreground))]">
-              <input
-                type="checkbox"
-                name="remember"
-                value="true"
-                className="h-4 w-4 rounded border-[hsl(var(--border))]"
-              />
+              <input type="checkbox" name="remember" value="true" className="h-4 w-4 rounded border-[hsl(var(--border))]" />
               Remember me
             </label>
 
@@ -102,17 +86,11 @@ export default async function SignInPage({
           >
             Sign in
           </SubmitButton>
-
-          {/* ✅ Always show messages (error/success) from the URL */}
-          <FormMessage message={searchParams} />
         </form>
 
         <p className="mt-6 text-center text-sm text-[hsl(var(--muted-foreground))] font-[var(--font-sans)] leading-[1.5]">
           Don&apos;t have an account?{" "}
-          <Link
-            href="/sign-up"
-            className="text-[hsl(var(--sidebar-primary))] hover:underline transition-colors font-medium"
-          >
+          <Link href="/sign-up" className="text-[hsl(var(--sidebar-primary))] hover:underline transition-colors font-medium">
             Sign up
           </Link>
         </p>
