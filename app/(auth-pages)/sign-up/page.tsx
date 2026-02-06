@@ -15,9 +15,8 @@ export const metadata: Metadata = {
   description: "Create a new account to access your dashboard.",
 };
 
-type SearchParams = Message & {
-  invite?: string;
-};
+// ✅ Next App Router: searchParams is an object, not a Promise
+type SearchParams = Message & { invite?: string };
 
 export default async function Signup({
   searchParams,
@@ -31,16 +30,8 @@ export default async function Signup({
   const inviteFromCookie = cookieStore.get("invite")?.value ?? "";
   const invite = inviteFromQuery || inviteFromCookie || "";
 
-  if ("message" in searchParams) {
-    return (
-      <div className="w-full flex-1 flex items-center min-h-screen justify-center gap-2 p-4">
-        <FormMessage message={searchParams} />
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[hsl(var(--background))] via-[hsl(var(--muted))] to-[hsl(var(--accent))] px-4 md:px-6 lg:px-12">
+    <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-[hsl(var(--background))] via-[hsl(var(--muted))] to-[hsl(var(--accent))] px-4 md:px-6 lg:px-12">
       <div className="mx-auto w-full max-w-2xl rounded-[var(--radius)] bg-[hsl(var(--card))] shadow-[var(--shadow-xl)] p-8 md:p-10">
         <h1 className="text-3xl md:text-4xl font-[var(--font-serif)] font-bold text-center text-[hsl(var(--sidebar-primary))] mb-6 leading-[1.2]">
           Create an Account
@@ -112,6 +103,7 @@ export default async function Signup({
             Create Account
           </SubmitButton>
 
+          {/* ✅ Always render so redirects show messages without layout switching */}
           <FormMessage message={searchParams} />
         </form>
 
