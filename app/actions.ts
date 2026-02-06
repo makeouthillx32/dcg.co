@@ -10,9 +10,6 @@ import { sendNotification } from "@/lib/notifications";
 const VALID_ROLES = ["admin", "member", "guest"] as const;
 type ValidRole = (typeof VALID_ROLES)[number];
 
-const DEFAULT_AVATAR =
-  "https://chsmesvozsjcgrwuimld.supabase.co/storage/v1/object/public/avatars/Default.png";
-
 const getCookieOptions = async (remember: boolean) => {
   const headerList = await headers();
   const origin = headerList.get("origin") || "";
@@ -57,9 +54,10 @@ const populateUserCookies = async (userId: string, remember: boolean = false) =>
     const store = await cookies();
     const cookieOptions = await getCookieOptions(remember);
 
+    // ✅ Only select fields you actually need
     const { data: profileData, error: profileError } = await supabase
       .from("profiles")
-      .select("role, display_name, department, avatar_url")
+      .select("role, display_name, department")
       .eq("id", userId)
       .single();
 
@@ -124,7 +122,6 @@ export const signUpAction = async (formData: FormData) => {
     email,
     password,
     options: {
-      // keep your callback route if that’s what your project uses
       emailRedirectTo: `${origin}/auth/callback/oauth`,
       data: inviteCode ? { invite: inviteCode } : {},
     },
@@ -152,20 +149,22 @@ export const signUpAction = async (formData: FormData) => {
     }
   }
 
-  // 3) Ensure profile exists + role set (UPSERT so it works even if profile row doesn’t exist yet)
+  // 3) Ensure profile exists + role set
+  // ✅ NO avatar_url, no images
   const { error: profileUpsertError } = await supabase
     .from("profiles")
     .upsert(
       {
         id: userId,
         role: finalRole,
-        avatar_url: DEFAULT_AVATAR,
       },
       { onConflict: "id" }
     );
 
   if (profileUpsertError) {
     console.error("[Auth] ❌ Profile upsert failed:", profileUpsertError.message);
+    // IMPORTANT: stop here so you *see* the DB issue
+    return encodedRedirect("error", "/sign-up", profileUpsertError.message);
   }
 
   // 4) Consume invite if used
@@ -173,19 +172,17 @@ export const signUpAction = async (formData: FormData) => {
     await supabase.from("invites").delete().eq("code", inviteCode);
   }
 
-  // 5) Optional notification
+  // 5) Optional notification (✅ no subtitle/imageUrl)
   try {
     await sendNotification({
       title: `${email} signed up`,
-      subtitle: `Role: ${finalRole}`,
-      imageUrl: DEFAULT_AVATAR,
       role_admin: true,
     });
   } catch (err) {
     console.error("[Auth] ⚠️ Notification failed:", err);
+    // do not fail signup for notifications
   }
 
-  // 6) Supabase email confirm flow
   return encodedRedirect(
     "success",
     "/sign-up",
