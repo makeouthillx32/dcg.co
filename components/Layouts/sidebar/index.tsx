@@ -19,7 +19,9 @@ export function Sidebar() {
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
 
   const toggleExpanded = (title: string) => {
-    setExpandedItems((prev) => (prev.includes(title) ? [] : [title]));
+    setExpandedItems((prev) =>
+      prev.includes(title) ? [] : [title]
+    );
   };
 
   useEffect(() => {
@@ -37,8 +39,7 @@ export function Sidebar() {
         })
       )
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname, base]);
+  }, [pathname]);
 
   return (
     <>
@@ -53,36 +54,26 @@ export function Sidebar() {
 
       <aside
         className={cn(
-          "overflow-hidden border-r border-[hsl(var(--border))] bg-[hsl(var(--sidebar))] dark:border-[hsl(var(--sidebar-border))] dark:bg-[hsl(var(--card))]",
-          "transition-all duration-200 ease-linear",
-          // Desktop: pinned sidebar
-          !isMobile && "sticky top-0 h-screen w-[290px]",
-          // Mobile: off-canvas drawer
-          isMobile &&
-            cn(
-              "fixed left-0 top-0 z-50 h-full w-[290px] max-w-[90vw] will-change-transform",
-              isOpen ? "translate-x-0" : "-translate-x-full"
-            )
+          "max-w-[290px] overflow-hidden border-r border-[hsl(var(--border))] bg-[hsl(var(--sidebar))] transition-[width] duration-200 ease-linear dark:border-[hsl(var(--sidebar-border))] dark:bg-[hsl(var(--card))]",
+          isMobile ? "fixed bottom-0 top-0 z-50" : "sticky top-0 h-screen",
+          isOpen ? "w-full" : "w-0"
         )}
         aria-label="Main navigation"
-        aria-hidden={isMobile ? !isOpen : false}
-        {...(isMobile && !isOpen ? ({ inert: "" } as any) : {})}
+        aria-hidden={!isOpen}
+        inert={!isOpen}
       >
         <div className="flex h-full flex-col py-10 pl-[25px] pr-[7px]">
           <div className="relative pr-4.5">
             <Link
               href={"/"}
-              onClick={() => {
-                if (isMobile) toggleSidebar();
-              }}
-              className="min-[850px]:py-0 px-0 py-2.5"
+              onClick={() => isMobile && toggleSidebar()}
+              className="px-0 py-2.5 min-[850px]:py-0"
             >
               <Logo />
             </Link>
 
             {isMobile && (
               <button
-                type="button"
                 onClick={toggleSidebar}
                 className="absolute left-3/4 right-4.5 top-1/2 -translate-y-1/2 text-right text-[hsl(var(--sidebar-foreground))]"
               >
@@ -117,7 +108,10 @@ export function Sidebar() {
                                 isActive={isSectionActive}
                                 onClick={() => toggleExpanded(item.title)}
                               >
-                                <item.icon className="size-6 shrink-0" aria-hidden="true" />
+                                <item.icon
+                                  className="size-6 shrink-0"
+                                  aria-hidden="true"
+                                />
                                 <span>{item.title}</span>
                                 <ChevronUp
                                   className={cn(
@@ -129,12 +123,19 @@ export function Sidebar() {
                               </MenuItem>
 
                               {expandedItems.includes(item.title) && (
-                                <ul className="ml-9 mr-0 space-y-1.5 pb-[15px] pr-0 pt-2" role="menu">
+                                <ul
+                                  className="ml-9 mr-0 space-y-1.5 pb-[15px] pr-0 pt-2"
+                                  role="menu"
+                                >
                                   {item.items.map((subItem) => {
                                     const href = `${base}${subItem.url}`;
                                     return (
                                       <li key={subItem.title} role="none">
-                                        <MenuItem as="link" href={href} isActive={pathname === href}>
+                                        <MenuItem
+                                          as="link"
+                                          href={href}
+                                          isActive={pathname === href}
+                                        >
                                           <span>{subItem.title}</span>
                                         </MenuItem>
                                       </li>
@@ -161,7 +162,10 @@ export function Sidebar() {
                             href={href}
                             isActive={pathname === href}
                           >
-                            <item.icon className="size-6 shrink-0" aria-hidden="true" />
+                            <item.icon
+                              className="size-6 shrink-0"
+                              aria-hidden="true"
+                            />
                             <span>{item.title}</span>
                           </MenuItem>
                         </li>

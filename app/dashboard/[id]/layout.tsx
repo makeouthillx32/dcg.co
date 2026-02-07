@@ -1,7 +1,8 @@
 // app/dashboard/[id]/layout.tsx
+"use client";
 
 import "@/css/satoshi.css";
-import "@/app/globals.css";
+import "@/app/globals.css"; // Import the global CSS that contains your CSS variables
 
 import { Sidebar } from "@/components/Layouts/sidebar";
 import { Header } from "@/components/Layouts/header";

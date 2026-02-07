@@ -6,7 +6,7 @@ export function OverviewCardsSkeleton() {
       {Array.from({ length: 4 }).map((_, i) => (
         <div
           key={i}
-          className="rounded-[var(--radius)] bg-[hsl(var(--background))] p-6 shadow-[var(--shadow-sm)] dark:bg-[hsl(var(--card))]"
+          className="rounded-[var(--radius)] bg-[hsl(var(--background))] p-6 shadow-[var(--shadow-sm)] dark:bg-[hsl(var(--card))] dark:shadow-[var(--shadow-md)]"
         >
           <Skeleton className="size-12 rounded-full" />
 

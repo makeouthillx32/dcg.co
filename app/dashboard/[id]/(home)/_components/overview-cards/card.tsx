@@ -15,7 +15,7 @@ export function OverviewCard({ label, data, Icon }: PropsType) {
   const isDecreasing = data.growthRate < 0;
 
   return (
-    <div className="rounded-[var(--radius)] bg-[hsl(var(--background))] p-6 shadow-[var(--shadow-sm)] dark:bg-[hsl(var(--card))]">
+    <div className="rounded-[var(--radius)] bg-[hsl(var(--background))] p-6 shadow-[var(--shadow-sm)] dark:bg-[hsl(var(--card))] dark:shadow-[var(--shadow-md)]">
       <Icon className="text-[hsl(var(--sidebar-primary))]" />
 
       <div className="mt-6 flex items-end justify-between">
