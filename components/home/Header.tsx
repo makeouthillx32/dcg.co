@@ -20,15 +20,20 @@ const Header: React.FC<HeaderProps> = ({ navigateTo }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { themeType } = useTheme();
 
+  const handleAccountClick = () => {
+    window.location.href = "/profile/me";
+  };
+
   return (
-    <div className="relative"> {/* Add relative positioning container */}
+    <div className="relative">
+      {/* Add relative positioning container */}
       <header className="header-container bg-background text-foreground border-border">
         <div className="header-content">
           {/* Left: Logo */}
           <div className="header-logo">
-            <a 
-              href="#" 
-              onClick={navigateTo("home")} 
+            <a
+              href="#"
+              onClick={navigateTo("home")}
               className="logo-link focus:ring-primary"
             >
               <img
@@ -61,10 +66,10 @@ const Header: React.FC<HeaderProps> = ({ navigateTo }) => {
                 </a>
               ) : (
                 <button
-                  onClick={() => (window.location.href = "/auth/logout")}
-                  className="auth-button text-destructive hover:text-destructive focus:ring-destructive"
+                  onClick={handleAccountClick}
+                  className="auth-button text-accent hover:text-accent focus:ring-accent"
                 >
-                  Log Out
+                  Account
                 </button>
               )}
             </div>
