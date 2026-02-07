@@ -1,11 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import {
-  MdExpandMore,
-  MdChevronRight,
-  MdArrowForwardIos,
-} from "react-icons/md";
+import { MdExpandMore, MdChevronRight, MdArrowForwardIos } from "react-icons/md";
 import { navTree } from "@/lib/navTree";
 import "./_components/Mobile.scss";
 
@@ -46,29 +42,33 @@ export default function MobileDrawer({
     }, 400); // Match the animation duration
   };
 
-  const handleClickAndClose = (key: string) => (e: React.MouseEvent<HTMLAnchorElement>) => {
-    navigateTo(key)(e);
+  const handleClickAndClose =
+    (key: string) => (e: React.MouseEvent<HTMLAnchorElement>) => {
+      navigateTo(key)(e);
+      handleClose();
+    };
+
+  const handleAccountClick = () => {
+    window.location.href = "/profile/me";
     handleClose();
   };
 
   return (
-    /* Remove the backdrop completely - let the drawer handle everything */
     <div
       ref={menuRef}
-      className={`drawer-content md:hidden
-        ${isClosing ? "animate-slide-up" : "animate-slide-down"}`}
+      className={`drawer-content md:hidden ${
+        isClosing ? "animate-slide-up" : "animate-slide-down"
+      }`}
       style={{
-        // Position relative to the header, not fixed to viewport
-        position: 'absolute',
-        top: '100%', // Position directly below the header
+        position: "absolute",
+        top: "100%",
         left: 0,
         right: 0,
         zIndex: 50,
-        maxHeight: 'calc(100vh - 4rem)',
-        overflowY: 'auto',
-        // Ensure no backdrop effects
-        backdropFilter: 'none',
-        WebkitBackdropFilter: 'none'
+        maxHeight: "calc(100vh - 4rem)",
+        overflowY: "auto",
+        backdropFilter: "none",
+        WebkitBackdropFilter: "none",
       }}
     >
       <div className="mobile-menu-container bg-background border-b border-border shadow-lg rounded-b-xl">
@@ -82,6 +82,7 @@ export default function MobileDrawer({
               >
                 {node.label}
               </a>
+
               {node.children ? (
                 <button
                   onClick={() => toggleExpand(node.key)}
@@ -130,13 +131,10 @@ export default function MobileDrawer({
             </a>
           ) : (
             <button
-              onClick={() => {
-                window.location.href = "/auth/logout";
-                handleClose();
-              }}
-              className="auth-button text-destructive hover:bg-secondary"
+              onClick={handleAccountClick}
+              className="auth-button text-accent hover:bg-secondary"
             >
-              Log Out
+              Account
             </button>
           )}
         </div>
