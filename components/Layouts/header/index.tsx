@@ -7,7 +7,6 @@ import { useSidebarContext } from "../sidebar/sidebar-context";
 import { MenuIcon } from "./icons";
 import { Notification } from "./notification";
 import { ThemeToggleSwitch } from "./theme-toggle";
-import { UserInfo } from "./user-info";
 import SwitchtoDarkMode from "@/components/SwitchtoDarkMode";
 
 export function Header() {
@@ -24,9 +23,9 @@ export function Header() {
       </button>
 
       {isMobile && (
-        <Link href={"/"} className="ml-2 max-[430px]:hidden min-[375px]:ml-4">
+        <Link href="/" className="ml-2 max-[430px]:hidden min-[375px]:ml-4">
           <Image
-            src={"/images/logo/logo-icon.svg"}
+            src="/images/logo/logo-icon.svg"
             width={50}
             height={50}
             alt="Logo"
@@ -39,7 +38,9 @@ export function Header() {
         <h1 className="mb-0.5 text-heading-5 font-bold text-[hsl(var(--foreground))] dark:text-[hsl(var(--card-foreground))]">
           Dashboard
         </h1>
-        <p className="font-medium text-[hsl(var(--muted-foreground))] dark:text-[hsl(var(--muted-foreground))]">DART Dashboard</p>
+        <p className="font-medium text-[hsl(var(--muted-foreground))] dark:text-[hsl(var(--muted-foreground))]">
+          DART Dashboard
+        </p>
       </div>
 
       <div className="flex flex-1 items-center justify-end gap-2 min-[375px]:gap-4">
@@ -52,17 +53,11 @@ export function Header() {
           <SearchIcon className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 max-[1015px]:size-5" />
         </div>
 
-        {/* Wrap theme toggle to prevent size constraints */}
         <div className="flex items-center justify-center">
           {isMobile ? <SwitchtoDarkMode /> : <ThemeToggleSwitch />}
         </div>
 
-        {/* This will show the notification bell with dot */}
         <Notification />
-
-        <div className="shrink-0">
-          <UserInfo />
-        </div>
       </div>
     </header>
   );
