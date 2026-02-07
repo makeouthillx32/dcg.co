@@ -1,3 +1,4 @@
+// app/actions.ts
 "use server";
 
 import { redirect } from "next/navigation";
@@ -47,7 +48,6 @@ const normalizeRole = (role: unknown): ValidRole => {
   return "member";
 };
 
-// Populates role/permission cookies based on profiles row
 const populateUserCookies = async (userId: string, remember: boolean = false) => {
   try {
     const supabase = await createClient();
@@ -79,7 +79,6 @@ const populateUserCookies = async (userId: string, remember: boolean = false) =>
       store.set("userDepartment", profileData.department, cookieOptions);
     }
 
-    // Permissions (optional)
     const rolePermissions = await supabase.rpc("get_role_permissions", {
       user_role_type: role,
     });
@@ -93,7 +92,7 @@ const populateUserCookies = async (userId: string, remember: boolean = false) =>
 
       store.set("userPermissions", JSON.stringify(permissionsData), {
         ...cookieOptions,
-        maxAge: 5 * 60, // 5 minutes
+        maxAge: 5 * 60,
       });
     }
 
@@ -104,11 +103,20 @@ const populateUserCookies = async (userId: string, remember: boolean = false) =>
 };
 
 export const signUpAction = async (formData: FormData) => {
-  const email = formData.get("email")?.toString().trim();
-  const password = formData.get("password")?.toString();
+  const email = formData.get("email")?.toString().trim() || "";
+  const password = formData.get("password")?.toString() || "";
+
+  // NEW: lightweight “storefront” fields
+  const firstName = formData.get("first_name")?.toString().trim() || "";
+  const lastName = formData.get("last_name")?.toString().trim() || "";
 
   if (!email || !password) {
     return encodedRedirect("error", "/sign-up", "Email and password are required.");
+  }
+
+  // If you haven’t added these inputs yet, keep these optional by removing this block.
+  if (!firstName || !lastName) {
+    return encodedRedirect("error", "/sign-up", "First and last name are required.");
   }
 
   const supabase = await createClient();
@@ -119,7 +127,13 @@ export const signUpAction = async (formData: FormData) => {
     email,
     password,
     options: {
+      // keep your callback route
       emailRedirectTo: `${origin}/auth/callback/oauth`,
+      // store in auth metadata too (handy later)
+      data: {
+        first_name: firstName,
+        last_name: lastName,
+      },
     },
   });
 
@@ -129,16 +143,20 @@ export const signUpAction = async (formData: FormData) => {
   }
 
   const userId = data.user.id;
+  const displayName = `${firstName} ${lastName}`.trim();
 
-  // Create/ensure profile row with DEFAULT role that matches your CHECK constraint.
-  // NOTE: your DB constraint only allows admin/member/guest.
+  // Create/ensure profile row. Keep role valid for your CHECK constraint.
   const { error: profileUpsertError } = await supabase
     .from("profiles")
     .upsert(
       {
         id: userId,
         role: "member" as ValidRole,
-      },
+        display_name: displayName,
+        // only include these if columns exist in your DB
+        first_name: firstName,
+        last_name: lastName,
+      } as any,
       { onConflict: "id" }
     );
 
@@ -147,7 +165,7 @@ export const signUpAction = async (formData: FormData) => {
     return encodedRedirect("error", "/sign-up", profileUpsertError.message);
   }
 
-  // Optional notification (no subtitle/image)
+  // Optional notification (don’t block signup)
   try {
     await sendNotification({
       title: `${email} signed up`,
@@ -157,8 +175,21 @@ export const signUpAction = async (formData: FormData) => {
     console.error("[Auth] ⚠️ Notification failed:", err);
   }
 
-  // ✅ send them to sign-in, not back to sign-up
-  // If email verification is ON, this message is correct.
+  /**
+   * IMPORTANT:
+   * - If email verification is OFF, Supabase returns a session (user is effectively logged in).
+   * - If verification is ON, session is usually null until they verify.
+   */
+  const hasSession = !!data.session;
+
+  // If verified is OFF → log them in immediately and send them back to lastPage
+  if (hasSession) {
+    await populateUserCookies(userId, false);
+    const lastPage = await getAndClearLastPage();
+    return redirect(`${lastPage}?refresh=true`);
+  }
+
+  // If verified is ON → send to sign-in with a success message
   return encodedRedirect(
     "success",
     "/sign-in",
@@ -169,8 +200,6 @@ export const signUpAction = async (formData: FormData) => {
 export const signInAction = async (formData: FormData) => {
   const email = formData.get("email")?.toString().trim() || "";
   const password = formData.get("password")?.toString() || "";
-
-  // Checkbox should be: name="remember" value="true"
   const remember = formData.get("remember") === "true";
 
   const supabase = await createClient();
