@@ -9,11 +9,11 @@ import { SubmitButton } from "@/components/submit-button";
 import { Input } from "@/components/Layouts/appheader/input";
 import { Label } from "@/components/ui/label";
 import SignInWithGoogle from "@/components/ui/SignInWithGoogle";
-import { Mail, Lock } from "lucide-react";
+import { Mail, Lock, User } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "Create account",
-  description: "Create a new account to access your dashboard.",
+  description: "Create a new account to access your account.",
 };
 
 type SearchParams = Message & {
@@ -27,13 +27,11 @@ export default async function SignUpPage({
 }) {
   const cookieStore = await cookies();
 
-  // ✅ Invite is URL-driven (generated links). Cookie fallback optional.
+  // Invite is URL-driven (generated links). Cookie fallback optional.
   const inviteFromQuery = typeof searchParams?.invite === "string" ? searchParams.invite : "";
   const inviteFromCookie = cookieStore.get("invite")?.value ?? "";
   const invite = inviteFromQuery || inviteFromCookie || "";
 
-  // ✅ If actions redirected with a message, keep the page layout and show FormMessage
-  // (Toast will also show, because we now mount <Toaster /> globally.)
   if ("message" in searchParams) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[hsl(var(--background))] via-[hsl(var(--muted))] to-[hsl(var(--accent))] px-4 md:px-6 lg:px-12">
@@ -47,9 +45,12 @@ export default async function SignUpPage({
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[hsl(var(--background))] via-[hsl(var(--muted))] to-[hsl(var(--accent))] px-4 md:px-6 lg:px-12">
       <div className="mx-auto w-full max-w-2xl rounded-[var(--radius)] bg-[hsl(var(--card))] shadow-[var(--shadow-xl)] p-8 md:p-10">
-        <h1 className="text-3xl md:text-4xl font-[var(--font-serif)] font-bold text-center text-[hsl(var(--sidebar-primary))] mb-6 leading-[1.2]">
+        <h1 className="text-3xl md:text-4xl font-[var(--font-serif)] font-bold text-center text-[hsl(var(--sidebar-primary))] mb-2 leading-[1.2]">
           Create an Account
         </h1>
+        <p className="text-center text-sm text-[hsl(var(--muted-foreground))] font-[var(--font-sans)] mb-6">
+          Join Desert Cowgirl and start shopping faster.
+        </p>
 
         <SignInWithGoogle />
 
@@ -62,8 +63,55 @@ export default async function SignUpPage({
         </div>
 
         <form className="space-y-6" action={signUpAction}>
-          {/* ✅ Hidden invite only (NO manual entry field) */}
+          {/* Hidden invite only (NO manual entry field) */}
           <input type="hidden" name="invite" value={invite} />
+
+          {/* NEW: first + last name (matches signUpAction) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label
+                htmlFor="first_name"
+                className="font-[var(--font-sans)] text-[hsl(var(--foreground))]"
+              >
+                First name
+              </Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))]">
+                  <User size={18} />
+                </span>
+                <Input
+                  id="first_name"
+                  name="first_name"
+                  type="text"
+                  placeholder="Jane"
+                  required
+                  className="pl-10 border-[hsl(var(--border))] bg-[hsl(var(--input))] text-[hsl(var(--foreground))] font-[var(--font-sans)] rounded-[var(--radius)] focus:ring-[hsl(var(--sidebar-ring))] focus:border-[hsl(var(--sidebar-primary))]"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label
+                htmlFor="last_name"
+                className="font-[var(--font-sans)] text-[hsl(var(--foreground))]"
+              >
+                Last name
+              </Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))]">
+                  <User size={18} />
+                </span>
+                <Input
+                  id="last_name"
+                  name="last_name"
+                  type="text"
+                  placeholder="Doe"
+                  required
+                  className="pl-10 border-[hsl(var(--border))] bg-[hsl(var(--input))] text-[hsl(var(--foreground))] font-[var(--font-sans)] rounded-[var(--radius)] focus:ring-[hsl(var(--sidebar-ring))] focus:border-[hsl(var(--sidebar-primary))]"
+                />
+              </div>
+            </div>
+          </div>
 
           <div className="space-y-2">
             <Label htmlFor="email" className="font-[var(--font-sans)] text-[hsl(var(--foreground))]">
@@ -85,10 +133,7 @@ export default async function SignUpPage({
           </div>
 
           <div className="space-y-2">
-            <Label
-              htmlFor="password"
-              className="font-[var(--font-sans)] text-[hsl(var(--foreground))]"
-            >
+            <Label htmlFor="password" className="font-[var(--font-sans)] text-[hsl(var(--foreground))]">
               Password
             </Label>
             <div className="relative">
