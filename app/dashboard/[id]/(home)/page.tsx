@@ -16,22 +16,25 @@ import { OverviewCardsSkeleton } from "./_components/overview-cards/skeleton";
 import { RegionLabels } from "./_components/region-labels";
 
 type PropsType = {
-  searchParams: Promise<{
+  searchParams?: {
     selected_time_frame?: string;
-  }>;
+  };
 };
 
-function getTimeFrameValue(extractTimeFrame: ReturnType<typeof createTimeFrameExtractor>, key: string) {
+function getTimeFrameValue(
+  extractTimeFrame: ReturnType<typeof createTimeFrameExtractor>,
+  key: string
+) {
   const raw = extractTimeFrame(key);
   if (!raw) return undefined;
 
   // expected format: "some_key:VALUE"
   const parts = raw.split(":");
-  return parts.length > 1 ? parts[1] : undefined;
+  return parts.length > 1 ? parts.slice(1).join(":") : undefined;
 }
 
 export default async function Home({ searchParams }: PropsType) {
-  const { selected_time_frame } = await searchParams;
+  const selected_time_frame = searchParams?.selected_time_frame;
   const extractTimeFrame = createTimeFrameExtractor(selected_time_frame);
 
   const paymentsTimeFrame = getTimeFrameValue(extractTimeFrame, "payments_overview");

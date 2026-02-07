@@ -1,5 +1,4 @@
 // app/dashboard/[id]/layout.tsx
-"use client";
 
 import "@/css/satoshi.css";
 import "@/app/globals.css";
