@@ -1,83 +1,155 @@
-// fetch.ts - SIMPLIFIED server-side role fetching (NO client-side Hall Monitor)
+import { createClient } from '@/utils/supabase/server';
 
-import { createClient } from "@/utils/supabase/server";
-
-// Role mapping that matches your database
-const ROLE_MAP: {[key: string]: string} = {
-  'admin1': 'admin',
-  'coachx7': 'jobcoach',
-  'user0x': 'user',
-  'client7x': 'client'
-};
-
-// Types for user role data
-export interface DashboardUser {
-  id: string;
-  email?: string;
-  role_name: string;
-  role_id: string;
-  specializations?: any[];
-  profile?: any;
-}
-
-// Get user role info for server-side routing
-export async function getUserRoleInfo(userId: string): Promise<DashboardUser | null> {
+export async function getOverviewData() {
   try {
-    console.log('[Server Fetch] Getting role info for user:', userId);
+    const usersData = await getUsersData();
     
-    const supabase = await createClient();
-    
-    const { data: profile, error } = await supabase
-      .from('profiles')
-      .select('id, role')
-      .eq('id', userId)
-      .single();
-
-    if (error || !profile) {
-      console.error('[Server Fetch] Error getting profile:', error);
-      return null;
-    }
-
-    // Map role ID to role name
-    const roleId = profile.role;
-    const roleName = ROLE_MAP[roleId] || 'user';
-
-    // Try to get specializations (optional, won't break if it fails)
-    let specializations = [];
-    try {
-      const { data: specializationData } = await supabase
-        .rpc('get_user_specializations', { user_id: userId });
-      
-      if (specializationData) {
-        specializations = specializationData;
-      }
-    } catch (specError) {
-      console.log('[Server Fetch] No specializations found (non-critical)');
-    }
-
     return {
-      id: profile.id,
-      role_name: roleName,
-      role_id: roleId,
-      specializations,
-      profile: {
-        first_name: 'User',
-        last_name: ''
-      }
+      views: {
+        value: 0,
+        growthRate: 0,
+      },
+      profit: {
+        value: 0,
+        growthRate: 0,
+      },
+      products: {
+        value: 0,
+        growthRate: 0,
+      },
+      users: usersData,
     };
   } catch (error) {
-    console.error('[Server Fetch] Unexpected error:', error);
-    return null;
+    console.error('Error fetching overview data:', error);
+    return {
+      views: { value: 0, growthRate: 0 },
+      profit: { value: 0, growthRate: 0 },
+      products: { value: 0, growthRate: 0 },
+      users: { value: 0, growthRate: 0 },
+    };
   }
 }
 
-// Quick role check function
-export async function getUserRole(userId: string): Promise<string | null> {
+async function getUsersData() {
   try {
-    const userData = await getUserRoleInfo(userId);
-    return userData?.role_name || null;
+    const supabase = await createClient();
+    
+    const { count: totalUsers, error: countError } = await supabase
+      .from('profiles')
+      .select('*', { count: 'exact', head: true });
+
+    if (countError) {
+      console.error('Error fetching user count:', countError);
+      return { value: 0, growthRate: 0 };
+    }
+
+    const now = new Date();
+    const firstDayThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const firstDayLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    
+    const { count: thisMonthUsers } = await supabase
+      .from('profiles')
+      .select('*', { count: 'exact', head: true })
+      .gte('created_at', firstDayThisMonth.toISOString());
+
+    const { count: lastMonthUsers } = await supabase
+      .from('profiles')
+      .select('*', { count: 'exact', head: true })
+      .gte('created_at', firstDayLastMonth.toISOString())
+      .lt('created_at', firstDayThisMonth.toISOString());
+
+    let growthRate = 0;
+    if (lastMonthUsers && lastMonthUsers > 0) {
+      growthRate = ((thisMonthUsers || 0) - lastMonthUsers) / lastMonthUsers;
+    } else if (thisMonthUsers && thisMonthUsers > 0) {
+      growthRate = 1;
+    }
+
+    return {
+      value: totalUsers || 0,
+      growthRate: Math.round(growthRate * 10000) / 100,
+    };
   } catch (error) {
-    console.error('[Server Fetch] Error getting user role:', error);
-    return null;
+    console.error('Error fetching users data:', error);
+    return { value: 0, growthRate: 0 };
+  }
+}
+
+export async function getChatsData() {
+  try {
+    const supabase = await createClient();
+    
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      console.log('No authenticated user found');
+      return [];
+    }
+
+    const { data, error } = await supabase.rpc('get_user_conversations_with_display_name', {
+      p_user_id: user.id,
+    });
+
+    if (error) {
+      console.error('RPC Error:', error.message);
+      return [];
+    }
+
+    if (!Array.isArray(data)) {
+      console.error('Conversations data is not an array:', data);
+      return [];
+    }
+
+    const mappedChats = data.map((conv) => {
+      let displayName = conv.channel_name || 'Unnamed Chat';
+      
+      if (!conv.is_group && conv.participants && Array.isArray(conv.participants)) {
+        const otherParticipant = conv.participants.find(p => p.user_id !== user.id);
+        if (otherParticipant && otherParticipant.display_name) {
+          displayName = otherParticipant.display_name;
+        }
+      }
+      
+      let profileImage = '/images/user/user-default.png';
+      if (conv.is_group) {
+        profileImage = '/images/user/group-default.png';
+      } else if (conv.participants && Array.isArray(conv.participants)) {
+        const otherParticipant = conv.participants.find(p => p.user_id !== user.id);
+        if (otherParticipant && otherParticipant.avatar_url) {
+          profileImage = otherParticipant.avatar_url;
+        }
+      }
+      
+      let isActive = false;
+      if (conv.participants && Array.isArray(conv.participants)) {
+        isActive = conv.participants.some(p => p.online === true);
+      }
+      
+      const lastMessageContent = conv.last_message_content || conv.last_message || 'No messages yet';
+      const lastMessageTime = conv.last_message_at || new Date().toISOString();
+      const hasUnread = (conv.unread_count || 0) > 0;
+      
+      return {
+        name: displayName,
+        profile: profileImage,
+        isActive: isActive,
+        lastMessage: {
+          content: lastMessageContent,
+          type: 'text',
+          timestamp: lastMessageTime,
+          isRead: !hasUnread,
+        },
+        unreadCount: conv.unread_count || 0,
+      };
+    });
+
+    return mappedChats;
+    
+  } catch (error) {
+    console.error('Error fetching chats data:', error);
+    return [];
   }
 }
