@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { MdExpandMore, MdChevronRight, MdArrowForwardIos } from "react-icons/md";
+import { X } from "lucide-react";
 import { navTree } from "@/lib/navTree";
 import "./_components/Mobile.scss";
 
@@ -39,7 +40,7 @@ export default function MobileDrawer({
     setTimeout(() => {
       setIsClosing(false);
       onClose();
-    }, 400); // Match the animation duration
+    }, 400);
   };
 
   const handleClickAndClose =
@@ -56,32 +57,42 @@ export default function MobileDrawer({
   return (
     <div
       ref={menuRef}
-      className={`drawer-content md:hidden ${
+      className={`drawer-content ${
         isClosing ? "animate-slide-up" : "animate-slide-down"
       }`}
-      style={{
-        position: "absolute",
-        top: "100%",
-        left: 0,
-        right: 0,
-        zIndex: 50,
-        maxHeight: "calc(100vh - 4rem)",
-        overflowY: "auto",
-        backdropFilter: "none",
-        WebkitBackdropFilter: "none",
-      }}
     >
-      <div className="mobile-menu-container bg-background border-b border-border shadow-lg rounded-b-xl">
+      {/* ===== Top Bar ===== */}
+      <div className="drawer-topbar">
+        <button
+          type="button"
+          className="drawer-close-button text-foreground"
+          onClick={handleClose}
+          aria-label="Close menu"
+        >
+          <X size={22} />
+        </button>
+      </div>
+
+      {/* ===== Top Divider ===== */}
+      <div className="drawer-divider-horizontal" />
+
+      <div className="mobile-menu-container bg-background">
         {navTree.map((node) => (
-          <div key={node.key}>
-            <div className="mobile-menu-item text-foreground hover:bg-secondary">
+          <div key={node.key} className="mobile-section">
+            {/* Section top divider */}
+            <div className="drawer-divider-horizontal" />
+
+            <div className="mobile-menu-item text-foreground">
               <a
                 href="#"
                 onClick={handleClickAndClose(node.key)}
-                className="menu-link focus:outline-none text-foreground no-underline"
+                className="menu-link text-foreground no-underline"
               >
                 {node.label}
               </a>
+
+              {/* Vertical divider before icon */}
+              <div className="drawer-divider-vertical" />
 
               {node.children ? (
                 <button
@@ -96,10 +107,9 @@ export default function MobileDrawer({
                   )}
                 </button>
               ) : (
-                <MdArrowForwardIos
-                  size={14}
-                  className="ml-2 text-muted-foreground"
-                />
+                <span className="menu-icon-slot" aria-hidden="true">
+                  <MdArrowForwardIos size={14} />
+                </span>
               )}
             </div>
 
@@ -110,7 +120,7 @@ export default function MobileDrawer({
                     key={child.key}
                     href="#"
                     onClick={handleClickAndClose(child.key)}
-                    className="submenu-link text-foreground hover:bg-secondary no-underline"
+                    className="submenu-link text-foreground no-underline"
                   >
                     {child.label}
                   </a>
@@ -120,19 +130,22 @@ export default function MobileDrawer({
           </div>
         ))}
 
-        <div className="mobile-auth-section border-t border-border bg-background">
+        {/* Auth */}
+        <div className="drawer-divider-horizontal" />
+
+        <div className="mobile-auth-section bg-background">
           {!session ? (
             <a
               href="/sign-in"
               onClick={handleClose}
-              className="auth-button text-accent hover:bg-secondary no-underline"
+              className="auth-button text-accent no-underline"
             >
               Sign In
             </a>
           ) : (
             <button
               onClick={handleAccountClick}
-              className="auth-button text-accent hover:bg-secondary"
+              className="auth-button text-accent"
             >
               Account
             </button>

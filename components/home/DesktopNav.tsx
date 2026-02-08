@@ -1,17 +1,15 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
+import { ChevronDown } from "lucide-react";
 import { navTree } from "@/lib/navTree";
 import "./_components/Desktop.scss";
-import useLoginSession from "@/lib/useLoginSession";
 
 interface DesktopNavProps {
   navigateTo: (key: string) => (e?: React.MouseEvent) => void;
 }
 
 export default function DesktopNav({ navigateTo }: DesktopNavProps) {
-  const session = useLoginSession();
-
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [hoverTimeout, setHoverTimeout] = useState<NodeJS.Timeout | null>(null);
   const navRefs = useRef<(HTMLElement | null)[]>([]);
@@ -136,12 +134,8 @@ export default function DesktopNav({ navigateTo }: DesktopNavProps) {
     };
   }, [hoverTimeout]);
 
-  const goAccount = () => {
-    window.location.href = "/profile/me";
-  };
-
   return (
-    <nav className="nav-container">
+    <nav className="nav-container" aria-label="Primary">
       <div className="nav-menu">
         {navTree.map((node, index) => (
           <div
@@ -163,14 +157,18 @@ export default function DesktopNav({ navigateTo }: DesktopNavProps) {
                   aria-haspopup="true"
                   tabIndex={0}
                   data-state={openKey === node.key ? "open" : "closed"}
+                  type="button"
                 >
                   {node.label}
+
+                  {/* Hollow chevron (lucide) */}
                   <span
-                    className={`ml-1 inline-block transition-transform duration-200 ${
+                    className={`ml-1 inline-flex items-center transition-transform duration-200 ${
                       openKey === node.key ? "rotate-180" : "rotate-0"
                     }`}
+                    aria-hidden="true"
                   >
-                    ▼
+                    <ChevronDown size={14} strokeWidth={1.75} />
                   </span>
                 </button>
 
@@ -188,7 +186,7 @@ export default function DesktopNav({ navigateTo }: DesktopNavProps) {
                   role="menu"
                   aria-label={`${node.label} submenu`}
                 >
-                  <div className="p-2 min-w-[12rem]">
+                  <div className="p-2">
                     {node.children.map((child) => (
                       <a
                         key={child.key}
@@ -220,26 +218,6 @@ export default function DesktopNav({ navigateTo }: DesktopNavProps) {
             )}
           </div>
         ))}
-
-        {/* ✅ Auth button at end of desktop nav */}
-        <div className="nav-item relative">
-          {!session ? (
-            <a
-              href="/sign-in"
-              className="nav-top-link text-accent hover:text-primary no-underline transition-colors duration-200 px-4 py-2 rounded-md hover:bg-muted/50 inline-block"
-            >
-              Sign In
-            </a>
-          ) : (
-            <button
-              type="button"
-              onClick={goAccount}
-              className="nav-top-link text-accent hover:text-primary bg-transparent border-none cursor-pointer transition-colors duration-200 px-4 py-2 rounded-md hover:bg-muted/50"
-            >
-              Account
-            </button>
-          )}
-        </div>
       </div>
     </nav>
   );

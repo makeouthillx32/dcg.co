@@ -2,26 +2,45 @@
 
 /* Mobile drawer content */
 .drawer-content {
-  /* Remove all backdrop filter properties */
+  height: 100%;
+  width: 100%;
+
+  /* ✅ only the inside scrolls */
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+
+  /* ✅ kill old hidden dropdown state */
+  opacity: 1 !important;
+  transform: none !important;
+  visibility: visible !important;
+
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
-  
-  /* Basic positioning and structure */
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  border-radius: 0 0 0.75rem 0.75rem;
-  overflow: hidden;
-  
-  /* Smooth scrolling */
-  -webkit-overflow-scrolling: touch;
-  scroll-behavior: smooth;
-  
-  /* Initial state - hidden but ready for animation */
-  opacity: 0;
-  transform: translateY(-20px);
-  visibility: hidden;
-  
-  /* Ensure smooth transitions */
-  transition: none; /* Let animations handle this */
+
+  /* ✅ scrollbar styling */
+  scrollbar-width: thin; /* firefox */
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+
+/* Chrome/Safari scrollbar */
+.drawer-content::-webkit-scrollbar {
+  width: 10px;
+}
+
+.drawer-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.drawer-content::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+
+.drawer-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.28);
+  background-clip: padding-box;
 }
 
 /* Mobile menu container structure */
@@ -41,40 +60,47 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.75rem 1rem;
-  font-size: 0.875rem;
+
+  padding: 0.9rem 1rem;
+  font-size: 0.95rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+
   position: relative;
-  
+
+  /* ✅ faint row separators (top + bottom) */
+  border-top: 1px solid hsl(var(--accent-foreground) / 0.16);
+ 
+
   .menu-link {
     width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     text-decoration: none;
-    
-    &:focus {
-      outline: none;
-    }
-    
+
+    &:focus { outline: none; }
     &:focus-visible {
       outline: 2px solid hsl(var(--ring));
       outline-offset: 2px;
       border-radius: 0.25rem;
     }
   }
-  
-  .menu-toggle {
-    padding-left: 0.5rem;
+
+  /* ✅ right side icon area with a vertical divider */
+  .menu-toggle,
+  .menu-icon-slot {
+    margin-left: 0.75rem;
+    padding-left: 0.85rem; /* space after divider */
+    display: inline-flex;
+    align-items: center;
     background: none;
     border: none;
     cursor: pointer;
-    display: flex;
-    align-items: center;
-    
-    &:focus {
-      outline: none;
-    }
-    
+
+    border-left: 1px solid hsl(var(--accent-foreground) / 0.16);
+
+    &:focus { outline: none; }
     &:focus-visible {
       outline: 2px solid hsl(var(--ring));
       outline-offset: 2px;
@@ -140,7 +166,7 @@
 /* ONLY target the home page header with .header-container class */
 .header-container {
   /* Force clear background - no overlays */
-  background: hsl(var(--background)) !important;
+  
   
   /* Prevent any backdrop effects */
   backdrop-filter: none !important;
@@ -187,11 +213,81 @@
     opacity: 1 !important;
   }
 }
+/* ===== Header motion smoothing ===== */
+.header-content,
+.header-left,
+.header-logo,
+.header-actions {
+  transition:
+    transform 260ms cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 200ms ease,
+    gap 260ms cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+}
 
 /* Mobile drawer overlay - position it relative to header */
 .mobile-drawer-overlay {
-  /* No longer needed - remove fixed positioning */
-  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+
+  /* grey out */
+  background: rgba(0, 0, 0, 0.45);
+
+  /* subtle glass */
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+
+  /* fade in/out */
+  opacity: 1;
+  transition: opacity 240ms ease;
+
+  /* tap */
+  cursor: pointer;
+}
+
+.mobile-drawer-shell {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  width: min(86vw, 360px);
+
+  z-index: 9999;
+
+  background: hsl(var(--background));
+  border-right: 1px solid hsl(var(--border));
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.25);
+
+  /* ✅ THE ONLY SCROLLER */
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+
+  /* ✅ THEMED scrollbar (Firefox) */
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--accent-foreground) / 0.28) transparent;
+}
+
+/* ✅ THEMED scrollbar (Chrome/Safari/Edge) */
+.mobile-drawer-shell::-webkit-scrollbar {
+  width: 10px;
+}
+
+.mobile-drawer-shell::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.mobile-drawer-shell::-webkit-scrollbar-thumb {
+  background: hsl(var(--accent-foreground) / 0.26);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+
+.mobile-drawer-shell::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--accent-foreground) / 0.36);
+  background-clip: padding-box;
 }
 
 /* ========== MOBILE SPECIFIC OVERRIDES - HOME PAGE ONLY ========== */
@@ -220,12 +316,25 @@
     }
   }
   
-  /* Mobile drawer improvements for small screens */
-  .mobile-menu-container {
-    max-height: calc(100vh - 5rem);
-    overflow-y: auto;
+
+  .header-content {
+    transform: translateY(0);
   }
-  
+
+  .header-left {
+    transform: translateX(0);
+    opacity: 1;
+  }
+
+  .header-logo {
+    transform: translateY(0);
+    opacity: 1;
+  }
+
+  .header-actions {
+    transform: translateX(0);
+    opacity: 1;
+  }
   /* Enhanced touch targets for mobile - accessibility */
   .mobile-menu-item {
     min-height: 48px; /* Accessibility guideline for touch targets */
@@ -280,24 +389,31 @@
 
 /* Ensure drawer starts hidden but animatable */
 .drawer-content {
-  /* Remove all backdrop filter properties */
+  /* ✅ NOT scrollable */
+  height: auto;
+  width: 100%;
+  overflow: visible;
+
+  /* remove old dropdown hidden stuff */
+  opacity: 1 !important;
+  transform: none !important;
+  visibility: visible !important;
+
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
-  
-  /* Basic positioning and structure */
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  border-radius: 0 0 0.75rem 0.75rem;
-  overflow: hidden;
-  
-  /* Smooth scrolling */
-  -webkit-overflow-scrolling: touch;
-  scroll-behavior: smooth;
-  
-  /* Initial state - hidden but ready for animation */
-  opacity: 0;
-  transform: translateY(-20px);
-  visibility: hidden;
-  
-  /* Ensure smooth transitions */
-  transition: none; /* Let animations handle this */
+}
+.mobile-menu-container {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+/* Optional: top breathing strip for a close button area */
+.drawer-topbar {
+  height: 44px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 14px;
+
 }

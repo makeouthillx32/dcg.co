@@ -1,160 +1,211 @@
 // app/api/notifications/create-message/route.ts
-import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/utils/supabase/server';
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/utils/supabase/server";
 
 interface CreateMessageNotificationRequest {
   channel_id: string;
-  sender_id: string;
   content: string;
+}
+
+function short(text: string, max = 50) {
+  const t = (text ?? "").trim();
+  return t.length > max ? t.slice(0, max) + "..." : t;
 }
 
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient();
-    
-    const {
+
+    const body = (await req.json()) as Partial<CreateMessageNotificationRequest>;
+    const channel_id = body.channel_id?.trim();
+    const content = body.content ?? "";
+
+    console.log("🔥 NOTIFICATION API CALLED:", {
       channel_id,
-      sender_id,
-      content,
-    }: CreateMessageNotificationRequest = await req.json();
+      content: String(content).slice(0, 20) + "...",
+    });
 
-    console.log('🔥 NOTIFICATION API CALLED:', { channel_id, sender_id, content: content.slice(0, 20) + '...' });
-
-    if (!channel_id || !sender_id || !content) {
+    if (!channel_id || !content?.trim()) {
       return NextResponse.json(
-        { error: 'Missing required fields: channel_id, sender_id, content' }, 
+        { error: "Missing required fields: channel_id, content" },
         { status: 400 }
       );
     }
 
-    // 1️⃣ Get sender's display name from auth.users (EXACTLY like SQL)
-    const { data: senderUser, error: senderError } = await supabase
-      .from('auth.users')
-      .select('email, raw_user_meta_data')
-      .eq('id', sender_id)
-      .single();
+    // 1) Who’s calling? (sender is the authenticated user)
+    const {
+      data: { user: me },
+      error: meError,
+    } = await supabase.auth.getUser();
 
-    if (senderError) {
-      console.error('🔥 FAILED TO GET SENDER:', senderError.message);
-      return NextResponse.json({ error: 'Failed to fetch sender info' }, { status: 500 });
+    if (meError || !me) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const metadata = (senderUser.raw_user_meta_data as Record<string, any>) || {};
-    const senderName = 
-      metadata.display_name ||
-      metadata.full_name ||
-      senderUser.email ||
-      'Someone';
+    const sender_id = me.id;
 
-    console.log('🔥 SENDER NAME:', senderName);
+    // 2) Get sender display name (prefer profiles_with_auth)
+    let senderName: string | null = null;
 
-    // 2️⃣ Get channel participants (EXACTLY like SQL)
+    const viewRes = await supabase
+      .from("profiles_with_auth")
+      .select("display_name, full_name, username, email")
+      .eq("id", sender_id)
+      .maybeSingle();
+
+    if (!viewRes.error && viewRes.data) {
+      senderName =
+        viewRes.data.display_name ??
+        viewRes.data.full_name ??
+        viewRes.data.username ??
+        viewRes.data.email ??
+        null;
+    } else {
+      const profRes = await supabase
+        .from("profiles")
+        .select("display_name, full_name, username")
+        .or(`id.eq.${sender_id},user_id.eq.${sender_id}`)
+        .maybeSingle();
+
+      if (!profRes.error && profRes.data) {
+        senderName =
+          (profRes.data as any).display_name ??
+          (profRes.data as any).full_name ??
+          (profRes.data as any).username ??
+          null;
+      }
+    }
+
+    if (!senderName) senderName = me.email ?? "Someone";
+
+    console.log("🔥 SENDER NAME:", senderName);
+
+    // 3) Channel participants except sender
     const { data: participants, error: participantsError } = await supabase
-      .from('channel_participants')
-      .select('user_id')
-      .eq('channel_id', channel_id)
-      .neq('user_id', sender_id);
+      .from("channel_participants")
+      .select("user_id")
+      .eq("channel_id", channel_id)
+      .neq("user_id", sender_id);
 
     if (participantsError) {
-      console.error('🔥 FAILED TO GET PARTICIPANTS:', participantsError.message);
-      return NextResponse.json({ error: 'Failed to fetch participants' }, { status: 500 });
+      console.error("🔥 FAILED TO GET PARTICIPANTS:", participantsError.message);
+      return NextResponse.json(
+        { error: "Failed to fetch participants" },
+        { status: 500 }
+      );
     }
 
     if (!participants || participants.length === 0) {
-      console.log('🔥 NO PARTICIPANTS FOUND');
-      return NextResponse.json({ message: 'No participants found to notify' }, { status: 200 });
+      console.log("🔥 NO PARTICIPANTS FOUND");
+      return NextResponse.json(
+        { message: "No participants found to notify" },
+        { status: 200 }
+      );
     }
 
-    console.log('🔥 FOUND PARTICIPANTS:', participants.length);
+    console.log("🔥 FOUND PARTICIPANTS:", participants.length);
 
-    // 3️⃣ Process each participant (EXACTLY like SQL loop)
-    const results = [];
+    // 4) Upsert-like behavior (update if recent, else create)
+    const results: Array<{
+      user_id: string;
+      status: "created" | "updated" | "error";
+      error?: string;
+    }> = [];
+
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
 
     for (const participant of participants) {
-      try {
-        console.log('🔥 PROCESSING PARTICIPANT:', participant.user_id);
+      const receiver_id = participant.user_id;
 
-        // Check for existing recent notification (EXACTLY like SQL)
-        const { data: existingNotification, error: checkError } = await supabase
-          .from('notifications')
-          .select('id')
-          .eq('receiver_id', participant.user_id)
-          .eq('sender_id', sender_id)
-          .like('title', '%sent you%message%')
-          .gte('created_at', fiveMinutesAgo)
-          .order('created_at', { ascending: false })
+      try {
+        // Check recent existing notification
+        const { data: existing, error: checkError } = await supabase
+          .from("notifications")
+          .select("id")
+          .eq("receiver_id", receiver_id)
+          .eq("sender_id", sender_id)
+          .like("title", "%sent you a message%")
+          .gte("created_at", fiveMinutesAgo)
+          .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle();
 
         if (checkError) {
-          console.error('🔥 ERROR CHECKING EXISTING:', checkError.message);
-          results.push({ user_id: participant.user_id, status: 'error', error: checkError.message });
+          console.error("🔥 ERROR CHECKING EXISTING:", checkError.message);
+          results.push({
+            user_id: receiver_id,
+            status: "error",
+            error: checkError.message,
+          });
           continue;
         }
 
-        if (existingNotification) {
-          // Update existing notification (EXACTLY like SQL)
-          console.log('🔥 UPDATING EXISTING NOTIFICATION:', existingNotification.id);
-          
+        if (existing?.id) {
+          console.log("🔥 UPDATING EXISTING NOTIFICATION:", existing.id);
+
           const { error: updateError } = await supabase
-            .from('notifications')
+            .from("notifications")
             .update({
-              subtitle: content.length > 50 ? content.slice(0, 50) + '...' : content,
+              subtitle: short(content),
               created_at: new Date().toISOString(),
             })
-            .eq('id', existingNotification.id);
+            .eq("id", existing.id);
 
           if (updateError) {
-            console.error('🔥 UPDATE FAILED:', updateError.message);
-            results.push({ user_id: participant.user_id, status: 'error', error: updateError.message });
+            console.error("🔥 UPDATE FAILED:", updateError.message);
+            results.push({
+              user_id: receiver_id,
+              status: "error",
+              error: updateError.message,
+            });
           } else {
-            console.log('🔥 UPDATE SUCCESS');
-            results.push({ user_id: participant.user_id, status: 'updated' });
+            results.push({ user_id: receiver_id, status: "updated" });
           }
         } else {
-          // Create new notification (EXACTLY like SQL)
-          console.log('🔥 CREATING NEW NOTIFICATION');
-          
+          console.log("🔥 CREATING NEW NOTIFICATION");
+
           const { error: insertError } = await supabase
-            .from('notifications')
+            .from("notifications")
             .insert({
-              sender_id: sender_id,
-              receiver_id: participant.user_id,
+              sender_id,
+              receiver_id,
               title: `${senderName} sent you a message`,
-              subtitle: content.length > 50 ? content.slice(0, 50) + '...' : content,
-              image_url: 'https://chsmesvozsjcgrwuimld.supabase.co/storage/v1/object/public/avatars/notification.png',
-              action_url: '/dashboard/me/messages',
-              role_admin: false,
-              role_jobcoach: false,
-              role_client: false,
-              role_user: false,
+              subtitle: short(content),
+              image_url:
+                "https://chsmesvozsjcgrwuimld.supabase.co/storage/v1/object/public/avatars/notification.png",
+              action_url: "/dashboard/me/messages",
             });
 
           if (insertError) {
-            console.error('🔥 INSERT FAILED:', insertError.message);
-            results.push({ user_id: participant.user_id, status: 'error', error: insertError.message });
+            console.error("🔥 INSERT FAILED:", insertError.message);
+            results.push({
+              user_id: receiver_id,
+              status: "error",
+              error: insertError.message,
+            });
           } else {
-            console.log('🔥 INSERT SUCCESS');
-            results.push({ user_id: participant.user_id, status: 'created' });
+            results.push({ user_id: receiver_id, status: "created" });
           }
         }
-      } catch (error) {
-        console.error('🔥 PARTICIPANT ERROR:', participant.user_id, error);
-        results.push({ user_id: participant.user_id, status: 'error', error: String(error) });
+      } catch (e) {
+        console.error("🔥 PARTICIPANT ERROR:", receiver_id, e);
+        results.push({
+          user_id: receiver_id,
+          status: "error",
+          error: String(e),
+        });
       }
     }
 
-    console.log('🔥 NOTIFICATION API COMPLETE:', results);
+    console.log("🔥 NOTIFICATION API COMPLETE:", results);
 
-    return NextResponse.json({ 
-      success: true, 
+    return NextResponse.json({
+      success: true,
       processed: results.length,
-      results: results
+      results,
     });
-
   } catch (error) {
-    console.error('🔥 NOTIFICATION API ERROR:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error("🔥 NOTIFICATION API ERROR:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
-import { Menu, X } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { Menu, X, User } from "lucide-react";
 import { useTheme } from "@/app/provider";
 import SwitchtoDarkMode from "@/components/SwitchtoDarkMode";
 import useLoginSession from "@/lib/useLoginSession";
@@ -24,12 +24,73 @@ const Header: React.FC<HeaderProps> = ({ navigateTo }) => {
     window.location.href = "/profile/me";
   };
 
+  const closeMobileMenu = () => setMobileMenuOpen(false);
+
+  // Optional: prevent background scroll when drawer is open (mobile)
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = "";
+      };
+    }
+  }, [mobileMenuOpen]);
+  // 🔒 Force-close mobile drawer when switching to desktop
+useEffect(() => {
+  if (typeof window === "undefined") return;
+
+  const mediaQuery = window.matchMedia("(min-width: 768px)");
+
+  const handleResize = () => {
+    if (mediaQuery.matches) {
+      setMobileMenuOpen(false);
+      document.body.style.overflow = "";
+    }
+  };
+
+  // Run once on mount (important if page loads wide)
+  handleResize();
+
+  // Listen for breakpoint change
+  if (mediaQuery.addEventListener) {
+    mediaQuery.addEventListener("change", handleResize);
+  } else {
+    mediaQuery.addListener(handleResize); // Safari fallback
+  }
+
+  return () => {
+    if (mediaQuery.removeEventListener) {
+      mediaQuery.removeEventListener("change", handleResize);
+    } else {
+      mediaQuery.removeListener(handleResize);
+    }
+  };
+}, []);
+
+
   return (
     <div className="relative">
-      {/* Add relative positioning container */}
-      <header className="header-container bg-background text-foreground border-border">
+      <header className="header-container bg-primary-foreground text-foreground border-border">
         <div className="header-content">
-          {/* Left: Logo */}
+          {/* LEFT (Mobile): Hamburger */}
+          <div className="header-left">
+            <button
+              className={`mobile-hamburger text-foreground focus:ring-primary ${
+                mobileMenuOpen ? "menu-open" : ""
+              }`}
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
+              type="button"
+            >
+              {mobileMenuOpen ? (
+                <X className="hamburger-icon" />
+              ) : (
+                <Menu className="hamburger-icon" />
+              )}
+            </button>
+          </div>
+
+          {/* CENTER: Logo */}
           <div className="header-logo">
             <a
               href="#"
@@ -48,12 +109,12 @@ const Header: React.FC<HeaderProps> = ({ navigateTo }) => {
             </a>
           </div>
 
-          {/* Center: Desktop Nav */}
+          {/* CENTER (Desktop): Desktop Nav */}
           <div className="header-nav">
             <DesktopNav navigateTo={navigateTo} />
           </div>
 
-          {/* Right: Auth + Dark mode + Hamburger */}
+          {/* RIGHT: Auth + Theme */}
           <div className="header-actions">
             {/* Desktop Auth */}
             <div className="header-auth">
@@ -61,49 +122,59 @@ const Header: React.FC<HeaderProps> = ({ navigateTo }) => {
                 <a
                   href="/sign-in"
                   className="auth-button text-accent hover:text-accent focus:ring-accent"
+                  aria-label="Sign in"
                 >
-                  Sign In
+                  {/* Mobile: text */}
+                  <span className="md:hidden">Sign In</span>
+
+                  {/* Desktop: icon */}
+                  <span className="hidden md:inline-flex items-center">
+                    <User className="w-5 h-5" aria-hidden="true" />
+                  </span>
                 </a>
               ) : (
                 <button
                   onClick={handleAccountClick}
                   className="auth-button text-accent hover:text-accent focus:ring-accent"
+                  type="button"
+                  aria-label="Account"
                 >
-                  Account
+                  {/* Mobile: text */}
+                  <span className="md:hidden">Account</span>
+
+                  {/* Desktop: icon */}
+                  <span className="hidden md:inline-flex items-center text-foreground hover:text-primary transition-colors">
+                    <User className="w-5 h-5" aria-hidden="true" />
+                  </span>
                 </button>
               )}
             </div>
 
             {/* Theme Switcher */}
-            <div className="theme-switcher">
+            <div className="theme-switcher text-foreground hover:text-primary transition-colors">
               <SwitchtoDarkMode />
             </div>
-
-            {/* Mobile Hamburger */}
-            <button
-              className={`mobile-hamburger text-foreground focus:ring-primary ${
-                mobileMenuOpen ? "menu-open" : ""
-              }`}
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
-            >
-              {mobileMenuOpen ? (
-                <X className="hamburger-icon" />
-              ) : (
-                <Menu className="hamburger-icon" />
-              )}
-            </button>
           </div>
         </div>
       </header>
 
-      {/* Mobile Drawer - positioned relative to this container */}
+      {/* Overlay + Left Drawer Shell (mobile only via SCSS) */}
       {mobileMenuOpen && (
-        <MobileDrawer
-          navigateTo={navigateTo}
-          session={session}
-          onClose={() => setMobileMenuOpen(false)}
-        />
+        <>
+          <div
+            className="mobile-drawer-overlay"
+            onClick={closeMobileMenu}
+            aria-hidden="true"
+          />
+
+          <div className="mobile-drawer-shell" role="dialog" aria-modal="true">
+            <MobileDrawer
+              navigateTo={navigateTo}
+              session={session}
+              onClose={closeMobileMenu}
+            />
+          </div>
+        </>
       )}
     </div>
   );
