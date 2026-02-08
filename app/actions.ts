@@ -1,9 +1,6 @@
-// app/actions.ts
 "use server";
-
 import { redirect } from "next/navigation";
-import { headers } from "next/headers";
-import { cookies } from "next/headers";
+import { headers, cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
 import { encodedRedirect } from "@/utils/utils";
 import { sendNotification } from "@/lib/notifications";
@@ -11,16 +8,35 @@ import { sendNotification } from "@/lib/notifications";
 const VALID_ROLES = ["admin", "member", "guest"] as const;
 type ValidRole = (typeof VALID_ROLES)[number];
 
-const getCookieOptions = async (remember: boolean) => {
+type CookieOptions = {
+  path: string;
+  secure: boolean;
+  sameSite: "lax";
+  maxAge: number;
+};
+
+type ProfileCookieRow = {
+  role: string | null;
+  display_name: string | null;
+};
+
+type ProfileUpsertRow = {
+  id: string;
+  role: ValidRole;
+  display_name: string;
+  first_name: string;
+  last_name: string;
+};
+
+const getCookieOptions = async (remember: boolean): Promise<CookieOptions> => {
   const headerList = await headers();
   const origin = headerList.get("origin") || "";
   const isHttps = origin.startsWith("https://");
   const isProd = process.env.NODE_ENV === "production";
-
   return {
     path: "/",
     secure: isProd || isHttps,
-    sameSite: "lax" as const,
+    sameSite: "lax",
     maxAge: remember ? 30 * 24 * 60 * 60 : 24 * 60 * 60,
   };
 };
@@ -28,17 +44,11 @@ const getCookieOptions = async (remember: boolean) => {
 const getAndClearLastPage = async (): Promise<string> => {
   const store = await cookies();
   const lastPageCookie = store.getAll().find((c) => c.name === "lastPage");
-
   let lastPage = lastPageCookie?.value || "/";
   store.delete("lastPage");
-
   const excludedPages = ["/sign-in", "/sign-up", "/forgot-password"];
   const pageWithoutHash = lastPage.split("#")[0];
-
-  if (excludedPages.includes(pageWithoutHash)) {
-    lastPage = "/";
-  }
-
+  if (excludedPages.includes(pageWithoutHash)) lastPage = "/";
   return lastPage;
 };
 
@@ -56,9 +66,9 @@ const populateUserCookies = async (userId: string, remember: boolean = false) =>
 
     const { data: profileData, error: profileError } = await supabase
       .from("profiles")
-      .select("role, display_name, department")
+      .select("role, display_name")
       .eq("id", userId)
-      .single();
+      .single<ProfileCookieRow>();
 
     if (profileError) {
       console.error("[Auth] ❌ Profile fetch failed:", profileError.message);
@@ -73,10 +83,6 @@ const populateUserCookies = async (userId: string, remember: boolean = false) =>
 
     if (profileData?.display_name) {
       store.set("userDisplayName", profileData.display_name, cookieOptions);
-    }
-
-    if (profileData?.department) {
-      store.set("userDepartment", profileData.department, cookieOptions);
     }
 
     const rolePermissions = await supabase.rpc("get_role_permissions", {
@@ -105,8 +111,6 @@ const populateUserCookies = async (userId: string, remember: boolean = false) =>
 export const signUpAction = async (formData: FormData) => {
   const email = formData.get("email")?.toString().trim() || "";
   const password = formData.get("password")?.toString() || "";
-
-  // NEW: lightweight “storefront” fields
   const firstName = formData.get("first_name")?.toString().trim() || "";
   const lastName = formData.get("last_name")?.toString().trim() || "";
 
@@ -114,7 +118,6 @@ export const signUpAction = async (formData: FormData) => {
     return encodedRedirect("error", "/sign-up", "Email and password are required.");
   }
 
-  // If you haven’t added these inputs yet, keep these optional by removing this block.
   if (!firstName || !lastName) {
     return encodedRedirect("error", "/sign-up", "First and last name are required.");
   }
@@ -127,9 +130,7 @@ export const signUpAction = async (formData: FormData) => {
     email,
     password,
     options: {
-      // keep your callback route
       emailRedirectTo: `${origin}/auth/callback/oauth`,
-      // store in auth metadata too (handy later)
       data: {
         first_name: firstName,
         last_name: lastName,
@@ -145,27 +146,23 @@ export const signUpAction = async (formData: FormData) => {
   const userId = data.user.id;
   const displayName = `${firstName} ${lastName}`.trim();
 
-  // Create/ensure profile row. Keep role valid for your CHECK constraint.
+  const payload: ProfileUpsertRow = {
+    id: userId,
+    role: "member",
+    display_name: displayName,
+    first_name: firstName,
+    last_name: lastName,
+  };
+
   const { error: profileUpsertError } = await supabase
     .from("profiles")
-    .upsert(
-      {
-        id: userId,
-        role: "member" as ValidRole,
-        display_name: displayName,
-        // only include these if columns exist in your DB
-        first_name: firstName,
-        last_name: lastName,
-      } as any,
-      { onConflict: "id" }
-    );
+    .upsert(payload, { onConflict: "id" });
 
   if (profileUpsertError) {
     console.error("[Auth] ❌ Profile upsert failed:", profileUpsertError.message);
     return encodedRedirect("error", "/sign-up", profileUpsertError.message);
   }
 
-  // Optional notification (don’t block signup)
   try {
     await sendNotification({
       title: `${email} signed up`,
@@ -175,21 +172,14 @@ export const signUpAction = async (formData: FormData) => {
     console.error("[Auth] ⚠️ Notification failed:", err);
   }
 
-  /**
-   * IMPORTANT:
-   * - If email verification is OFF, Supabase returns a session (user is effectively logged in).
-   * - If verification is ON, session is usually null until they verify.
-   */
   const hasSession = !!data.session;
 
-  // If verified is OFF → log them in immediately and send them back to lastPage
   if (hasSession) {
     await populateUserCookies(userId, false);
     const lastPage = await getAndClearLastPage();
     return redirect(`${lastPage}?refresh=true`);
   }
 
-  // If verified is ON → send to sign-in with a success message
   return encodedRedirect(
     "success",
     "/sign-in",
@@ -281,7 +271,6 @@ export const signOutAction = async () => {
   store.delete("userRole");
   store.delete("userRoleUserId");
   store.delete("userDisplayName");
-  store.delete("userDepartment");
   store.delete("userPermissions");
   store.delete("rememberMe");
 
