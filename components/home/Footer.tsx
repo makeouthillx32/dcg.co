@@ -75,7 +75,7 @@ const Footer: React.FC = () => {
   ];
 
   return (
-    <footer className="bg-[var(--background)] text-[var(--foreground)] border-t border-[var(--border)]">
+    <footer className="bg-[var(--primary)] text-[var(--foreground)] border-t border-[var(--border)]">
       <div className="mx-auto max-w-7xl px-6 sm:px-8 md:px-12 lg:px-16 xl:px-20">
         {/* Top */}
         <div className="grid gap-10 py-14 md:grid-cols-2 lg:grid-cols-5">
