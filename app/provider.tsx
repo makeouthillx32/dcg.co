@@ -289,8 +289,8 @@ export const Providers: React.FC<{
         // Update meta theme-color for iOS
         const isHome = window.location.pathname === "/";
         let themeColor = themeType === "dark" 
-          ? (isHome ? getComputedStyle(html).getPropertyValue("--sidebar").trim() : getComputedStyle(html).getPropertyValue("--background").trim())
-          : getComputedStyle(html).getPropertyValue("--background").trim();
+          ? (isHome ? getComputedStyle(html).getPropertyValue("--sidebar").trim() : getComputedStyle(html).getPropertyValue("--primary").trim())
+          : getComputedStyle(html).getPropertyValue("--primary").trim();
           
         if (themeColor.startsWith("var(--")) {
           themeColor = getComputedStyle(html).getPropertyValue(themeColor.slice(4, -1)).trim();
