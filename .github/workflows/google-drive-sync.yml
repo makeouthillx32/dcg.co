@@ -1,4 +1,4 @@
-name: Sync Zip to Google Drive
+name: Sync to Google Drive
 on:
   push:
     branches:
@@ -11,14 +11,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Create Zip Archive
-        # This zips everything but skips the heavy 'junk' folders
-        run: zip -r codebase_backup.zip . -x "*.git*" "node_modules/*" ".next/*"
-
-      - name: Upload Zip to Drive
-        uses: adityak74/google-drive-upload-git-action@main
+      - name: Upload to Drive
+        uses: mathisve/gdrive-upload-action@main
         with:
           credentials: ${{ secrets.GDRIVE_CREDENTIALS }}
-          folderId: '1OsDtwOjtFaxsMIYgAXzCKSy2RZ9pCofd'
-          filename: codebase_backup.zip
-          overwrite: "true"
+          # The glob pattern './**' selects all files in all subfolders
+          filename: './**'
+          folderId: ${{ secrets.FOLDER_ID }}
+          # Proof: This flag recreates your GitHub folder tree in Drive
+          mirrorDirectoryStructure: true
+          # This ensures it updates the 'seed' files you already uploaded
+          overwrite: true
