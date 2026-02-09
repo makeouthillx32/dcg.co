@@ -1,9 +1,11 @@
 // utils/supabase/server.ts
 import { createServerClient } from "@supabase/ssr";
-import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import { createClient as createSupabaseClient, type SupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 
-export const createClient = async (mode: "regular" | "service" = "regular") => {
+export async function createClient(
+  mode: "regular" | "service" = "regular"
+): Promise<SupabaseClient> {
   if (mode === "service") {
     return createSupabaseClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -11,7 +13,7 @@ export const createClient = async (mode: "regular" | "service" = "regular") => {
     );
   }
 
-  const cookieStore = await cookies(); // Await cookies()
+  const cookieStore = await cookies();
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -33,4 +35,4 @@ export const createClient = async (mode: "regular" | "service" = "regular") => {
       },
     }
   );
-};
+}
