@@ -12,11 +12,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Upload Files Individually
-        uses: Jishu-dev/google-drive-upload-git-action@main
+        uses: adityak74/google-drive-upload-git-action@main
         with:
           credentials: ${{ secrets.GDRIVE_CREDENTIALS }}
           folderId: '1OsDtwOjtFaxsMIYgAXzCKSy2RZ9pCofd'
-          # This will upload the current directory contents
+          # Providing a path to the folder instead of a zip file
           uploadSource: '.' 
-          # Setting overwrite to true ensures your context stays current
           overwrite: "true"
