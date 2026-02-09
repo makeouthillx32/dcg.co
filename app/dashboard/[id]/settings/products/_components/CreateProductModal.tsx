@@ -20,12 +20,28 @@ function slugify(input: string) {
     .replace(/^-|-$/g, "");
 }
 
-function fileExt(name: string) {
+function safeExtFromFile(file: File) {
+  // Prefer mime -> extension when possible (more reliable than random filenames)
+  const type = (file.type || "").toLowerCase();
+
+  if (type.includes("jpeg")) return "jpg";
+  if (type.includes("jpg")) return "jpg";
+  if (type.includes("png")) return "png";
+  if (type.includes("webp")) return "webp";
+  if (type.includes("gif")) return "gif";
+  if (type.includes("avif")) return "avif";
+  if (type.includes("heic") || type.includes("heif")) return "heic"; // note: many browsers can't display HEIC
+
+  // fallback: filename ext
+  const name = file.name || "";
   const i = name.lastIndexOf(".");
-  return i >= 0 ? name.slice(i + 1).toLowerCase() : "jpg";
+  const ext = i >= 0 ? name.slice(i + 1).toLowerCase() : "jpg";
+  return ext || "jpg";
 }
-function randId() {
-  return Math.random().toString(16).slice(2) + Date.now().toString(16);
+
+function buildObjectPath(productId: string, index1Based: number, ext: string) {
+  // ✅ standardized naming: 1.jpg, 2.jpg, 3.png, ...
+  return `products/${productId}/${index1Based}.${ext}`;
 }
 
 async function safeReadJson(res: Response) {
@@ -64,15 +80,27 @@ export default function CreateProductModal({
 
   const autoSlug = () => setSlug(slugify(title));
 
+  const reset = () => {
+    setTitle("");
+    setSlug("");
+    setPrice("0.00");
+    setDescription("");
+    setFiles([]);
+    setAlt("");
+  };
+
   const create = async () => {
     if (!title.trim()) return toast.error("Title is required");
+
     const finalSlug = (slug.trim() || slugify(title)).trim();
     if (!finalSlug) return toast.error("Slug is required");
+
     if (cents === null || cents < 0) return toast.error("Price must be valid");
 
     setCreating(true);
+
     try {
-      // 1) Create product
+      // 1) Create product (draft)
       const res = await fetch("/api/products/admin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -97,15 +125,20 @@ export default function CreateProductModal({
 
         for (let i = 0; i < files.length; i++) {
           const file = files[i];
-          const object_path = `products/${productId}/${randId()}.${fileExt(file.name)}`;
 
+          const ext = safeExtFromFile(file);
+          const object_path = buildObjectPath(productId, i + 1, ext);
+
+          // Upload to storage
           const up = await supabase.storage.from(PRODUCT_IMAGE_BUCKET).upload(object_path, file, {
-            upsert: false,
+            upsert: false, // don't overwrite if already exists
             cacheControl: "3600",
-            contentType: file.type || "image/*",
+            contentType: file.type || "application/octet-stream",
           });
+
           if (up.error) throw new Error(up.error.message);
 
+          // Insert row into product_images (matches your schema)
           const r2 = await fetch(`/api/products/admin/${productId}/images`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -114,25 +147,24 @@ export default function CreateProductModal({
               object_path,
               alt_text: alt.trim() ? alt.trim() : null,
               position: i,
+              // (optional, if your API supports it later)
+              // sort_order: i,
+              // is_primary: i === 0,
+              // is_public: true,
             }),
           });
 
           const j2 = await safeReadJson(r2);
-          if (!r2.ok || !j2?.ok) throw new Error(j2?.error?.message ?? "Failed to create image row");
+          if (!r2.ok || !j2?.ok) {
+            throw new Error(j2?.error?.message ?? `Failed to create image row (${r2.status})`);
+          }
         }
       }
 
       toast.success(files.length ? "Product created + images uploaded" : "Product created");
       onOpenChange(false);
       onCreated();
-
-      // reset
-      setTitle("");
-      setSlug("");
-      setPrice("0.00");
-      setDescription("");
-      setFiles([]);
-      setAlt("");
+      reset();
     } catch (e: any) {
       console.error(e);
       toast.error(e?.message ?? "Create failed");
@@ -189,13 +221,21 @@ export default function CreateProductModal({
                 placeholder="Alt text applied to uploaded images (optional)"
               />
               <div className="text-xs text-[hsl(var(--muted-foreground))]">
-                Uploads to bucket: <code>{PRODUCT_IMAGE_BUCKET}</code>
+                Saved as: <code>products/&lt;productId&gt;/1.ext</code>, <code>2.ext</code>,{" "}
+                <code>3.ext</code>… in bucket: <code>{PRODUCT_IMAGE_BUCKET}</code>
               </div>
             </div>
           </div>
 
           <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => onOpenChange(false)}>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                onOpenChange(false);
+                reset();
+              }}
+              disabled={creating}
+            >
               Cancel
             </Button>
             <Button onClick={create} disabled={creating}>
