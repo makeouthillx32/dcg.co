@@ -1,4 +1,4 @@
-name: Sync to Google Drive
+name: Sync to Google Drive (Unzipped)
 on:
   push:
     branches:
@@ -11,13 +11,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Zip Repository
-        run: zip -r repository_backup.zip . -x "*.git*"
-
-      - name: Upload to Drive
-        uses: adityak74/google-drive-upload-git-action@main
+      - name: Upload Files Individually
+        uses: Jishu-dev/google-drive-upload-git-action@main
         with:
           credentials: ${{ secrets.GDRIVE_CREDENTIALS }}
-          filename: repository_backup.zip
           folderId: '1OsDtwOjtFaxsMIYgAXzCKSy2RZ9pCofd'
+          # This will upload the current directory contents
+          uploadSource: '.' 
+          # Setting overwrite to true ensures your context stays current
           overwrite: "true"
