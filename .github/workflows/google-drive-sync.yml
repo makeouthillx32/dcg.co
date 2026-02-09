@@ -1,4 +1,4 @@
-name: Sync to Google Drive
+name: Sync Folder to Google Drive
 on:
   push:
     branches:
@@ -11,15 +11,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Consolidate Codebase for Gemini
-        # This merges all text files into one 'full_context.txt' for NotebookLM
-        run: |
-          find . -maxdepth 2 -not -path '*/.*' -type f \( -name "*.js" -o -name "*.ts" -o -name "*.tsx" -o -name "*.py" -o -name "*.md" -o -name "*.json" \) -exec echo "FILE: {}" \; -exec cat {} \; -exec echo -e "\n---\n" \; > full_context.txt
-
-      - name: Upload to Drive
-        uses: adityak74/google-drive-upload-git-action@main
+      - name: Sync to Drive
+        uses: wei/rclone@v1
+        env:
+          RCLONE_CONFIG_GDRIVE_TYPE: google cloud storage
+          RCLONE_CONFIG_GDRIVE_SERVICE_ACCOUNT_FILE__CONTENT: ${{ secrets.GDRIVE_CREDENTIALS }}
+          RCLONE_CONFIG_GDRIVE_TEAM_DRIVE: ''
         with:
-          credentials: ${{ secrets.GDRIVE_CREDENTIALS }}
-          folderId: '1OsDtwOjtFaxsMIYgAXzCKSy2RZ9pCofd'
-          filename: full_context.txt
-          overwrite: "true"
+          args: sync . gdrive:${{ secrets.FOLDER_ID }} --exclude ".git/**" --exclude "node_modules/**" --exclude ".next/**"
