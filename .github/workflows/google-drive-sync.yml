@@ -2,7 +2,7 @@ name: Sync to Google Drive
 on:
   push:
     branches:
-      - main  # Change this to 'master' if your main branch uses that name
+      - main
 
 jobs:
   deploy:
@@ -19,5 +19,5 @@ jobs:
         with:
           credentials: ${{ secrets.GDRIVE_CREDENTIALS }}
           filename: repository_backup.zip
-          folderId: 'YOUR_FOLDER_ID_HERE'
+          folderId: '1OsDtwOjtFaxsMIYgAXzCKSy2RZ9pCofd'
           overwrite: "true"
