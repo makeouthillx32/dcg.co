@@ -1,9 +1,12 @@
 // utils/supabase/server.ts
-import { createServerClient } from "@supabase/ssr";
+import { createServerClient as createSsrClient } from "@supabase/ssr";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 
-export const createClient = async (mode: "regular" | "service" = "regular") => {
+type ClientMode = "regular" | "service";
+
+export const createClient = async (mode: ClientMode = "regular") => {
+  // Service role client (server-only). Never expose this key to the browser.
   if (mode === "service") {
     return createSupabaseClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -11,9 +14,10 @@ export const createClient = async (mode: "regular" | "service" = "regular") => {
     );
   }
 
-  const cookieStore = await cookies(); // Await cookies()
+  // Next.js 15: cookies() is async
+  const cookieStore = await cookies();
 
-  return createServerClient(
+  return createSsrClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
@@ -27,10 +31,16 @@ export const createClient = async (mode: "regular" | "service" = "regular") => {
               cookieStore.set(name, value, options);
             });
           } catch {
-            // no-op in edge environments
+            // no-op (can throw in some edge/runtime situations)
           }
         },
       },
     }
   );
+};
+
+// ✅ Backwards-compatible alias for older code that imports:
+// import { createServerClient } from "@/utils/supabase/server";
+export const createServerClient = async (mode: ClientMode = "regular") => {
+  return createClient(mode);
 };

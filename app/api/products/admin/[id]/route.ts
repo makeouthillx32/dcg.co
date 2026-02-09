@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/utils/supabase/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 type Params = {
   params: { id: string };
@@ -12,7 +13,7 @@ function jsonError(status: number, code: string, message: string, details?: any)
   );
 }
 
-async function requireAuth(supabase: ReturnType<typeof createServerClient>) {
+async function requireAuth(supabase: SupabaseClient) {
   const { data, error } = await supabase.auth.getUser();
   if (error) return { user: null, error };
   return { user: data.user, error: null };
@@ -23,13 +24,8 @@ async function requireAuth(supabase: ReturnType<typeof createServerClient>) {
  * Wire this to your existing role system (profile/role_label or set-role route).
  */
 async function requireAdmin(
-  supabase: ReturnType<typeof createServerClient>
+  supabase: SupabaseClient
 ): Promise<{ ok: boolean; reason?: string }> {
-  // TODO: implement based on your roles system
-  // Example patterns you might use:
-  // - read from profiles table by user.id -> role_label
-  // - read from JWT claims if you set them
-  // For now: authenticated == allowed (replace ASAP)
   const { user } = await requireAuth(supabase);
   if (!user) return { ok: false, reason: "UNAUTHORIZED" };
   return { ok: true };
@@ -39,8 +35,8 @@ async function requireAdmin(
  * GET /api/products/admin/[id]
  * Admin product detail (any status), includes variants/images/categories
  */
-export async function GET(req: NextRequest, { params }: Params) {
-  const supabase = createServerClient();
+export async function GET(_req: NextRequest, { params }: Params) {
+  const supabase = await createServerClient();
 
   const gate = await requireAdmin(supabase);
   if (!gate.ok) return jsonError(401, "UNAUTHORIZED", "Authentication required");
@@ -115,8 +111,7 @@ export async function GET(req: NextRequest, { params }: Params) {
   }
 
   const categories =
-    data?.product_categories?.map((pc: any) => pc.categories).filter(Boolean) ??
-    [];
+    data?.product_categories?.map((pc: any) => pc.categories).filter(Boolean) ?? [];
 
   const images = (data?.product_images ?? []).slice().sort((a: any, b: any) => {
     const pa = typeof a.position === "number" ? a.position : 0;
@@ -124,13 +119,11 @@ export async function GET(req: NextRequest, { params }: Params) {
     return pa - pb;
   });
 
-  const variants = (data?.product_variants ?? [])
-    .slice()
-    .sort((a: any, b: any) => {
-      const pa = typeof a.position === "number" ? a.position : 0;
-      const pb = typeof b.position === "number" ? b.position : 0;
-      return pa - pb;
-    });
+  const variants = (data?.product_variants ?? []).slice().sort((a: any, b: any) => {
+    const pa = typeof a.position === "number" ? a.position : 0;
+    const pb = typeof b.position === "number" ? b.position : 0;
+    return pa - pb;
+  });
 
   return NextResponse.json({
     ok: true,
@@ -146,25 +139,9 @@ export async function GET(req: NextRequest, { params }: Params) {
 /**
  * PATCH /api/products/admin/[id]
  * Admin update product
- *
- * Accepts partial updates, e.g.:
- * {
- *   "title": "...",
- *   "slug": "...",
- *   "description": "...",
- *   "price_cents": 1234,
- *   "compare_at_price_cents": 1500,
- *   "currency": "USD",
- *   "badge": "New",
- *   "is_featured": true,
- *   "status": "active" | "draft" | "archived",
- *   "seo_title": "...",
- *   "seo_description": "...",
- *   "og_image_override_url": "..."
- * }
  */
 export async function PATCH(req: NextRequest, { params }: Params) {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
 
   const gate = await requireAdmin(supabase);
   if (!gate.ok) return jsonError(401, "UNAUTHORIZED", "Authentication required");
@@ -179,7 +156,6 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     return jsonError(400, "INVALID_JSON", "Body must be valid JSON");
   }
 
-  // Whitelist fields we allow updates for
   const allowed: Record<string, true> = {
     slug: true,
     title: true,
@@ -193,7 +169,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     seo_title: true,
     seo_description: true,
     og_image_override_url: true,
-    search_text: true, // optional (can be auto-generated later)
+    search_text: true,
   };
 
   const update: Record<string, any> = {};
@@ -245,8 +221,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
  * DELETE /api/products/admin/[id]
  * Soft-delete (archive) product
  */
-export async function DELETE(req: NextRequest, { params }: Params) {
-  const supabase = createServerClient();
+export async function DELETE(_req: NextRequest, { params }: Params) {
+  const supabase = await createServerClient();
 
   const gate = await requireAdmin(supabase);
   if (!gate.ok) return jsonError(401, "UNAUTHORIZED", "Authentication required");
