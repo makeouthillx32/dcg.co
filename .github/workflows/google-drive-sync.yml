@@ -1,24 +1,8 @@
-name: Sync to Google Drive
-on:
-  push:
-    branches:
-      - main
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Upload to Drive
-        uses: mathisve/gdrive-upload-action@main
-        with:
-          credentials: ${{ secrets.GDRIVE_CREDENTIALS }}
-          # The glob pattern './**' selects all files in all subfolders
-          filename: './**'
-          folderId: ${{ secrets.FOLDER_ID }}
-          # Proof: This flag recreates your GitHub folder tree in Drive
-          mirrorDirectoryStructure: true
-          # This ensures it updates the 'seed' files you already uploaded
-          overwrite: true
+- name: Upload to Drive
+  uses: mathisve/gdrive-upload-action@v1
+  with:
+    credentials: ${{ secrets.GDRIVE_CREDENTIALS }}
+    encoded: false
+    filename: './**'
+    folderId: ${{ secrets.FOLDER_ID }}
+    overwrite: true
