@@ -268,3 +268,147 @@ These endpoints connect products to categories/tags/collections through join tab
 **File:** `app/api/products/admin/[id]/collections/route.ts`
 
 ---
+Perfect timing — this is the **last core utility** you need before wiring real data.
+
+Below is a **clean, future-proof image helper** that works with **Supabase Storage** and keeps **all image logic out of components**.
+
+No guessing, no hardcoded URLs.
+
+---
+
+## 1️⃣ Create: `lib/images.ts`
+
+**Path**
+
+```
+Z:\WEBSITES\DCG.CO\lib\images.ts
+```
+
+```ts
+/**
+ * Central image helpers for Supabase Storage
+ *
+ * Assumptions:
+ * - Images are stored in Supabase Storage
+ * - You store `storage_path` in the DB (NOT full URLs)
+ *   example: "products/abc123/main.jpg"
+ */
+
+const SUPABASE_URL =
+  process.env.NEXT_PUBLIC_SUPABASE_URL ??
+  process.env.NEXT_PUBLIC_SUPABASE_PROJECT_URL ??
+  "";
+
+if (!SUPABASE_URL) {
+  console.warn("⚠️ NEXT_PUBLIC_SUPABASE_URL is not set");
+}
+
+/**
+ * CHANGE THIS to your actual bucket name
+ * Common values:
+ * - "public"
+ * - "product-images"
+ * - "images"
+ */
+export const PRODUCT_IMAGE_BUCKET = "product-images";
+
+/**
+ * Build a public Supabase Storage URL from a storage path
+ *
+ * @example
+ * storagePathToUrl("products/123/main.jpg")
+ * → https://xyz.supabase.co/storage/v1/object/public/product-images/products/123/main.jpg
+ */
+export function storagePathToUrl(storagePath?: string | null): string | null {
+  if (!storagePath) return null;
+  if (!SUPABASE_URL) return null;
+
+  return `${SUPABASE_URL}/storage/v1/object/public/${PRODUCT_IMAGE_BUCKET}/${storagePath}`;
+}
+
+/**
+ * Returns the first image URL (or fallback)
+ */
+export function getPrimaryImageUrl(
+  images: { storage_path: string }[] | null | undefined,
+  fallback: string = "/images/placeholder.png"
+): string {
+  if (!images || images.length === 0) return fallback;
+
+  const url = storagePathToUrl(images[0].storage_path);
+  return url ?? fallback;
+}
+```
+
+---
+
+## 2️⃣ (Optional but smart) Create a placeholder image
+
+Put **one fallback image** here so broken products never look bad:
+
+```
+public/images/placeholder.png
+```
+
+Even a gray square is fine for now.
+
+---
+
+## 3️⃣ Example usage (Featured product card)
+
+When you swap from placeholder → real product cards, this is how images plug in:
+
+```tsx
+import Image from "next/image";
+import { getPrimaryImageUrl } from "@/lib/images";
+import { formatMoney } from "@/lib/money";
+import type { StoreProductListItem } from "@/types/store";
+
+export function ProductCard({ product }: { product: StoreProductListItem }) {
+  const imageUrl = getPrimaryImageUrl(product.product_images);
+
+  return (
+    <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] overflow-hidden">
+      <div className="aspect-square relative">
+        <Image
+          src={imageUrl}
+          alt={product.title}
+          fill
+          className="object-cover"
+        />
+      </div>
+
+      <div className="p-3">
+        <div className="font-semibold text-sm">{product.title}</div>
+        <div className="text-sm text-[var(--muted-foreground)] mt-1">
+          {formatMoney(product.price_cents, product.currency)}
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## 4️⃣ Why this setup is important (quick)
+
+* ✅ DB stores **paths**, not URLs (portable, clean)
+* ✅ Changing buckets = **one line**
+* ✅ Signed URLs later = **swap function**
+* ✅ Components stay dumb (good React)
+
+---
+
+## 5️⃣ Next logical steps (your choice)
+
+Say one of these and we go **exactly there**:
+
+* **“swap featured products”** → replace placeholders with `/api/products`
+* **“swap category tiles”** → fully live landing categories
+* **“product grid page”** → `/shop` page wired to backend
+* **“product detail page”** → slug page with variants & images
+
+You’re in the *clean part* of the build now — everything after this is just plugging in data.
+
+---
