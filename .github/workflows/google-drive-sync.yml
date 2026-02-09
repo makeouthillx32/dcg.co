@@ -1,8 +1,59 @@
-- name: Upload to Drive
-  uses: mathisve/gdrive-upload-action@v1
-  with:
-    credentials: ${{ secrets.GDRIVE_CREDENTIALS }}
-    encoded: false
-    filename: './**'
-    folderId: ${{ secrets.FOLDER_ID }}
-    overwrite: true
+name: Sync to Google Drive
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # --- DEBUG: list repo contents ---
+      - name: Debug – list files
+        run: |
+          echo "Repo root:"
+          ls -la
+          echo ""
+          echo "First-level folders:"
+          find . -maxdepth 2 -type d
+
+      # --- DEBUG: verify secrets exist (without printing them) ---
+      - name: Debug – verify secrets exist
+        run: |
+          if [ -z "${{ secrets.GDRIVE_CREDENTIALS }}" ]; then
+            echo "❌ GDRIVE_CREDENTIALS is EMPTY"
+            exit 1
+          else
+            echo "✅ GDRIVE_CREDENTIALS exists"
+          fi
+
+          if [ -z "${{ secrets.FOLDER_ID }}" ]; then
+            echo "❌ FOLDER_ID is EMPTY"
+            exit 1
+          else
+            echo "✅ FOLDER_ID exists"
+          fi
+
+      # --- DEBUG: validate JSON shape (safe) ---
+      - name: Debug – validate credentials JSON
+        run: |
+          echo '${{ secrets.GDRIVE_CREDENTIALS }}' | jq -e '.type and .client_email and .private_key' \
+            && echo "✅ Credentials JSON looks valid" \
+            || (echo "❌ Credentials JSON invalid"; exit 1)
+
+      # --- ACTUAL UPLOAD ---
+      - name: Upload to Google Drive
+        uses: mathisve/gdrive-upload-action@v1
+        with:
+          credentials: ${{ secrets.GDRIVE_CREDENTIALS }}
+          encoded: false
+          filename: './**'
+          folderId: ${{ secrets.FOLDER_ID }}
+          overwrite: true
+        env:
+          ACTIONS_STEP_DEBUG: true
