@@ -8,6 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
+import { createBrowserClient } from "@/utils/supabase/client";
+import { PRODUCT_IMAGE_BUCKET } from "@/lib/images";
+
 function slugify(input: string) {
   return input
     .toLowerCase()
@@ -18,6 +21,15 @@ function slugify(input: string) {
     .replace(/^-|-$/g, "");
 }
 
+function fileExt(name: string) {
+  const i = name.lastIndexOf(".");
+  return i >= 0 ? name.slice(i + 1).toLowerCase() : "jpg";
+}
+function randId() {
+  return Math.random().toString(16).slice(2) + Date.now().toString(16);
+}
+
+async function
 async function safeReadJson(res: Response) {
   const text = await res.text();
   if (!text) return null;
@@ -41,6 +53,11 @@ export default function CreateProductModal({
   const [slug, setSlug] = useState("");
   const [price, setPrice] = useState("0.00");
   const [description, setDescription] = useState("");
+  const [altText, setAltText] = useState("");
+
+  // ✅ images picked at creation time
+  const [files, setFiles] = useState<File[]>([]);
+
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -49,6 +66,8 @@ export default function CreateProductModal({
       setSlug("");
       setPrice("0.00");
       setDescription("");
+      setAltText("");
+      setFiles([]);
       setSaving(false);
     }
   }, [open]);
@@ -70,7 +89,9 @@ export default function CreateProductModal({
     if (!Number.isFinite(p) || p < 0) return toast.error("Price must be a valid number");
 
     setSaving(true);
+
     try {
+      // 1) create product
       const res = await fetch("/api/products/admin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -85,10 +106,47 @@ export default function CreateProductModal({
       const json = await safeReadJson(res);
       if (!res.ok || !json?.ok) throw new Error(json?.error?.message ?? "Create failed");
 
-      const newId = json.data?.id as string | undefined;
-      if (!newId) throw new Error("Create succeeded but response missing product id");
+      const productId = json.data?.id as string | undefined;
+      if (!productId) throw new Error("Create succeeded but response missing product id");
 
-      onCreated(newId);
+      // 2) optionally upload images + insert DB rows
+      if (files.length) {
+        const supabase = createBrowserClient();
+
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          const object_path = `products/${productId}/${randId()}.${fileExt(file.name)}`;
+
+          const up = await supabase.storage.from(PRODUCT_IMAGE_BUCKET).upload(object_path, file, {
+            upsert: false,
+            cacheControl: "3600",
+            contentType: file.type || "image/*",
+          });
+
+          if (up.error) throw new Error(up.error.message);
+
+          // insert row into product_images via API (matches your schema)
+          const ins = await fetch(`/api/products/admin/${productId}/images`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              bucket_name: PRODUCT_IMAGE_BUCKET,
+              object_path,
+              alt_text: altText.trim() ? altText.trim() : null,
+              position: i,
+              is_primary: i === 0,
+            }),
+          });
+
+          const insJson = await safeReadJson(ins);
+          if (!ins.ok || !insJson?.ok) {
+            throw new Error(insJson?.error?.message ?? `Image insert failed: ${ins.status}`);
+          }
+        }
+      }
+
+      toast.success(files.length ? "Product created with images" : "Product created");
+      onCreated(productId);
     } catch (e: any) {
       console.error(e);
       toast.error(e?.message ?? "Create failed");
@@ -123,14 +181,33 @@ export default function CreateProductModal({
           <div className="space-y-2">
             <label className="text-sm font-semibold">Price (USD)</label>
             <Input value={price} onChange={(e) => setPrice(e.target.value)} />
-            <p className="text-xs text-[hsl(var(--muted-foreground))]">
-              This will be stored as cents in the database.
-            </p>
           </div>
 
           <div className="space-y-2">
             <label className="text-sm font-semibold">Description (optional)</label>
-            <Textarea value={description} onChange={(e) => setDescription(e.target.value)} className="min-h-[120px]" />
+            <Textarea value={description} onChange={(e) => setDescription(e.target.value)} className="min-h-[110px]" />
+          </div>
+
+          {/* ✅ Images at creation */}
+          <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4 space-y-2">
+            <div className="text-sm font-semibold">Images (optional)</div>
+
+            <Input
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
+            />
+
+            <Input
+              value={altText}
+              onChange={(e) => setAltText(e.target.value)}
+              placeholder="Alt text applied to uploaded images (optional)"
+            />
+
+            <div className="text-xs text-[hsl(var(--muted-foreground))]">
+              Bucket: <code>{PRODUCT_IMAGE_BUCKET}</code> • First image becomes primary
+            </div>
           </div>
         </div>
 
