@@ -1,0 +1,23 @@
+name: Sync to Google Drive
+on:
+  push:
+    branches:
+      - main  # Change this to 'master' if your main branch uses that name
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Zip Repository
+        run: zip -r repository_backup.zip . -x "*.git*"
+
+      - name: Upload to Drive
+        uses: adityak74/google-drive-upload-git-action@main
+        with:
+          credentials: ${{ secrets.GDRIVE_CREDENTIALS }}
+          filename: repository_backup.zip
+          folderId: 'YOUR_FOLDER_ID_HERE'
+          overwrite: "true"
