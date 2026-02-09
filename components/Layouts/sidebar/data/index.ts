@@ -54,7 +54,7 @@ export const NAV_DATA = [
           {
             title: "Collections",
             url: "/settings/collections",
-            icon: Icons.Table,
+            icon: Icons.FourCircle, // ✅ safe replacement
           },
           {
             title: "Tags / Subcategories",
@@ -66,7 +66,7 @@ export const NAV_DATA = [
           {
             title: "Banners",
             url: "/settings/banners",
-            icon: Icons.Image ?? Icons.FourCircle,
+            icon: Icons.FourCircle, // ✅ Image icon removed
           },
           {
             title: "Discounts",
@@ -95,6 +95,7 @@ export const NAV_DATA = [
           {
             title: "Theme Maker",
             url: "/settings/thememaker",
+            icon: Icons.SettingsIcon,
           },
 
           // ───────── Dev / Seed (optional) ─────────
