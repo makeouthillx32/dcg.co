@@ -6,7 +6,7 @@ import { createServerClient } from "@/utils/supabase/server";
  * Public product listing (active products only)
  */
 export async function GET(req: NextRequest) {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
 
   const { searchParams } = new URL(req.url);
   const q = searchParams.get("q");
@@ -15,7 +15,8 @@ export async function GET(req: NextRequest) {
 
   let query = supabase
     .from("products")
-    .select(`
+    .select(
+      `
       id,
       slug,
       title,
@@ -31,7 +32,8 @@ export async function GET(req: NextRequest) {
         alt,
         position
       )
-    `)
+    `
+    )
     .eq("status", "active")
     .order("created_at", { ascending: false })
     .range(offset, offset + limit - 1);
@@ -70,12 +72,26 @@ export async function GET(req: NextRequest) {
  * Create a new product (admin only)
  */
 export async function POST(req: NextRequest) {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
 
   // 🔒 Auth check
   const {
     data: { user },
+    error: authError,
   } = await supabase.auth.getUser();
+
+  if (authError) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: {
+          code: "AUTH_ERROR",
+          message: authError.message,
+        },
+      },
+      { status: 401 }
+    );
+  }
 
   if (!user) {
     return NextResponse.json(
@@ -91,7 +107,6 @@ export async function POST(req: NextRequest) {
   }
 
   // TODO: role check (admin / catalog manager)
-  // You already have role infra — we’ll wire it next
 
   const body = await req.json();
 
@@ -130,7 +145,7 @@ export async function POST(req: NextRequest) {
       currency,
       badge,
       is_featured,
-      status: "draft", // 👈 always start as draft
+      status: "draft", // always start as draft
     })
     .select()
     .single();
