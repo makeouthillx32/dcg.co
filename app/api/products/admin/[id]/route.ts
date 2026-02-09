@@ -2,37 +2,46 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/utils/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+type Params = {
+  params: { id: string };
+};
+
 function jsonError(status: number, code: string, message: string, details?: any) {
   return NextResponse.json({ ok: false, error: { code, message, details } }, { status });
 }
 
-async function requireAdmin(supabase: SupabaseClient) {
+async function requireAuth(supabase: SupabaseClient) {
   const { data, error } = await supabase.auth.getUser();
-  if (error) return { ok: false, status: 401 as const, message: error.message };
-  if (!data.user) return { ok: false, status: 401 as const, message: "Authentication required" };
-  // TODO: real role gating
-  return { ok: true as const };
+  if (error) return { user: null, error };
+  return { user: data.user, error: null };
 }
 
 /**
- * GET /api/products/admin
- * Admin product listing (any status)
- * Returns [] when empty (never 500 for empty).
+ * NOTE: Role check placeholder.
+ * Wire this to your existing role system (profile/role_label or set-role route).
  */
-export async function GET(req: NextRequest) {
+async function requireAdmin(
+  supabase: SupabaseClient
+): Promise<{ ok: boolean; reason?: string }> {
+  const { user } = await requireAuth(supabase);
+  if (!user) return { ok: false, reason: "UNAUTHORIZED" };
+  return { ok: true };
+}
+
+/**
+ * GET /api/products/admin/[id]
+ * Admin product detail (any status), includes variants/images/categories
+ */
+export async function GET(_req: NextRequest, { params }: Params) {
   const supabase = await createServerClient();
 
   const gate = await requireAdmin(supabase);
-  if (!gate.ok) return jsonError(gate.status, "UNAUTHORIZED", gate.message);
+  if (!gate.ok) return jsonError(401, "UNAUTHORIZED", "Authentication required");
 
-  const { searchParams } = new URL(req.url);
+  const id = params.id;
+  if (!id) return jsonError(400, "INVALID_ID", "Missing product id");
 
-  const limit = Math.min(Number(searchParams.get("limit") ?? 50), 200);
-  const offset = Math.max(Number(searchParams.get("offset") ?? 0), 0);
-  const status = (searchParams.get("status") ?? "all").toLowerCase(); // all|active|draft|archived
-  const q = searchParams.get("q")?.trim() || "";
-
-  let query = supabase
+  const { data, error } = await supabase
     .from("products")
     .select(
       `
@@ -46,30 +55,209 @@ export async function GET(req: NextRequest) {
       badge,
       is_featured,
       status,
+      search_text,
+      seo_title,
+      seo_description,
+      og_image_override_url,
       created_at,
+      updated_at,
+
       product_images (
-        storage_path,
-        alt,
-        position
+        id,
+        product_id,
+        bucket_name,
+        object_path,
+        alt_text,
+        sort_order,
+        position,
+        is_primary,
+        is_public,
+        blurhash,
+        width,
+        height,
+        mime_type,
+        size_bytes,
+        created_at
+      ),
+
+      product_variants (
+        id,
+        product_id,
+        title,
+        sku,
+        price_cents,
+        compare_at_price_cents,
+        position,
+        inventory_enabled,
+        stock_on_hand,
+        low_stock_threshold,
+        created_at
+      ),
+
+      product_categories (
+        categories (
+          id,
+          slug,
+          name,
+          parent_id
+        )
       )
     `
     )
-    .order("created_at", { ascending: false })
-    .range(offset, offset + limit - 1);
-
-  if (status !== "all") query = query.eq("status", status);
-  if (q) query = query.ilike("search_text", `%${q}%`);
-
-  const { data, error } = await query;
+    .eq("id", id)
+    .single();
 
   if (error) {
-    return jsonError(500, "PRODUCT_ADMIN_LIST_FAILED", error.message, error);
+    const status =
+      error.code === "PGRST116" || /0 rows/i.test(error.message) ? 404 : 500;
+
+    return jsonError(
+      status,
+      status === 404 ? "NOT_FOUND" : "PRODUCT_FETCH_FAILED",
+      status === 404 ? "Product not found" : error.message
+    );
   }
 
-  // ✅ empty list is success
+  const categories =
+    data?.product_categories?.map((pc: any) => pc.categories).filter(Boolean) ?? [];
+
+  const images = (data?.product_images ?? []).slice().sort((a: any, b: any) => {
+    const sa = typeof a.sort_order === "number" ? a.sort_order : 0;
+    const sb = typeof b.sort_order === "number" ? b.sort_order : 0;
+    if (sa !== sb) return sa - sb;
+
+    const pa = typeof a.position === "number" ? a.position : 0;
+    const pb = typeof b.position === "number" ? b.position : 0;
+    if (pa !== pb) return pa - pb;
+
+    const ca = a.created_at ? Date.parse(a.created_at) : 0;
+    const cb = b.created_at ? Date.parse(b.created_at) : 0;
+    return ca - cb;
+  });
+
+  const variants = (data?.product_variants ?? []).slice().sort((a: any, b: any) => {
+    const pa = typeof a.position === "number" ? a.position : 0;
+    const pb = typeof b.position === "number" ? b.position : 0;
+    return pa - pb;
+  });
+
   return NextResponse.json({
     ok: true,
-    data: data ?? [],
-    meta: { limit, offset, status, q },
+    data: {
+      ...data,
+      product_images: images,
+      product_variants: variants,
+      categories,
+    },
   });
+}
+
+/**
+ * PATCH /api/products/admin/[id]
+ * Admin update product
+ */
+export async function PATCH(req: NextRequest, { params }: Params) {
+  const supabase = await createServerClient();
+
+  const gate = await requireAdmin(supabase);
+  if (!gate.ok) return jsonError(401, "UNAUTHORIZED", "Authentication required");
+
+  const id = params.id;
+  if (!id) return jsonError(400, "INVALID_ID", "Missing product id");
+
+  let body: any = null;
+  try {
+    body = await req.json();
+  } catch {
+    return jsonError(400, "INVALID_JSON", "Body must be valid JSON");
+  }
+
+  const allowed: Record<string, true> = {
+    slug: true,
+    title: true,
+    description: true,
+    price_cents: true,
+    compare_at_price_cents: true,
+    currency: true,
+    badge: true,
+    is_featured: true,
+    status: true,
+    seo_title: true,
+    seo_description: true,
+    og_image_override_url: true,
+    search_text: true,
+  };
+
+  const update: Record<string, any> = {};
+  for (const [k, v] of Object.entries(body ?? {})) {
+    if (allowed[k]) update[k] = v;
+  }
+
+  if (Object.keys(update).length === 0) {
+    return jsonError(400, "NO_FIELDS", "No updatable fields were provided");
+  }
+
+  if ("price_cents" in update) {
+    if (typeof update.price_cents !== "number" || !Number.isFinite(update.price_cents) || update.price_cents < 0) {
+      return jsonError(400, "INVALID_PRICE", "price_cents must be a number >= 0");
+    }
+  }
+
+  if ("compare_at_price_cents" in update) {
+    const v = update.compare_at_price_cents;
+    if (v !== null && (typeof v !== "number" || !Number.isFinite(v) || v < 0)) {
+      return jsonError(
+        400,
+        "INVALID_COMPARE_PRICE",
+        "compare_at_price_cents must be a number >= 0 or null"
+      );
+    }
+  }
+
+  if ("status" in update) {
+    const s = String(update.status);
+    if (!["active", "draft", "archived"].includes(s)) {
+      return jsonError(400, "INVALID_STATUS", "status must be active|draft|archived");
+    }
+  }
+
+  const { data, error } = await supabase
+    .from("products")
+    .update(update)
+    .eq("id", id)
+    .select()
+    .single();
+
+  if (error) {
+    return jsonError(500, "PRODUCT_UPDATE_FAILED", error.message);
+  }
+
+  return NextResponse.json({ ok: true, data });
+}
+
+/**
+ * DELETE /api/products/admin/[id]
+ * Soft-delete (archive) product
+ */
+export async function DELETE(_req: NextRequest, { params }: Params) {
+  const supabase = await createServerClient();
+
+  const gate = await requireAdmin(supabase);
+  if (!gate.ok) return jsonError(401, "UNAUTHORIZED", "Authentication required");
+
+  const id = params.id;
+  if (!id) return jsonError(400, "INVALID_ID", "Missing product id");
+
+  const { data, error } = await supabase
+    .from("products")
+    .update({ status: "archived" })
+    .eq("id", id)
+    .select()
+    .single();
+
+  if (error) {
+    return jsonError(500, "PRODUCT_ARCHIVE_FAILED", error.message);
+  }
+
+  return NextResponse.json({ ok: true, data });
 }

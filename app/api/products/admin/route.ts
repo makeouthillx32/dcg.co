@@ -47,9 +47,20 @@ export async function GET(req: NextRequest) {
       status,
       created_at,
       product_images (
-        storage_path,
-        alt,
-        position
+        id,
+        bucket_name,
+        object_path,
+        alt_text,
+        position,
+        sort_order,
+        is_primary,
+        is_public,
+        blurhash,
+        width,
+        height,
+        mime_type,
+        size_bytes,
+        created_at
       )
     `
     )
@@ -63,9 +74,29 @@ export async function GET(req: NextRequest) {
 
   if (error) return jsonError(500, "PRODUCT_ADMIN_LIST_FAILED", error.message, error);
 
+  // Optional: sort images in each product to make UI stable
+  const normalized = (data ?? []).map((p: any) => {
+    const imgs = (p.product_images ?? []).slice().sort((a: any, b: any) => {
+      // prefer sort_order, then position, then created_at
+      const sa = typeof a.sort_order === "number" ? a.sort_order : 0;
+      const sb = typeof b.sort_order === "number" ? b.sort_order : 0;
+      if (sa !== sb) return sa - sb;
+
+      const pa = typeof a.position === "number" ? a.position : 0;
+      const pb = typeof b.position === "number" ? b.position : 0;
+      if (pa !== pb) return pa - pb;
+
+      const ca = a.created_at ? Date.parse(a.created_at) : 0;
+      const cb = b.created_at ? Date.parse(b.created_at) : 0;
+      return ca - cb;
+    });
+
+    return { ...p, product_images: imgs };
+  });
+
   return NextResponse.json({
     ok: true,
-    data: data ?? [],
+    data: normalized,
     meta: { limit, offset, status, q },
   });
 }
@@ -103,6 +134,16 @@ export async function POST(req: NextRequest) {
     return jsonError(400, "INVALID_INPUT", "slug, title, and price_cents are required");
   }
 
+  if (price_cents < 0) {
+    return jsonError(400, "INVALID_PRICE", "price_cents must be >= 0");
+  }
+  if (compare_at_price_cents !== null && typeof compare_at_price_cents !== "number") {
+    return jsonError(400, "INVALID_COMPARE_PRICE", "compare_at_price_cents must be a number or null");
+  }
+  if (typeof currency !== "string" || currency.length < 3) {
+    return jsonError(400, "INVALID_CURRENCY", "currency must be a 3-letter code like USD");
+  }
+
   const { data, error } = await supabase
     .from("products")
     .insert({
@@ -117,7 +158,21 @@ export async function POST(req: NextRequest) {
       search_text,
       status: "draft",
     })
-    .select()
+    .select(
+      `
+      id,
+      slug,
+      title,
+      description,
+      price_cents,
+      compare_at_price_cents,
+      currency,
+      badge,
+      is_featured,
+      status,
+      created_at
+    `
+    )
     .single();
 
   if (error) return jsonError(500, "PRODUCT_CREATE_FAILED", error.message, error);
