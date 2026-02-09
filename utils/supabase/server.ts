@@ -1,19 +1,12 @@
 // utils/supabase/server.ts
-import { createServerClient as createSSRClient } from "@supabase/ssr";
-import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import { createServerClient as createSsrServerClient } from "@supabase/ssr";
+import { createClient as createSupabaseClient, type SupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 
-export const createClient = async (mode: "regular" | "service" = "regular") => {
-  if (mode === "service") {
-    return createSupabaseClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
-  }
-
+export async function createServerClient(): Promise<SupabaseClient> {
   const cookieStore = await cookies();
 
-  return createSSRClient(
+  return createSsrServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
@@ -27,13 +20,17 @@ export const createClient = async (mode: "regular" | "service" = "regular") => {
               cookieStore.set(name, value, options);
             });
           } catch {
-            // no-op
+            // no-op in edge environments
           }
         },
       },
     }
   );
-};
+}
 
-// ✅ add this so your API routes work without changing imports everywhere
-export const createServerClient = createClient;
+export function createServiceClient(): SupabaseClient {
+  return createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
