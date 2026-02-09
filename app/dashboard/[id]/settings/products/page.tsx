@@ -1,3 +1,4 @@
+// app/dashboard/[id]/settings/products/page.tsx
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
@@ -8,25 +9,15 @@ import LoadingState from "./_components/LoadingState";
 import ErrorAlert from "./_components/ErrorAlert";
 import ProductsSearchBar from "./_components/ProductsSearchBar";
 import ProductActionBar from "./_components/ProductActionBar";
-import ProductsTable from "./_components/ProductsTable";
+import ProductsTable, { ProductRow } from "./_components/ProductsTable";
+
+// ✅ create modal (we’ll add this next)
+import CreateProductModal from "./_components/CreateProductModal";
+
+// ✅ manage modal (the big one you pasted)
 import ProductModal from "./_components/ProductModal";
 
 import "./_components/products.scss";
-
-export type ProductRow = {
-  id: string;
-  slug: string;
-  title: string;
-  description: string | null;
-  price_cents: number;
-  compare_at_price_cents: number | null;
-  currency: string;
-  badge: string | null;
-  is_featured: boolean;
-  status?: string;
-  created_at: string;
-  product_images?: { storage_path: string; alt: string | null; position: number }[];
-};
 
 async function safeReadJson(res: Response) {
   const text = await res.text();
@@ -34,10 +25,7 @@ async function safeReadJson(res: Response) {
   try {
     return JSON.parse(text);
   } catch {
-    return {
-      ok: false,
-      error: { code: "NON_JSON_RESPONSE", message: text.slice(0, 300) },
-    };
+    return { ok: false, error: { code: "NON_JSON_RESPONSE", message: text.slice(0, 300) } };
   }
 }
 
@@ -49,8 +37,12 @@ export default function ProductsPage() {
 
   const [searchQuery, setSearchQuery] = useState("");
 
-  // modal open state for "Create"
+  // ✅ Create modal open
   const [createOpen, setCreateOpen] = useState(false);
+
+  // ✅ Manage modal open + selected product
+  const [manageOpen, setManageOpen] = useState(false);
+  const [manageProductId, setManageProductId] = useState<string | null>(null);
 
   const fetchProducts = async (mode: "initial" | "refresh" = "refresh") => {
     mode === "initial" ? setIsLoading(true) : setIsRefreshing(true);
@@ -65,9 +57,7 @@ export default function ProductsPage() {
       const res = await fetch(url.toString(), { cache: "no-store" });
       const json = await safeReadJson(res);
 
-      if (!res.ok || !json?.ok) {
-        throw new Error(json?.error?.message ?? `Failed: ${res.status}`);
-      }
+      if (!res.ok || !json?.ok) throw new Error(json?.error?.message ?? `Failed: ${res.status}`);
 
       setProducts((json.data ?? []) as ProductRow[]);
       setError(null);
@@ -91,10 +81,7 @@ export default function ProductsPage() {
     if (!q) return products;
 
     return products.filter((p) =>
-      [p.title, p.slug, p.badge ?? "", p.currency, p.status ?? ""]
-        .join(" ")
-        .toLowerCase()
-        .includes(q)
+      [p.title, p.slug, p.badge ?? "", p.status ?? ""].join(" ").toLowerCase().includes(q)
     );
   }, [products, searchQuery]);
 
@@ -116,20 +103,52 @@ export default function ProductsPage() {
         </div>
 
         {isLoading && <LoadingState message="Loading products..." />}
-
         {error && <ErrorAlert message={error} onDismiss={() => setError(null)} />}
 
         {!isLoading && !error && (
-          <ProductsTable products={filtered} onChanged={() => fetchProducts("refresh")} />
+          <ProductsTable
+            products={filtered}
+            isRefreshing={isRefreshing}
+            onManage={(p) => {
+              setManageProductId(p.id);
+              setManageOpen(true);
+            }}
+            onArchive={async (p) => {
+              if (!confirm(`Archive "${p.title}"?`)) return;
+              try {
+                const res = await fetch(`/api/products/admin/${p.id}`, { method: "DELETE" });
+                const json = await safeReadJson(res);
+                if (!res.ok || !json?.ok) throw new Error(json?.error?.message ?? "Archive failed");
+                toast.success("Archived");
+                fetchProducts("refresh");
+              } catch (e: any) {
+                toast.error(e?.message ?? "Archive failed");
+              }
+            }}
+          />
         )}
 
-        <ProductModal
+        {/* ✅ Create */}
+        <CreateProductModal
           open={createOpen}
           onOpenChange={setCreateOpen}
-          onCreated={() => {
+          onCreated={(newProductId) => {
             setCreateOpen(false);
+            toast.success("Product created");
             fetchProducts("refresh");
+
+            // optional: immediately open manage
+            setManageProductId(newProductId);
+            setManageOpen(true);
           }}
+        />
+
+        {/* ✅ Manage */}
+        <ProductModal
+          open={manageOpen}
+          onOpenChange={(v) => setManageOpen(v)}
+          productId={manageProductId}
+          onChanged={() => fetchProducts("refresh")}
         />
       </div>
     </ShowcaseSection>

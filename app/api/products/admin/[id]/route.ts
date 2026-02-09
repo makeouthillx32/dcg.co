@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@/utils/supabase/server";
+import { createClient } from "@/utils/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 type Params = {
@@ -33,7 +33,7 @@ async function requireAdmin(
  * Admin product detail (any status), includes variants/images/categories
  */
 export async function GET(_req: NextRequest, { params }: Params) {
-  const supabase = await createServerClient();
+  const supabase = await createClient();
 
   const gate = await requireAdmin(supabase);
   if (!gate.ok) return jsonError(401, "UNAUTHORIZED", "Authentication required");
@@ -122,6 +122,12 @@ export async function GET(_req: NextRequest, { params }: Params) {
     data?.product_categories?.map((pc: any) => pc.categories).filter(Boolean) ?? [];
 
   const images = (data?.product_images ?? []).slice().sort((a: any, b: any) => {
+    // primary first
+    const ap = a.is_primary ? 1 : 0;
+    const bp = b.is_primary ? 1 : 0;
+    if (ap !== bp) return bp - ap;
+
+    // then sort_order, then position, then created_at
     const sa = typeof a.sort_order === "number" ? a.sort_order : 0;
     const sb = typeof b.sort_order === "number" ? b.sort_order : 0;
     if (sa !== sb) return sa - sb;
@@ -157,7 +163,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
  * Admin update product
  */
 export async function PATCH(req: NextRequest, { params }: Params) {
-  const supabase = await createServerClient();
+  const supabase = await createClient();
 
   const gate = await requireAdmin(supabase);
   if (!gate.ok) return jsonError(401, "UNAUTHORIZED", "Authentication required");
@@ -198,7 +204,11 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   }
 
   if ("price_cents" in update) {
-    if (typeof update.price_cents !== "number" || !Number.isFinite(update.price_cents) || update.price_cents < 0) {
+    if (
+      typeof update.price_cents !== "number" ||
+      !Number.isFinite(update.price_cents) ||
+      update.price_cents < 0
+    ) {
       return jsonError(400, "INVALID_PRICE", "price_cents must be a number >= 0");
     }
   }
@@ -229,7 +239,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     .single();
 
   if (error) {
-    return jsonError(500, "PRODUCT_UPDATE_FAILED", error.message);
+    return jsonError(500, "PRODUCT_UPDATE_FAILED", error.message, error);
   }
 
   return NextResponse.json({ ok: true, data });
@@ -240,7 +250,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
  * Soft-delete (archive) product
  */
 export async function DELETE(_req: NextRequest, { params }: Params) {
-  const supabase = await createServerClient();
+  const supabase = await createClient();
 
   const gate = await requireAdmin(supabase);
   if (!gate.ok) return jsonError(401, "UNAUTHORIZED", "Authentication required");
@@ -256,7 +266,7 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     .single();
 
   if (error) {
-    return jsonError(500, "PRODUCT_ARCHIVE_FAILED", error.message);
+    return jsonError(500, "PRODUCT_ARCHIVE_FAILED", error.message, error);
   }
 
   return NextResponse.json({ ok: true, data });

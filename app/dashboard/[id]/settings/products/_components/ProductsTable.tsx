@@ -6,6 +6,18 @@ import { Trash2, Loader2, Settings2, Image as ImageIcon, Tag as TagIcon } from "
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
+export type ProductImageRow = {
+  id?: string;
+  bucket_name: string;
+  object_path: string;
+  alt_text: string | null;
+  sort_order: number | null;
+  position: number | null;
+  is_primary: boolean | null;
+  is_public: boolean | null;
+  created_at?: string;
+};
+
 export type ProductRow = {
   id: string;
   slug: string;
@@ -18,7 +30,7 @@ export type ProductRow = {
   is_featured: boolean;
   status?: string;
   created_at: string;
-  product_images?: { storage_path: string; alt: string | null; position: number }[];
+  product_images?: ProductImageRow[];
 };
 
 interface ProductsTableProps {
@@ -176,9 +188,7 @@ export default function ProductsTable({
 
               {/* Desktop-only small info strip */}
               <div className="hidden md:flex md:col-span-12 items-center justify-between pt-2 text-xs text-[hsl(var(--muted-foreground))]">
-                <span>
-                  Created: {new Date(p.created_at).toLocaleString()}
-                </span>
+                <span>Created: {new Date(p.created_at).toLocaleString()}</span>
                 <span className="inline-flex items-center gap-1">
                   <ImageIcon size={14} /> {imgCount} image{imgCount === 1 ? "" : "s"}
                   <span className="mx-2">•</span>

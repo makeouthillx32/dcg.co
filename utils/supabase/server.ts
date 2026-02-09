@@ -1,12 +1,9 @@
 // utils/supabase/server.ts
-import { createServerClient as createSsrClient } from "@supabase/ssr";
+import { createServerClient as createSSRClient } from "@supabase/ssr";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 
-type ClientMode = "regular" | "service";
-
-export const createClient = async (mode: ClientMode = "regular") => {
-  // Service role client (server-only). Never expose this key to the browser.
+export const createClient = async (mode: "regular" | "service" = "regular") => {
   if (mode === "service") {
     return createSupabaseClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -14,10 +11,9 @@ export const createClient = async (mode: ClientMode = "regular") => {
     );
   }
 
-  // Next.js 15: cookies() is async
   const cookieStore = await cookies();
 
-  return createSsrClient(
+  return createSSRClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
@@ -31,7 +27,7 @@ export const createClient = async (mode: ClientMode = "regular") => {
               cookieStore.set(name, value, options);
             });
           } catch {
-            // no-op (can throw in some edge/runtime situations)
+            // no-op
           }
         },
       },
@@ -39,8 +35,5 @@ export const createClient = async (mode: ClientMode = "regular") => {
   );
 };
 
-// ✅ Backwards-compatible alias for older code that imports:
-// import { createServerClient } from "@/utils/supabase/server";
-export const createServerClient = async (mode: ClientMode = "regular") => {
-  return createClient(mode);
-};
+// ✅ add this so your API routes work without changing imports everywhere
+export const createServerClient = createClient;

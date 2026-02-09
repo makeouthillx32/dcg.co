@@ -5,33 +5,27 @@ type Params = {
   params: { slug: string };
 };
 
+function jsonError(status: number, code: string, message: string, details?: any) {
+  return NextResponse.json({ ok: false, error: { code, message, details } }, { status });
+}
+
 /**
  * GET /api/products/[slug]
  * Public product detail (active products only)
  *
  * Optional query:
- *  - include=inventory  -> includes variant inventory fields (if present in schema)
+ *  - include=inventory  -> includes variant inventory fields
  */
 export async function GET(req: NextRequest, { params }: Params) {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
 
   const slug = params.slug;
-  if (!slug) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: { code: "INVALID_SLUG", message: "Missing slug" },
-      },
-      { status: 400 }
-    );
-  }
+  if (!slug) return jsonError(400, "INVALID_SLUG", "Missing slug");
 
   const { searchParams } = new URL(req.url);
   const include = searchParams.get("include");
   const includeInventory = include === "inventory";
 
-  // Base select (safe for storefront)
-  // Note: we keep inventory optional so we don't leak internal fields by default.
   const variantsSelect = includeInventory
     ? `
       id,
@@ -78,9 +72,18 @@ export async function GET(req: NextRequest, { params }: Params) {
 
       product_images (
         id,
-        storage_path,
-        alt,
+        bucket_name,
+        object_path,
+        alt_text,
+        sort_order,
         position,
+        is_primary,
+        is_public,
+        blurhash,
+        width,
+        height,
+        mime_type,
+        size_bytes,
         created_at
       ),
 
@@ -101,47 +104,47 @@ export async function GET(req: NextRequest, { params }: Params) {
     .single();
 
   if (error) {
-    // If not found, Supabase usually returns an error for .single()
     const status =
       error.code === "PGRST116" || /0 rows/i.test(error.message) ? 404 : 500;
 
-    return NextResponse.json(
-      {
-        ok: false,
-        error: {
-          code: status === 404 ? "NOT_FOUND" : "PRODUCT_FETCH_FAILED",
-          message:
-            status === 404
-              ? "Product not found"
-              : error.message ?? "Failed to fetch product",
-        },
-      },
-      { status }
+    return jsonError(
+      status,
+      status === 404 ? "NOT_FOUND" : "PRODUCT_FETCH_FAILED",
+      status === 404 ? "Product not found" : error.message ?? "Failed to fetch product"
     );
   }
 
-  // Normalize category shape (flatten product_categories -> categories[])
+  // Flatten categories
   const categories =
-    data?.product_categories?.map((pc: any) => pc.categories).filter(Boolean) ??
-    [];
+    data?.product_categories?.map((pc: any) => pc.categories).filter(Boolean) ?? [];
 
-  // Normalize images + variants order
+  // Sort images: sort_order -> position -> created_at
   const images = (data?.product_images ?? []).slice().sort((a: any, b: any) => {
+    const sa = typeof a.sort_order === "number" ? a.sort_order : 0;
+    const sb = typeof b.sort_order === "number" ? b.sort_order : 0;
+    if (sa !== sb) return sa - sb;
+
+    const pa = typeof a.position === "number" ? a.position : 0;
+    const pb = typeof b.position === "number" ? b.position : 0;
+    if (pa !== pb) return pa - pb;
+
+    const ca = a.created_at ? Date.parse(a.created_at) : 0;
+    const cb = b.created_at ? Date.parse(b.created_at) : 0;
+    return ca - cb;
+  });
+
+  // Sort variants by position
+  const variants = (data?.product_variants ?? []).slice().sort((a: any, b: any) => {
     const pa = typeof a.position === "number" ? a.position : 0;
     const pb = typeof b.position === "number" ? b.position : 0;
     return pa - pb;
   });
 
-  const variants = (data?.product_variants ?? [])
-    .slice()
-    .sort((a: any, b: any) => {
-      const pa = typeof a.position === "number" ? a.position : 0;
-      const pb = typeof b.position === "number" ? b.position : 0;
-      return pa - pb;
-    });
-
-  // Primary image (first by position)
-  const primary_image = images.length > 0 ? images[0] : null;
+  // Primary image preference:
+  // 1) first is_primary=true
+  // 2) else first by sort order
+  const primary_image =
+    images.find((img: any) => img?.is_primary) ?? (images.length > 0 ? images[0] : null);
 
   return NextResponse.json({
     ok: true,
