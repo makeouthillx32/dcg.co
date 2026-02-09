@@ -11,29 +11,24 @@ export const NAV_DATA = [
         url: "/",
         icon: Icons.HomeIcon,
         items: [],
-        roles: ["admin", "jobcoach"],
       },
       {
         title: "Calendar",
         url: "/calendar",
         icon: Icons.Calendar,
         items: [],
-        roles: ["admin", "jobcoach", "client"],
       },
-      // Calendar Planner removed as not needed
       {
         title: "Profile",
         url: "/profile",
         icon: Icons.User,
         items: [],
-        roles: ["admin", "jobcoach", "client"],
       },
       {
         title: "Messages",
         url: "/messages",
         icon: Icons.MessageIcon,
-        items: [],  // No dropdown, Chats is the main messages URL
-        roles: ["admin", "jobcoach", "client"],
+        items: [],
       },
       {
         title: "Admin",
@@ -44,11 +39,49 @@ export const NAV_DATA = [
             url: "/settings/members",
             icon: Icons.User,
           },
+
+          // ───────── Store Management ─────────
           {
-            title: "Roles",
-            url: "/settings/roles",
+            title: "Products",
+            url: "/settings/products",
             icon: Icons.Authentication,
           },
+          {
+            title: "Categories",
+            url: "/settings/categories",
+            icon: Icons.Table,
+          },
+          {
+            title: "Collections",
+            url: "/settings/collections",
+            icon: Icons.Table,
+          },
+          {
+            title: "Tags / Subcategories",
+            url: "/settings/tags",
+            icon: Icons.Alphabet,
+          },
+
+          // ───────── Marketing ─────────
+          {
+            title: "Banners",
+            url: "/settings/banners",
+            icon: Icons.Image ?? Icons.FourCircle,
+          },
+          {
+            title: "Discounts",
+            url: "/settings/discounts",
+            icon: Icons.Table,
+          },
+
+          // ───────── Operations ─────────
+          {
+            title: "Inventory",
+            url: "/settings/inventory",
+            icon: Icons.Table,
+          },
+
+          // ───────── System ─────────
           {
             title: "Invites",
             url: "/settings/invites",
@@ -63,11 +96,18 @@ export const NAV_DATA = [
             title: "Theme Maker",
             url: "/settings/thememaker",
           },
+
+          // ───────── Dev / Seed (optional) ─────────
+          {
+            title: "Seed Data",
+            url: "/settings/seed",
+            icon: Icons.Alphabet,
+          },
         ],
-        roles: ["admin"],
       },
     ],
   },
+
   {
     label: "DEVELOPMENT",
     items: [
@@ -84,7 +124,6 @@ export const NAV_DATA = [
             url: "/forms/form-layout",
           },
         ],
-        roles: ["admin"],
       },
       {
         title: "Tables",
@@ -95,7 +134,6 @@ export const NAV_DATA = [
             url: "/tables",
           },
         ],
-        roles: ["admin"],
       },
       {
         title: "UI Elements",
@@ -110,7 +148,6 @@ export const NAV_DATA = [
             url: "/ui-elements/buttons",
           },
         ],
-        roles: ["admin"],
       },
     ],
   },

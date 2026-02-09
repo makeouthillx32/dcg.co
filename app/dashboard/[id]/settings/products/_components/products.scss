@@ -1,18 +1,18 @@
-// Roles and specializations styling
-.roles-page {
-  .role-item {
+// product and specializations styling
+.products-page {
+  .product-item {
     transition: background-color 0.3s ease;
 
-    // Role color indicators
-    .role-color {
+    // product color indicators
+    .product-color {
       width: 12px;
       height: 12px;
       border-radius: 50%;
       margin-right: 10px;
     }
 
-    // For role badges
-    .role-badge {
+    // For product badges
+    .product-badge {
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -24,7 +24,7 @@
   }
 
   // Search section styling
-  .roles-header {
+  .products-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -48,7 +48,7 @@
 
   // Responsive adjustments
   @media (max-width: 768px) {
-    .roles-header {
+    .products-header {
       flex-direction: column;
       align-items: stretch;
       gap: 1rem;
@@ -57,8 +57,8 @@
 }
 
 // Dark mode specific adjustments
-.dark .roles-page {
-  .role-item:hover {
+.dark .products-page {
+  .product-item:hover {
     background-color: rgba(255, 255, 255, 0.05);
   }
 }

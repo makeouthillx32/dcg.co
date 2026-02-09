@@ -1,4 +1,4 @@
-// app/dashboard/[id]/settings/roles/_components/LoadingState.tsx
+// app/dashboard/[id]/settings/products/_components/LoadingState.tsx
 'use client';
 
 import React from 'react';
