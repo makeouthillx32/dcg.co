@@ -1,57 +1,156 @@
+// app/dashboard/[id]/settings/products/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
-import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
-import { PersonalInfoForm } from "./_components/personal-info";
-import { UploadPhotoForm } from "./_components/upload-photo";
-import ManualRoleEditor from "@/components/profile/ManualRoleEditor";
-import AdminUserManager from "@/components/profile/AdminDelete";
-import { createBrowserClient } from "@/utils/supabase/client";
+import React, { useEffect, useMemo, useState } from "react";
+import { ShowcaseSection } from "@/components/Layouts/showcase-section";
+import { toast } from "react-hot-toast";
 
-export default function SettingsPage() {
-  const [isAdmin, setIsAdmin] = useState(false);
+import LoadingState from "./_components/LoadingState";
+import ErrorAlert from "./_components/ErrorAlert";
+import ProductsSearchBar from "./_components/ProductsSearchBar";
+import ProductActionBar from "./_components/ProductActionBar";
+import ProductsTable, { ProductRow } from "./_components/ProductsTable";
+
+// ✅ create modal (we’ll add this next)
+import CreateProductModal from "./_components/CreateProductModal";
+
+// ✅ manage modal (the big one you pasted)
+import ProductModal from "./_components/ProductModal";
+
+import "./_components/products.scss";
+
+async function safeReadJson(res: Response) {
+  const text = await res.text();
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { ok: false, error: { code: "NON_JSON_RESPONSE", message: text.slice(0, 300) } };
+  }
+}
+
+export default function ProductsPage() {
+  const [products, setProducts] = useState<ProductRow[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // ✅ Create modal open
+  const [createOpen, setCreateOpen] = useState(false);
+
+  // ✅ Manage modal open + selected product
+  const [manageOpen, setManageOpen] = useState(false);
+  const [manageProductId, setManageProductId] = useState<string | null>(null);
+
+  const fetchProducts = async (mode: "initial" | "refresh" = "refresh") => {
+    mode === "initial" ? setIsLoading(true) : setIsRefreshing(true);
+
+    try {
+      const url = new URL("/api/products/admin", window.location.origin);
+      url.searchParams.set("limit", "50");
+      url.searchParams.set("offset", "0");
+      url.searchParams.set("status", "all");
+      if (searchQuery.trim()) url.searchParams.set("q", searchQuery.trim());
+
+      const res = await fetch(url.toString(), { cache: "no-store" });
+      const json = await safeReadJson(res);
+
+      if (!res.ok || !json?.ok) throw new Error(json?.error?.message ?? `Failed: ${res.status}`);
+
+      setProducts((json.data ?? []) as ProductRow[]);
+      setError(null);
+
+      if (mode !== "initial") toast.success("Products refreshed");
+    } catch (e: any) {
+      console.error(e);
+      setError(e?.message ?? "Failed to load products.");
+    } finally {
+      mode === "initial" ? setIsLoading(false) : setIsRefreshing(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchRole = async () => {
-      const supabase = createBrowserClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data: profile, error } = await supabase
-        .from("profiles")
-        .select("role!inner(name)")
-        .eq("id", user.id)
-        .single();
-
-      if (!error && profile?.role?.name === "admin") {
-        setIsAdmin(true);
-      }
-    };
-
-    fetchRole();
+    fetchProducts("initial");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const filtered = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return products;
+
+    return products.filter((p) =>
+      [p.title, p.slug, p.badge ?? "", p.status ?? ""].join(" ").toLowerCase().includes(q)
+    );
+  }, [products, searchQuery]);
+
   return (
-    <div className="mx-auto w-full max-w-[1080px]">
-      <Breadcrumb pageName="Settings" />
+    <ShowcaseSection title="Products">
+      <div className="products-page space-y-6">
+        <div className="products-header flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <ProductsSearchBar
+            searchQuery={searchQuery}
+            onSearchQueryChange={setSearchQuery}
+            onSubmitSearch={() => fetchProducts("refresh")}
+          />
 
-      <div className="grid grid-cols-5 gap-8">
-        <div className="col-span-5 xl:col-span-3">
-          <PersonalInfoForm />
+          <ProductActionBar
+            isRefreshing={isRefreshing}
+            onRefresh={() => fetchProducts("refresh")}
+            onCreateProduct={() => setCreateOpen(true)}
+          />
         </div>
-        <div className="col-span-5 xl:col-span-2">
-          <UploadPhotoForm />
-        </div>
+
+        {isLoading && <LoadingState message="Loading products..." />}
+        {error && <ErrorAlert message={error} onDismiss={() => setError(null)} />}
+
+        {!isLoading && !error && (
+          <ProductsTable
+            products={filtered}
+            isRefreshing={isRefreshing}
+            onManage={(p) => {
+              setManageProductId(p.id);
+              setManageOpen(true);
+            }}
+            onArchive={async (p) => {
+              if (!confirm(`Archive "${p.title}"?`)) return;
+              try {
+                const res = await fetch(`/api/products/admin/${p.id}`, { method: "DELETE" });
+                const json = await safeReadJson(res);
+                if (!res.ok || !json?.ok) throw new Error(json?.error?.message ?? "Archive failed");
+                toast.success("Archived");
+                fetchProducts("refresh");
+              } catch (e: any) {
+                toast.error(e?.message ?? "Archive failed");
+              }
+            }}
+          />
+        )}
+
+        {/* ✅ Create */}
+        <CreateProductModal
+          open={createOpen}
+          onOpenChange={setCreateOpen}
+          onCreated={(newProductId) => {
+            setCreateOpen(false);
+            toast.success("Product created");
+            fetchProducts("refresh");
+
+            // optional: immediately open manage
+            setManageProductId(newProductId);
+            setManageOpen(true);
+          }}
+        />
+
+        {/* ✅ Manage */}
+        <ProductModal
+          open={manageOpen}
+          onOpenChange={(v) => setManageOpen(v)}
+          productId={manageProductId}
+          onChanged={() => fetchProducts("refresh")}
+        />
       </div>
-
-      {isAdmin && (
-        <div className="mt-10 space-y-12">
-          <ManualRoleEditor />
-          <AdminUserManager />
-        </div>
-      )}
-    </div>
+    </ShowcaseSection>
   );
 }
