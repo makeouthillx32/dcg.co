@@ -3,9 +3,6 @@ on:
   push:
     branches:
       - main
-  pull_request:
-    branches:
-      - main
 
 jobs:
   deploy:
@@ -14,13 +11,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Archive for NotebookLM
-        run: zip -r codebase.zip . -x "*.git*" "node_modules/*" ".next/*"
+      - name: Consolidate Codebase for Gemini
+        # This merges all text files into one 'full_context.txt' for NotebookLM
+        run: |
+          find . -maxdepth 2 -not -path '*/.*' -type f \( -name "*.js" -o -name "*.ts" -o -name "*.tsx" -o -name "*.py" -o -name "*.md" -o -name "*.json" \) -exec echo "FILE: {}" \; -exec cat {} \; -exec echo -e "\n---\n" \; > full_context.txt
 
       - name: Upload to Drive
         uses: adityak74/google-drive-upload-git-action@main
         with:
           credentials: ${{ secrets.GDRIVE_CREDENTIALS }}
           folderId: '1OsDtwOjtFaxsMIYgAXzCKSy2RZ9pCofd'
-          filename: codebase.zip
+          filename: full_context.txt
           overwrite: "true"
