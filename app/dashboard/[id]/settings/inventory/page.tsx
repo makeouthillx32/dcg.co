@@ -13,22 +13,15 @@ import { InventoryTable, type InventoryRow } from "./_components/InventoryTable"
 import { EditInventoryForm } from "./_components/EditInventoryForm";
 
 /**
- * Inventory Manager
- * - Reads inventory rows and joins product + variant to show SKU/title
- * - Lets you toggle track_inventory / backorders / quantity
- * - Provides "Seed Missing" (creates inventory rows for variants that don't have one yet)
+ * Inventory Manager (PRODUCT_VARIANTS-BASED)
  *
- * NOTE:
- * This page assumes these columns exist on public.inventory:
- *  - id, variant_id, quantity, track_inventory, allow_backorder, updated_at
+ * Your schema stores inventory on public.product_variants:
+ * - track_inventory (boolean NOT NULL)
+ * - inventory_qty (integer NOT NULL)
+ * - allow_backorder (boolean NOT NULL)
+ * - updated_at (timestamptz NOT NULL)
  *
- * And these exist on public.product_variants:
- *  - id, product_id, title, sku
- *
- * And these exist on public.products:
- *  - id, title
- *
- * If any naming differs, tell me your actual column names and I’ll adjust.
+ * We join product_variants -> products to show product title.
  */
 export default function InventoryPage() {
   const supabase = useMemo(() => {
@@ -55,28 +48,22 @@ export default function InventoryPage() {
     setErr(null);
     setLoading(true);
 
-    // Join chain: inventory -> product_variants -> products
-    // Supabase nested select syntax:
-    // inventory.select("..., product_variants(..., products(...))")
+    // product_variants -> products join
     const { data, error } = await supabase
-      .from("inventory")
+      .from("product_variants")
       .select(
         `
         id,
-        variant_id,
-        quantity,
+        product_id,
+        title,
+        sku,
         track_inventory,
+        inventory_qty,
         allow_backorder,
         updated_at,
-        product_variants (
+        products (
           id,
-          title,
-          sku,
-          product_id,
-          products (
-            id,
-            title
-          )
+          title
         )
       `
       )
@@ -90,19 +77,20 @@ export default function InventoryPage() {
     }
 
     const mapped: InventoryRow[] =
-      (data ?? []).map((r: any) => ({
-        inventory_id: r.id,
-        variant_id: r.variant_id,
+      (data ?? []).map((v: any) => ({
+        // Inventory UI expects an inventory_id; we use variant id as the "row id"
+        inventory_id: v.id,
+        variant_id: v.id,
 
-        product_title: r.product_variants?.products?.title ?? null,
-        variant_title: r.product_variants?.title ?? null,
-        sku: r.product_variants?.sku ?? null,
+        product_title: v.products?.title ?? null,
+        variant_title: v.title ?? null,
+        sku: v.sku ?? null,
 
-        quantity: r.quantity ?? 0,
-        track_inventory: !!r.track_inventory,
-        allow_backorder: !!r.allow_backorder,
+        quantity: v.inventory_qty ?? 0,
+        track_inventory: !!v.track_inventory,
+        allow_backorder: !!v.allow_backorder,
 
-        updated_at: r.updated_at ?? null,
+        updated_at: v.updated_at ?? null,
       })) ?? [];
 
     setRows(mapped);
@@ -124,17 +112,12 @@ export default function InventoryPage() {
         const qty = r.quantity ?? 0;
         if (qty > lowStockThreshold) return false;
       } else if (showLowStock && !r.track_inventory) {
-        // If "Low stock" is enabled, we ignore non-tracked items by default
         return false;
       }
 
       if (!q) return true;
 
-      const hay = [
-        r.product_title ?? "",
-        r.variant_title ?? "",
-        r.sku ?? "",
-      ]
+      const hay = [r.product_title ?? "", r.variant_title ?? "", r.sku ?? ""]
         .join(" ")
         .toLowerCase();
 
@@ -148,20 +131,22 @@ export default function InventoryPage() {
   };
 
   const handleSave = async (data: {
-    inventory_id: string;
+    inventory_id: string; // variant id
     quantity: number;
     track_inventory: boolean;
     allow_backorder: boolean;
   }) => {
     setErr(null);
 
+    const now = new Date().toISOString();
+
     const { error } = await supabase
-      .from("inventory")
+      .from("product_variants")
       .update({
-        quantity: data.quantity,
+        inventory_qty: data.quantity,
         track_inventory: data.track_inventory,
         allow_backorder: data.allow_backorder,
-        updated_at: new Date().toISOString(),
+        updated_at: now,
       })
       .eq("id", data.inventory_id);
 
@@ -173,13 +158,13 @@ export default function InventoryPage() {
     // Optimistic update
     setRows((prev) =>
       prev.map((r) =>
-        r.inventory_id === data.inventory_id
+        r.variant_id === data.inventory_id
           ? {
               ...r,
               quantity: data.quantity,
               track_inventory: data.track_inventory,
               allow_backorder: data.allow_backorder,
-              updated_at: new Date().toISOString(),
+              updated_at: now,
             }
           : r
       )
@@ -187,53 +172,8 @@ export default function InventoryPage() {
   };
 
   const handleReseedMissing = async () => {
-    setErr(null);
-
-    // Create inventory rows for variants missing them
-    // Default stock = 25, tracked = true, backorder = false
-    const { data: variants, error: vErr } = await supabase
-      .from("product_variants")
-      .select("id");
-
-    if (vErr) {
-      setErr(vErr.message);
-      return;
-    }
-
-    const variantIds: string[] = (variants ?? []).map((v: any) => v.id);
-    if (!variantIds.length) return;
-
-    const { data: existing, error: eErr } = await supabase
-      .from("inventory")
-      .select("variant_id");
-
-    if (eErr) {
-      setErr(eErr.message);
-      return;
-    }
-
-    const existingSet = new Set((existing ?? []).map((x: any) => x.variant_id));
-    const missing = variantIds.filter((id) => !existingSet.has(id));
-
-    if (!missing.length) {
-      await load();
-      return;
-    }
-
-    const insertRows = missing.map((id) => ({
-      variant_id: id,
-      quantity: 25,
-      track_inventory: true,
-      allow_backorder: false,
-    }));
-
-    const { error: iErr } = await supabase.from("inventory").insert(insertRows);
-
-    if (iErr) {
-      setErr(iErr.message);
-      return;
-    }
-
+    // No separate inventory table in your schema — inventory lives on product_variants.
+    // Keeping the button so the UI doesn’t break; it just refreshes.
     await load();
   };
 
@@ -241,9 +181,12 @@ export default function InventoryPage() {
     <div className="inventory-manager">
       <div className="inventory-header">
         <div>
-          <h1 className="text-xl font-semibold text-[hsl(var(--foreground))]">Inventory</h1>
+          <h1 className="text-xl font-semibold text-[hsl(var(--foreground))]">
+            Inventory
+          </h1>
           <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">
-            Manage stock per variant. Track inventory, allow backorders, and adjust quantities.
+            Manage stock per variant (stored on product_variants). Track inventory,
+            allow backorders, and adjust quantities.
           </p>
         </div>
 
