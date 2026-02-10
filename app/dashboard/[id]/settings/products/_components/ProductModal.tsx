@@ -1,3 +1,4 @@
+// app/dashboard/[id]/settings/products/_components/ProductModal.tsx
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -8,20 +9,30 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 // ✅ browser client for storage uploads
 import { createBrowserClient } from "@/utils/supabase/client";
 
-// ✅ your storage helpers (must exist)
-import { PRODUCT_IMAGE_BUCKET, storagePathToUrl } from "@/lib/images";
+// ✅ your storage helpers (updated: bucket_name + object_path)
+import {
+  PRODUCT_IMAGE_BUCKET,
+  supabasePublicUrlFromImage,
+  pickPrimaryImage,
+} from "@/lib/images";
 
 /* ---------------- Types ---------------- */
+
+export type ProductImageRow = {
+  id?: string;
+  bucket_name: string | null;
+  object_path: string | null;
+  alt_text?: string | null;
+  sort_order?: number | null;
+  position?: number | null;
+  is_primary?: boolean | null;
+  is_public?: boolean | null;
+};
 
 export type ProductRow = {
   id: string;
@@ -33,9 +44,9 @@ export type ProductRow = {
   currency: string;
   badge: string | null;
   is_featured: boolean;
-  status?: string;
+  status?: "draft" | "active" | "archived" | string;
   created_at: string;
-  product_images?: { id?: string; storage_path: string; alt: string | null; position: number }[];
+  product_images?: ProductImageRow[];
   tags?: { id: string; slug: string; name: string }[];
 };
 
@@ -86,6 +97,10 @@ function randId() {
   return Math.random().toString(16).slice(2) + Date.now().toString(16);
 }
 
+function normalizeStatus(s: any): "draft" | "active" | "archived" {
+  return s === "active" ? "active" : s === "archived" ? "archived" : "draft";
+}
+
 /* ---------------- Component ---------------- */
 
 export default function ProductModal({
@@ -97,7 +112,7 @@ export default function ProductModal({
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  productId: string | null; // if null => modal closed or create flow elsewhere
+  productId: string | null;
   title?: string;
   onChanged: () => void;
 }) {
@@ -142,7 +157,7 @@ export default function ProductModal({
       setFormDesc(data.description ?? "");
       setFormBadge(data.badge ?? "");
       setFormFeatured(Boolean(data.is_featured));
-      setFormStatus(((data.status ?? "draft") as any) === "active" ? "active" : ((data.status ?? "draft") as any));
+      setFormStatus(normalizeStatus(data.status));
     } catch (e: any) {
       console.error(e);
       toast.error(e?.message ?? "Failed to load product");
@@ -156,7 +171,6 @@ export default function ProductModal({
       setActiveTab("details");
       load();
     } else {
-      // reset lightweight UI state when closing
       setFiles([]);
       setAlt("");
       setTagInput("");
@@ -218,9 +232,10 @@ export default function ProductModal({
       const supabase = createBrowserClient();
 
       for (const file of files) {
-        const storage_path = `products/${productId}/${randId()}.${fileExt(file.name)}`;
+        // ✅ Supabase storage wants the *object path* inside the bucket
+        const object_path = `products/${productId}/${randId()}.${fileExt(file.name)}`;
 
-        const up = await supabase.storage.from(PRODUCT_IMAGE_BUCKET).upload(storage_path, file, {
+        const up = await supabase.storage.from(PRODUCT_IMAGE_BUCKET).upload(object_path, file, {
           upsert: false,
           cacheControl: "3600",
           contentType: file.type || "image/*",
@@ -228,12 +243,14 @@ export default function ProductModal({
 
         if (up.error) throw new Error(up.error.message);
 
+        // ✅ Create DB row using your schema: bucket_name + object_path + alt_text
         const res = await fetch(`/api/products/admin/${productId}/images`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            storage_path,
-            alt: alt.trim() ? alt.trim() : null,
+            bucket_name: PRODUCT_IMAGE_BUCKET,
+            object_path,
+            alt_text: alt.trim() ? alt.trim() : null,
           }),
         });
 
@@ -306,6 +323,21 @@ export default function ProductModal({
     }
   };
 
+  // ✅ image ordering for the grid + primary marker
+  const orderedImages = (detail?.product_images ?? [])
+    .slice()
+    .sort((a, b) => {
+      const ap = a.position ?? 999999;
+      const bp = b.position ?? 999999;
+      if (ap !== bp) return ap - bp;
+
+      const as = a.sort_order ?? 999999;
+      const bs = b.sort_order ?? 999999;
+      return as - bs;
+    });
+
+  const primary = pickPrimaryImage(orderedImages);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl p-0 overflow-hidden">
@@ -375,15 +407,11 @@ export default function ProductModal({
         {/* Content */}
         <div className="max-h-[75vh] overflow-auto p-5">
           {!productId ? (
-            <div className="text-sm text-[hsl(var(--muted-foreground))]">
-              Select a product to manage.
-            </div>
+            <div className="text-sm text-[hsl(var(--muted-foreground))]">Select a product to manage.</div>
           ) : loading ? (
             <div className="text-sm text-[hsl(var(--muted-foreground))]">Loading…</div>
           ) : !detail ? (
-            <div className="text-sm text-[hsl(var(--muted-foreground))]">
-              Couldn’t load product.
-            </div>
+            <div className="text-sm text-[hsl(var(--muted-foreground))]">Couldn’t load product.</div>
           ) : activeTab === "details" ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -481,31 +509,49 @@ export default function ProductModal({
                 </div>
               </div>
 
+              {/* ✅ If you’re seeing “transparent squares”, it’s usually CSS or URL.
+                  This uses the exact public URL builder from your DB rows. */}
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                {(detail.product_images ?? [])
-                  .slice()
-                  .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
-                  .map((img, idx) => {
-                    const url = storagePathToUrl(img.storage_path);
+                {orderedImages.length === 0 ? (
+                  <div className="col-span-full text-sm text-[hsl(var(--muted-foreground))]">
+                    No images yet.
+                  </div>
+                ) : (
+                  orderedImages.map((img, idx) => {
+                    const url = supabasePublicUrlFromImage(img);
+                    const isPrimary =
+                      primary?.bucket_name === img.bucket_name &&
+                      primary?.object_path === img.object_path;
+
                     return (
                       <div
-                        key={`${img.storage_path}-${idx}`}
+                        key={`${img.bucket_name ?? "bucket"}-${img.object_path ?? "path"}-${idx}`}
                         className="rounded-lg border border-[hsl(var(--border))] overflow-hidden bg-[hsl(var(--background))]"
                       >
-                        {url ? (
-                          <img
-                            src={url}
-                            alt={img.alt ?? "product image"}
-                            className="w-full aspect-square object-cover"
-                          />
-                        ) : (
-                          <div className="w-full aspect-square flex items-center justify-center text-xs text-[hsl(var(--muted-foreground))]">
-                            Missing URL
-                          </div>
-                        )}
+                        <div className="relative w-full aspect-square">
+                          {url ? (
+                            <img
+                              src={url}
+                              alt={img.alt_text ?? "product image"}
+                              className="absolute inset-0 w-full h-full object-cover"
+                              loading="lazy"
+                            />
+                          ) : (
+                            <div className="absolute inset-0 flex items-center justify-center text-xs text-[hsl(var(--muted-foreground))]">
+                              Missing URL
+                            </div>
+                          )}
+
+                          {isPrimary ? (
+                            <div className="absolute left-2 top-2 text-[10px] px-2 py-1 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card))]">
+                              Primary
+                            </div>
+                          ) : null}
+                        </div>
                       </div>
                     );
-                  })}
+                  })
+                )}
               </div>
             </div>
           ) : (
