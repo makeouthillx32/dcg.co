@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/utils/supabase/server";
 
-type Params = {
-  params: { slug: string };
-};
+type Params = { params: { slug: string } };
 
 function jsonError(status: number, code: string, message: string, details?: any) {
   return NextResponse.json({ ok: false, error: { code, message, details } }, { status });
@@ -14,7 +12,7 @@ function jsonError(status: number, code: string, message: string, details?: any)
  * Public product detail (active products only)
  *
  * Optional query:
- *  - include=inventory  -> includes variant inventory fields
+ *  - include=inventory  -> includes inventory per variant
  */
 export async function GET(req: NextRequest, { params }: Params) {
   const supabase = await createServerClient();
@@ -23,8 +21,7 @@ export async function GET(req: NextRequest, { params }: Params) {
   if (!slug) return jsonError(400, "INVALID_SLUG", "Missing slug");
 
   const { searchParams } = new URL(req.url);
-  const include = searchParams.get("include");
-  const includeInventory = include === "inventory";
+  const includeInventory = searchParams.get("include") === "inventory";
 
   const variantsSelect = includeInventory
     ? `
@@ -35,10 +32,24 @@ export async function GET(req: NextRequest, { params }: Params) {
       price_cents,
       compare_at_price_cents,
       position,
-      inventory_enabled,
-      stock_on_hand,
-      low_stock_threshold,
-      created_at
+      is_active,
+      track_inventory,
+      allow_backorder,
+      inventory_qty,
+      currency,
+      weight_grams,
+      options,
+      option_values,
+      options_text,
+      created_at,
+      updated_at,
+      inventory (
+        variant_id,
+        quantity,
+        track_inventory,
+        allow_backorder,
+        updated_at
+      )
     `
     : `
       id,
@@ -48,7 +59,17 @@ export async function GET(req: NextRequest, { params }: Params) {
       price_cents,
       compare_at_price_cents,
       position,
-      created_at
+      is_active,
+      track_inventory,
+      allow_backorder,
+      inventory_qty,
+      currency,
+      weight_grams,
+      options,
+      option_values,
+      options_text,
+      created_at,
+      updated_at
     `;
 
   const { data, error } = await supabase
@@ -63,12 +84,15 @@ export async function GET(req: NextRequest, { params }: Params) {
       compare_at_price_cents,
       currency,
       badge,
+      brand,
+      featured,
       is_featured,
-      seo_title,
-      seo_description,
-      og_image_override_url,
+      status,
+      tags,
+      search_text,
       created_at,
       updated_at,
+      created_by,
 
       product_images (
         id,
@@ -104,9 +128,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     .single();
 
   if (error) {
-    const status =
-      error.code === "PGRST116" || /0 rows/i.test(error.message) ? 404 : 500;
-
+    const status = error.code === "PGRST116" || /0 rows/i.test(error.message) ? 404 : 500;
     return jsonError(
       status,
       status === 404 ? "NOT_FOUND" : "PRODUCT_FETCH_FAILED",
@@ -114,11 +136,9 @@ export async function GET(req: NextRequest, { params }: Params) {
     );
   }
 
-  // Flatten categories
   const categories =
     data?.product_categories?.map((pc: any) => pc.categories).filter(Boolean) ?? [];
 
-  // Sort images: sort_order -> position -> created_at
   const images = (data?.product_images ?? []).slice().sort((a: any, b: any) => {
     const sa = typeof a.sort_order === "number" ? a.sort_order : 0;
     const sb = typeof b.sort_order === "number" ? b.sort_order : 0;
@@ -133,16 +153,23 @@ export async function GET(req: NextRequest, { params }: Params) {
     return ca - cb;
   });
 
-  // Sort variants by position
-  const variants = (data?.product_variants ?? []).slice().sort((a: any, b: any) => {
-    const pa = typeof a.position === "number" ? a.position : 0;
-    const pb = typeof b.position === "number" ? b.position : 0;
-    return pa - pb;
-  });
+  const variants = (data?.product_variants ?? [])
+    .slice()
+    .sort((a: any, b: any) => (Number(a.position ?? 0) - Number(b.position ?? 0)))
+    .map((v: any) => {
+      if (!includeInventory) return v;
 
-  // Primary image preference:
-  // 1) first is_primary=true
-  // 2) else first by sort order
+      // Provide a single, easy field for storefront usage
+      const inventory_quantity =
+        typeof v?.inventory?.quantity === "number"
+          ? v.inventory.quantity
+          : typeof v?.inventory_qty === "number"
+            ? v.inventory_qty
+            : null;
+
+      return { ...v, inventory_quantity };
+    });
+
   const primary_image =
     images.find((img: any) => img?.is_primary) ?? (images.length > 0 ? images[0] : null);
 
