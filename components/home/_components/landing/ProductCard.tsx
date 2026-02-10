@@ -13,8 +13,14 @@ function formatMoney(price_cents: number, currency: string) {
 }
 
 export function LandingProductCard({ product }: { product: LandingProduct }) {
+  // Force optimized delivery (webp/avif) via Next optimizer
+  const imageUrl = getPrimaryImageUrl(product.product_images, {
+    optimized: true,
+    width: 900,
+    quality: 82,
+  });
+
   const primary = pickPrimaryImage(product.product_images);
-  const imageUrl = getPrimaryImageUrl(product.product_images);
   const alt = primary?.alt_text || product.title || "Product image";
 
   return (
@@ -28,13 +34,9 @@ export function LandingProductCard({ product }: { product: LandingProduct }) {
             src={imageUrl}
             alt={alt}
             fill
+            // since we're serving a single optimized URL, keep sizes for layout
             sizes="(max-width: 768px) 50vw, 25vw"
             className="object-cover transition-transform duration-300 group-hover:scale-[1.02]"
-            // helps avoid edge-case Next/Image crashes if a url is briefly bad
-            onError={(e) => {
-              const img = e.currentTarget as unknown as HTMLImageElement;
-              img.style.display = "none";
-            }}
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center">
