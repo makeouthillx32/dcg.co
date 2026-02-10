@@ -5,16 +5,17 @@ import React from "react";
 import { Trash2, Loader2, Settings2, Image as ImageIcon, Tag as TagIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { getPrimaryImageUrl } from "@/lib/images";
 
 export type ProductImageRow = {
   id?: string;
-  bucket_name: string;
-  object_path: string;
-  alt_text: string | null;
-  sort_order: number | null;
-  position: number | null;
-  is_primary: boolean | null;
-  is_public: boolean | null;
+  bucket_name: string | null;
+  object_path: string | null;
+  alt_text?: string | null;
+  sort_order?: number | null;
+  position?: number | null;
+  is_primary?: boolean | null;
+  is_public?: boolean | null;
   created_at?: string;
 };
 
@@ -37,11 +38,7 @@ interface ProductsTableProps {
   products: ProductRow[];
   allProductsCount?: number;
   isRefreshing?: boolean;
-
-  // Opens your Manage modal/dialog for this product
   onManage: (product: ProductRow) => void;
-
-  // Archive/delete action (admin route)
   onArchive: (product: ProductRow) => void;
 }
 
@@ -58,7 +55,7 @@ function statusBadgeVariant(status?: string) {
   const s = (status ?? "draft").toLowerCase();
   if (s === "active") return "default";
   if (s === "archived") return "destructive";
-  return "secondary"; // draft, etc
+  return "secondary";
 }
 
 export default function ProductsTable({
@@ -70,15 +67,12 @@ export default function ProductsTable({
 }: ProductsTableProps) {
   if (!products || products.length === 0) {
     return (
-      <p className="py-8 text-center text-[hsl(var(--muted-foreground))]">
-        No products found.
-      </p>
+      <p className="py-8 text-center text-[hsl(var(--muted-foreground))]">No products found.</p>
     );
   }
 
   return (
     <div className="bg-[hsl(var(--background))] border border-[hsl(var(--border))] rounded-[var(--radius)] overflow-hidden shadow-[var(--shadow-sm)]">
-      {/* Column headers */}
       <div className="grid grid-cols-12 p-4 bg-[hsl(var(--muted))] font-medium text-[hsl(var(--muted-foreground))] text-xs uppercase tracking-wider">
         <div className="col-span-6 md:col-span-4">Product</div>
         <div className="hidden md:block md:col-span-2">Status</div>
@@ -87,21 +81,34 @@ export default function ProductsTable({
         <div className="col-span-3 md:col-span-2 text-right">Actions</div>
       </div>
 
-      {/* Rows */}
       <div className="divide-y divide-[hsl(var(--border))]">
         {products.map((p) => {
           const imgCount = p.product_images?.length ?? 0;
+
+          // ✅ Use your new bucket_name/object_path system
+          // ✅ Optimized=true forces Next to serve webp/avif when possible
+          const thumbUrl =
+            getPrimaryImageUrl(p.product_images ?? [], {
+              optimized: true,
+              width: 96,
+              quality: 80,
+            }) ?? null;
+
+          const thumbAlt = p.title || "Product image";
 
           return (
             <div
               key={p.id}
               className="product-item grid grid-cols-12 gap-y-2 p-4 hover:bg-[hsl(var(--accent))] transition-colors"
             >
-              {/* Product (title + slug + meta) */}
               <div className="col-span-12 md:col-span-4 min-w-0">
                 <div className="flex items-start gap-3">
-                  <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--card))]">
-                    <ImageIcon size={16} className="text-[hsl(var(--muted-foreground))]" />
+                  <div className="mt-0.5 h-9 w-9 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--card))] overflow-hidden flex items-center justify-center">
+                    {thumbUrl ? (
+                      <img src={thumbUrl} alt={thumbAlt} className="h-full w-full object-cover" />
+                    ) : (
+                      <ImageIcon size={16} className="text-[hsl(var(--muted-foreground))]" />
+                    )}
                   </div>
 
                   <div className="min-w-0">
@@ -120,12 +127,8 @@ export default function ProductsTable({
                       {p.slug}
                     </div>
 
-                    {/* Mobile-only meta row */}
                     <div className="mt-2 flex flex-wrap items-center gap-2 md:hidden">
-                      <Badge variant={statusBadgeVariant(p.status)}>
-                        {p.status ?? "draft"}
-                      </Badge>
-
+                      <Badge variant={statusBadgeVariant(p.status)}>{p.status ?? "draft"}</Badge>
                       {p.badge ? <Badge variant="secondary">{p.badge}</Badge> : null}
 
                       <span className="inline-flex items-center gap-1 text-xs text-[hsl(var(--muted-foreground))]">
@@ -140,28 +143,20 @@ export default function ProductsTable({
                 </div>
               </div>
 
-              {/* Status (desktop) */}
               <div className="hidden md:flex md:col-span-2 items-center">
-                <Badge variant={statusBadgeVariant(p.status)}>
-                  {p.status ?? "draft"}
-                </Badge>
+                <Badge variant={statusBadgeVariant(p.status)}>{p.status ?? "draft"}</Badge>
               </div>
 
-              {/* Price */}
               <div className="col-span-6 md:col-span-2 flex items-center">
                 <span className="text-sm font-medium text-[hsl(var(--foreground))]">
                   {centsToMoney(p.price_cents, p.currency)}
                 </span>
               </div>
 
-              {/* Badge (desktop) */}
               <div className="hidden md:flex md:col-span-2 items-center">
-                <span className="text-sm text-[hsl(var(--muted-foreground))]">
-                  {p.badge ?? "—"}
-                </span>
+                <span className="text-sm text-[hsl(var(--muted-foreground))]">{p.badge ?? "—"}</span>
               </div>
 
-              {/* Actions */}
               <div className="col-span-6 md:col-span-2 flex items-center justify-end">
                 <div className="flex flex-col sm:flex-row gap-2 items-end sm:items-center">
                   <Button
@@ -186,7 +181,6 @@ export default function ProductsTable({
                 </div>
               </div>
 
-              {/* Desktop-only small info strip */}
               <div className="hidden md:flex md:col-span-12 items-center justify-between pt-2 text-xs text-[hsl(var(--muted-foreground))]">
                 <span>Created: {new Date(p.created_at).toLocaleString()}</span>
                 <span className="inline-flex items-center gap-1">
@@ -200,7 +194,6 @@ export default function ProductsTable({
         })}
       </div>
 
-      {/* Footer summary */}
       <div className="p-4 text-sm text-[hsl(var(--muted-foreground))] flex items-center justify-between">
         <span>
           Showing {products.length}
