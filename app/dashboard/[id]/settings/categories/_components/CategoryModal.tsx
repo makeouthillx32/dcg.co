@@ -2,7 +2,7 @@
 "use client";
 
 import { X } from "lucide-react";
-import { ReactNode, useEffect } from "react";
+import { ReactNode, useEffect, useRef } from "react";
 
 type Props = {
   open: boolean;
@@ -12,21 +12,93 @@ type Props = {
   onClose: () => void;
 };
 
-export function CategoryModal({ open, title, description, children, onClose }: Props) {
-  // ESC to close
+export function CategoryModal({
+  open,
+  title,
+  description,
+  children,
+  onClose,
+}: Props) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  const lastActiveRef = useRef<HTMLElement | null>(null);
+
+  // ESC to close + basic focus trap + restore focus
   useEffect(() => {
     if (!open) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+
+    lastActiveRef.current = document.activeElement as HTMLElement | null;
+
+    const focusFirst = () => {
+      const panel = panelRef.current;
+      if (!panel) return;
+
+      const focusables = panel.querySelectorAll<HTMLElement>(
+        'button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])'
+      );
+
+      // focus first focusable, otherwise focus panel itself
+      (focusables[0] ?? panel).focus?.();
     };
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onClose();
+        return;
+      }
+
+      if (e.key !== "Tab") return;
+
+      // trap focus inside modal
+      const panel = panelRef.current;
+      if (!panel) return;
+
+      const focusables = Array.from(
+        panel.querySelectorAll<HTMLElement>(
+          'button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])'
+        )
+      ).filter((el) => !el.hasAttribute("disabled") && !el.getAttribute("aria-hidden"));
+
+      if (focusables.length === 0) {
+        e.preventDefault();
+        return;
+      }
+
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      const active = document.activeElement as HTMLElement | null;
+
+      if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      } else if (e.shiftKey && active === first) {
+        e.preventDefault();
+        last.focus();
+      }
+    };
+
+    // lock body scroll
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    // focus after paint
+    const t = window.setTimeout(focusFirst, 0);
+
+    return () => {
+      window.clearTimeout(t);
+      window.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = prevOverflow;
+
+      // restore focus
+      lastActiveRef.current?.focus?.();
+    };
   }, [open, onClose]);
 
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[100]">
+    <div className="fixed inset-0 z-[100]" role="dialog" aria-modal="true">
       {/* backdrop */}
       <button
         type="button"
@@ -37,7 +109,11 @@ export function CategoryModal({ open, title, description, children, onClose }: P
 
       {/* panel */}
       <div className="absolute left-1/2 top-1/2 w-[calc(100%-24px)] max-w-xl -translate-x-1/2 -translate-y-1/2">
-        <div className="rounded-[var(--radius)] border border-[hsl(var(--border))] bg-[hsl(var(--card))] shadow-[var(--shadow-lg)]">
+        <div
+          ref={panelRef}
+          tabIndex={-1}
+          className="rounded-[var(--radius)] border border-[hsl(var(--border))] bg-[hsl(var(--card))] shadow-[var(--shadow-lg)] outline-none"
+        >
           <div className="flex items-start justify-between gap-4 border-b border-[hsl(var(--border))] px-4 py-3">
             <div className="min-w-0">
               <h2 className="truncate text-base font-semibold text-[hsl(var(--foreground))]">

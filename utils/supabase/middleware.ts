@@ -3,14 +3,13 @@ import { type NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
 export async function middleware(req: NextRequest) {
-  // NEVER mutate the request object unless rewriting — this breaks dynamic API route params
   let res = NextResponse.next();
 
   const invite = req.nextUrl.searchParams.get("invite");
   if (invite) {
     res.cookies.set("invite", invite, {
       path: "/",
-      maxAge: 60 * 10, // 10 minutes
+      maxAge: 60 * 10,
     });
   }
 
@@ -29,9 +28,7 @@ export async function middleware(req: NextRequest) {
     }
   );
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  const { data: { session } } = await supabase.auth.getSession();
 
   const protectedPrefixes = ["/protected", "/settings", "/api/messages"];
   const isProtected = protectedPrefixes.some(
@@ -41,8 +38,7 @@ export async function middleware(req: NextRequest) {
   );
 
   if (isProtected && !session) {
-    const target =
-      req.nextUrl.pathname + (req.nextUrl.search || "");
+    const target = req.nextUrl.pathname + (req.nextUrl.search || "");
     return NextResponse.redirect(
       new URL(`/sign-in?redirect_to=${encodeURIComponent(target)}`, req.url)
     );
@@ -51,7 +47,4 @@ export async function middleware(req: NextRequest) {
   return res;
 }
 
-export const config = {
-  matcher:
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
-};
+// ❌ REMOVED: export const config = { ... }

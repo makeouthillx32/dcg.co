@@ -1,7 +1,6 @@
-// app/settings/categories/page.tsx
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { createBrowserClient } from "@supabase/ssr";
 
 import "./_components/categories.scss";
@@ -15,8 +14,18 @@ import { EditCategoryForm } from "./_components/EditCategoryForm";
 import { DeleteConfirmModal } from "./_components/DeleteConfirmModal";
 
 type DbCategory = CategoryRow & {
-  position?: number; // exists now after your ALTER, but keep optional for safety
+  position?: number;
 };
+
+function normalizeSlug(input: string) {
+  return input
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, "")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+}
 
 export default function CategoriesPage() {
   const supabase = useMemo(() => {
@@ -28,6 +37,7 @@ export default function CategoriesPage() {
 
   const [rows, setRows] = useState<DbCategory[]>([]);
   const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   const [search, setSearch] = useState("");
@@ -36,9 +46,9 @@ export default function CategoriesPage() {
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
-  const [selected, setSelected] = useState<CategoryRow | null>(null);
+  const [selected, setSelected] = useState<DbCategory | null>(null);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setErr(null);
     setLoading(true);
 
@@ -57,99 +67,156 @@ export default function CategoriesPage() {
 
     setRows((data as DbCategory[]) ?? []);
     setLoading(false);
-  };
+  }, [supabase]);
 
   useEffect(() => {
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [load]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return rows;
-
-    return rows.filter((r) => {
-      return (
-        r.name.toLowerCase().includes(q) ||
-        r.slug.toLowerCase().includes(q)
-      );
-    });
+    return rows.filter(
+      (r) => r.name.toLowerCase().includes(q) || r.slug.toLowerCase().includes(q)
+    );
   }, [rows, search]);
+
+  const nextPositionForParent = useCallback(
+    (parent_id: string | null, excludeId?: string) => {
+      const siblings = rows.filter(
+        (r) =>
+          (r.parent_id ?? null) === (parent_id ?? null) &&
+          (excludeId ? r.id !== excludeId : true)
+      );
+      const maxPos = Math.max(-1, ...siblings.map((s) => s.position ?? 0));
+      return maxPos + 1;
+    },
+    [rows]
+  );
+
+  const safeCloseCreate = () => {
+    if (busy) return;
+    setCreateOpen(false);
+  };
+
+  const safeCloseEdit = () => {
+    if (busy) return;
+    setEditOpen(false);
+  };
+
+  const safeCloseDelete = () => {
+    if (busy) return;
+    setDeleteOpen(false);
+  };
 
   // ✅ Create
   const handleCreate = async (data: { name: string; slug: string; parent_id: string | null }) => {
     setErr(null);
+    setBusy(true);
 
-    // choose a "position" at end of the chosen parent group
-    const siblings = rows.filter((r) => (r.parent_id ?? null) === (data.parent_id ?? null));
-    const maxPos = Math.max(-1, ...siblings.map((s) => (s.position ?? 0)));
-    const nextPos = maxPos + 1;
+    try {
+      const slug = normalizeSlug(data.slug);
 
-    const { error } = await supabase.from("categories").insert({
-      name: data.name,
-      slug: data.slug,
-      parent_id: data.parent_id,
-      position: nextPos,
-    });
+      // client-side duplicate guard (DB still enforces uniqueness)
+      if (rows.some((r) => r.slug === slug)) {
+        setErr(`Slug "${slug}" already exists.`);
+        return;
+      }
 
-    if (error) {
-      setErr(error.message);
-      return;
+      const position = nextPositionForParent(data.parent_id);
+
+      const { error } = await supabase.from("categories").insert({
+        name: data.name.trim(),
+        slug,
+        parent_id: data.parent_id,
+        position,
+      });
+
+      if (error) {
+        setErr(error.message);
+        return;
+      }
+
+      await load();
+      setCreateOpen(false);
+    } finally {
+      setBusy(false);
     }
-
-    await load();
   };
 
   // ✅ Edit
   const handleEdit = (cat: CategoryRow) => {
-    setSelected(cat);
+    const full = rows.find((r) => r.id === cat.id) ?? (cat as DbCategory);
+    setSelected(full);
     setEditOpen(true);
   };
 
   const handleSave = async (data: { id: string; name: string; slug: string; parent_id: string | null }) => {
     setErr(null);
+    setBusy(true);
 
-    // prevent self-parenting (extra guard)
-    if (data.parent_id && data.parent_id === data.id) {
-      setErr("A category cannot be its own parent.");
-      return;
+    try {
+      const slug = normalizeSlug(data.slug);
+
+      if (data.parent_id && data.parent_id === data.id) {
+        setErr("A category cannot be its own parent.");
+        return;
+      }
+
+      const current = rows.find((r) => r.id === data.id);
+      const parentChanged = (current?.parent_id ?? null) !== (data.parent_id ?? null);
+      const position = parentChanged
+        ? nextPositionForParent(data.parent_id, data.id)
+        : current?.position;
+
+      const { error } = await supabase
+        .from("categories")
+        .update({
+          name: data.name.trim(),
+          slug,
+          parent_id: data.parent_id,
+          ...(parentChanged ? { position } : {}),
+        })
+        .eq("id", data.id);
+
+      if (error) {
+        setErr(error.message);
+        return;
+      }
+
+      await load();
+      setEditOpen(false);
+      setSelected(null);
+    } finally {
+      setBusy(false);
     }
-
-    const { error } = await supabase
-      .from("categories")
-      .update({
-        name: data.name,
-        slug: data.slug,
-        parent_id: data.parent_id,
-      })
-      .eq("id", data.id);
-
-    if (error) {
-      setErr(error.message);
-      return;
-    }
-
-    await load();
   };
 
   // ✅ Delete
   const handleDelete = (cat: CategoryRow) => {
-    setSelected(cat);
+    const full = rows.find((r) => r.id === cat.id) ?? (cat as DbCategory);
+    setSelected(full);
     setDeleteOpen(true);
   };
 
   const handleConfirmDelete = async (cat: CategoryRow) => {
     setErr(null);
+    setBusy(true);
 
-    const { error } = await supabase.from("categories").delete().eq("id", cat.id);
+    try {
+      const { error } = await supabase.from("categories").delete().eq("id", cat.id);
 
-    if (error) {
-      // common case: FK block because children exist
-      setErr(error.message);
-      return;
+      if (error) {
+        setErr(error.message);
+        return;
+      }
+
+      await load();
+      setDeleteOpen(false);
+      setSelected(null);
+    } finally {
+      setBusy(false);
     }
-
-    await load();
   };
 
   return (
@@ -169,9 +236,7 @@ export default function CategoriesPage() {
         />
       </div>
 
-      {err ? (
-        <ErrorAlert message={err} onRetry={load} />
-      ) : null}
+      {err ? <ErrorAlert message={err} onRetry={load} /> : null}
 
       {loading ? (
         <LoadingState />
@@ -184,7 +249,7 @@ export default function CategoriesPage() {
       <CreateCategoryModal
         open={createOpen}
         categories={rows}
-        onClose={() => setCreateOpen(false)}
+        onClose={safeCloseCreate}
         onCreate={handleCreate}
       />
 
@@ -192,14 +257,14 @@ export default function CategoriesPage() {
         open={editOpen}
         category={selected}
         categories={rows}
-        onClose={() => setEditOpen(false)}
+        onClose={safeCloseEdit}
         onSave={handleSave}
       />
 
       <DeleteConfirmModal
         open={deleteOpen}
         category={selected}
-        onClose={() => setDeleteOpen(false)}
+        onClose={safeCloseDelete}
         onConfirm={handleConfirmDelete}
       />
     </div>

@@ -2,22 +2,87 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { ChevronDown } from "lucide-react";
-import { navTree } from "@/lib/navTree";
+
+// ✅ fallback to old dummy nav so UI always shows something
+import { navTree as fallbackNavTree } from "@/lib/navTree";
+
 import "./_components/Desktop.scss";
+
+type NavNode = {
+  key: string;
+  label: string;
+  children?: NavNode[];
+};
 
 interface DesktopNavProps {
   navigateTo: (key: string) => (e?: React.MouseEvent) => void;
 }
 
+function mapDbTreeToNavNodes(dbNodes: any[]): NavNode[] {
+  return (dbNodes ?? []).map((n: any) => ({
+    key: n.slug,
+    label: n.name,
+    children: (n.children ?? []).map((c: any) => ({
+      key: c.slug,
+      label: c.name,
+      children: (c.children ?? []).map((cc: any) => ({
+        key: cc.slug,
+        label: cc.name,
+      })),
+    })),
+  }));
+}
+
 export default function DesktopNav({ navigateTo }: DesktopNavProps) {
+  // ✅ start with fallback so it renders immediately
+  const [navTree, setNavTree] = useState<NavNode[]>(
+    (fallbackNavTree as any[]).map((n) => ({
+      key: n.key,
+      label: n.label,
+      children: n.children?.map((c: any) => ({ key: c.key, label: c.label })) ?? undefined,
+    }))
+  );
+
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [hoverTimeout, setHoverTimeout] = useState<NodeJS.Timeout | null>(null);
+
   const navRefs = useRef<(HTMLElement | null)[]>([]);
   const dropdownRefs = useRef<(HTMLDivElement | null)[]>([]);
 
+  // ✅ Fetch DB-backed nav (and swap in if it works)
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const res = await fetch("/api/nav", { cache: "no-store" });
+
+        if (!res.ok) {
+          console.error("Nav fetch failed:", res.status);
+          return;
+        }
+
+        const json = await res.json();
+
+        if (!json?.ok) {
+          console.error("Nav API returned error:", json?.error);
+          return;
+        }
+
+        const mapped = mapDbTreeToNavNodes(json.data);
+        if (!cancelled && mapped.length) setNavTree(mapped);
+      } catch (e) {
+        console.error("Nav fetch exception:", e);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const getDropdownAlignment = (index: number) => {
     if (typeof window === "undefined") return "dropdown-align-center";
-
     const navItem = navRefs.current[index];
     if (!navItem) return "dropdown-align-center";
 
@@ -84,11 +149,12 @@ export default function DesktopNav({ navigateTo }: DesktopNavProps) {
 
   const handleKeyDown = (e: React.KeyboardEvent, index: number) => {
     const node = navTree[index];
+    if (!node) return;
 
     switch (e.key) {
       case "ArrowDown":
         e.preventDefault();
-        if (node.children) {
+        if (node.children?.length) {
           setOpenKey(node.key);
           setTimeout(() => {
             const firstItem = document.querySelector(
@@ -120,7 +186,7 @@ export default function DesktopNav({ navigateTo }: DesktopNavProps) {
 
       case "Enter":
       case " ":
-        if (node.children) {
+        if (node.children?.length) {
           e.preventDefault();
           setOpenKey(openKey === node.key ? null : node.key);
         }
@@ -141,10 +207,10 @@ export default function DesktopNav({ navigateTo }: DesktopNavProps) {
           <div
             key={node.key}
             className="nav-item relative"
-            onMouseEnter={() => node.children && handleMouseEnter(node.key)}
-            onMouseLeave={node.children ? handleMouseLeave : undefined}
+            onMouseEnter={() => node.children?.length && handleMouseEnter(node.key)}
+            onMouseLeave={node.children?.length ? handleMouseLeave : undefined}
           >
-            {node.children ? (
+            {node.children?.length ? (
               <>
                 <button
                   ref={(el) => {
@@ -160,8 +226,6 @@ export default function DesktopNav({ navigateTo }: DesktopNavProps) {
                   type="button"
                 >
                   {node.label}
-
-                  {/* Hollow chevron (lucide) */}
                   <span
                     className={`ml-1 inline-flex items-center transition-transform duration-200 ${
                       openKey === node.key ? "rotate-180" : "rotate-0"

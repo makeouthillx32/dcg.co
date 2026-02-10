@@ -1,87 +1,97 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
-export type LandingCategory = { title: string; href: string };
-export type LandingProductCard = { label: string };
-
-type LandingData = {
-  categories: LandingCategory[];
-  featuredPlaceholders: LandingProductCard[];
+export type LandingCategory = {
+  id: string;
+  name: string;
+  slug: string;
 };
 
-type Mode = "dummy" | "live";
+export type LandingProductImage = {
+  bucket_name: string;
+  object_path: string;
+  alt_text?: string | null;
+  sort_order?: number | null;
+  position?: number | null;
+  is_primary?: boolean | null;
+  is_public?: boolean | null;
+  width?: number | null;
+  height?: number | null;
+  blurhash?: string | null;
+  mime_type?: string | null;
+  size_bytes?: number | null;
+};
 
-/**
- * Starts as dummy.
- * When ready, flip MODE to "live" and it will fetch from your API.
- */
-const MODE: Mode = "dummy";
+export type LandingProduct = {
+  id: string;
+  slug: string;
+  title: string;
+  price_cents: number;
+  compare_at_price_cents: number | null;
+  currency: string;
+  badge: string | null;
+  is_featured: boolean;
+  product_images: LandingProductImage[];
+};
+
+type Envelope<T> =
+  | { ok: true; data: T; meta?: any }
+  | { ok: false; error: { code: string; message: string; details?: any } };
+
+function asArray<T>(v: any): T[] {
+  return Array.isArray(v) ? v : [];
+}
 
 export function useLandingData() {
-  const [data, setData] = useState<LandingData>({
-    categories: [
-      { title: "Desert Girl Exclusives", href: "#desert-girl-exclusives" },
-      { title: "Tops", href: "#tops" },
-      { title: "Bottoms & Sets", href: "#bottoms" },
-      { title: "Jewelry & Accessories", href: "#accessories" },
-      { title: "The Extras", href: "#extras" },
-      { title: "Deals / Sale", href: "#sale" },
-    ],
-    featuredPlaceholders: [
-      { label: "Featured Item 1" },
-      { label: "Featured Item 2" },
-      { label: "Featured Item 3" },
-      { label: "Featured Item 4" },
-    ],
-  });
-
-  const [loading, setLoading] = useState(false);
+  const [categories, setCategories] = useState<LandingCategory[]>([]);
+  const [featured, setFeatured] = useState<LandingProduct[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (MODE !== "live") return;
+    let alive = true;
 
-    let cancelled = false;
-
-    async function run() {
-      setLoading(true);
-      setError(null);
-
+    (async () => {
       try {
-        // Step 1: categories from backend
-        const categoriesRes = await fetch("/api/categories", { cache: "no-store" });
-        const categoriesJson = await categoriesRes.json();
+        setLoading(true);
+        setError(null);
 
-        if (!categoriesRes.ok || !categoriesJson?.ok) {
-          throw new Error(categoriesJson?.error?.message ?? "Failed to load categories");
+        const [catsRes, prodRes] = await Promise.all([
+          fetch("/api/categories?limit=6", { cache: "no-store" }),
+          fetch("/api/products?limit=4&featured=1", { cache: "no-store" }),
+        ]);
+
+        const catsJson = (await catsRes.json()) as Envelope<LandingCategory[]>;
+        const prodJson = (await prodRes.json()) as Envelope<LandingProduct[]>;
+
+        if (!catsRes.ok || (catsJson as any).ok === false) {
+          throw new Error((catsJson as any)?.error?.message ?? `Categories failed (${catsRes.status})`);
         }
 
-        // map backend -> landing tiles
-        const cats =
-          (categoriesJson.data ?? []).slice(0, 6).map((c: any) => ({
-            title: c.name,
-            href: `/shop?category=${encodeURIComponent(c.slug)}`,
-          })) ?? [];
-
-        if (!cancelled) {
-          setData((prev) => ({
-            ...prev,
-            categories: cats.length ? cats : prev.categories,
-          }));
+        if (!prodRes.ok || (prodJson as any).ok === false) {
+          throw new Error((prodJson as any)?.error?.message ?? `Products failed (${prodRes.status})`);
         }
+
+        if (!alive) return;
+
+        setCategories(asArray<LandingCategory>((catsJson as any).data));
+        setFeatured(asArray<LandingProduct>((prodJson as any).data));
       } catch (e: any) {
-        if (!cancelled) setError(e?.message ?? "Failed to load landing data");
+        if (!alive) return;
+        setError(e?.message ?? "Failed to load landing data");
+        setCategories([]);
+        setFeatured([]);
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!alive) return;
+        setLoading(false);
       }
-    }
+    })();
 
-    run();
     return () => {
-      cancelled = true;
+      alive = false;
     };
   }, []);
 
-  return useMemo(() => ({ ...data, loading, error }), [data, loading, error]);
+  return { categories, featured, loading, error };
 }

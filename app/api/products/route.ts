@@ -4,14 +4,21 @@ import { createServerClient } from "@/utils/supabase/server";
 /**
  * GET /api/products
  * Public product listing (active products only)
+ *
+ * Query:
+ * - q
+ * - limit
+ * - offset
+ * - featured=1 (optional)
  */
 export async function GET(req: NextRequest) {
   const supabase = await createServerClient();
 
   const { searchParams } = new URL(req.url);
   const q = searchParams.get("q");
-  const limit = Number(searchParams.get("limit") ?? 20);
-  const offset = Number(searchParams.get("offset") ?? 0);
+  const limit = Math.min(100, Math.max(1, Number(searchParams.get("limit") ?? 20)));
+  const offset = Math.max(0, Number(searchParams.get("offset") ?? 0));
+  const featured = searchParams.get("featured");
 
   let query = supabase
     .from("products")
@@ -26,11 +33,21 @@ export async function GET(req: NextRequest) {
       currency,
       badge,
       is_featured,
+      status,
       created_at,
       product_images (
-        storage_path,
-        alt,
-        position
+        bucket_name,
+        object_path,
+        alt_text,
+        sort_order,
+        position,
+        is_primary,
+        is_public,
+        width,
+        height,
+        blurhash,
+        mime_type,
+        size_bytes
       )
     `
     )
@@ -38,7 +55,12 @@ export async function GET(req: NextRequest) {
     .order("created_at", { ascending: false })
     .range(offset, offset + limit - 1);
 
+  if (featured === "1" || featured === "true") {
+    query = query.eq("is_featured", true);
+  }
+
   if (q) {
+    // if you have search_text, this is fine. if not, switch to title/description.
     query = query.ilike("search_text", `%${q}%`);
   }
 
@@ -59,11 +81,8 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     ok: true,
-    data,
-    meta: {
-      limit,
-      offset,
-    },
+    data: data ?? [],
+    meta: { limit, offset },
   });
 }
 
@@ -74,7 +93,6 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const supabase = await createServerClient();
 
-  // 🔒 Auth check
   const {
     data: { user },
     error: authError,
@@ -82,31 +100,17 @@ export async function POST(req: NextRequest) {
 
   if (authError) {
     return NextResponse.json(
-      {
-        ok: false,
-        error: {
-          code: "AUTH_ERROR",
-          message: authError.message,
-        },
-      },
+      { ok: false, error: { code: "AUTH_ERROR", message: authError.message } },
       { status: 401 }
     );
   }
 
   if (!user) {
     return NextResponse.json(
-      {
-        ok: false,
-        error: {
-          code: "UNAUTHORIZED",
-          message: "Authentication required",
-        },
-      },
+      { ok: false, error: { code: "UNAUTHORIZED", message: "Authentication required" } },
       { status: 401 }
     );
   }
-
-  // TODO: role check (admin / catalog manager)
 
   const body = await req.json();
 
@@ -125,10 +129,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         ok: false,
-        error: {
-          code: "INVALID_INPUT",
-          message: "slug, title, and price_cents are required",
-        },
+        error: { code: "INVALID_INPUT", message: "slug, title, and price_cents are required" },
       },
       { status: 400 }
     );
@@ -145,26 +146,17 @@ export async function POST(req: NextRequest) {
       currency,
       badge,
       is_featured,
-      status: "draft", // always start as draft
+      status: "draft",
     })
     .select()
     .single();
 
   if (error) {
     return NextResponse.json(
-      {
-        ok: false,
-        error: {
-          code: "PRODUCT_CREATE_FAILED",
-          message: error.message,
-        },
-      },
+      { ok: false, error: { code: "PRODUCT_CREATE_FAILED", message: error.message } },
       { status: 500 }
     );
   }
 
-  return NextResponse.json({
-    ok: true,
-    data,
-  });
+  return NextResponse.json({ ok: true, data });
 }

@@ -3,13 +3,45 @@
 import React, { useState, useRef, useEffect } from "react";
 import { MdExpandMore, MdChevronRight, MdArrowForwardIos } from "react-icons/md";
 import { X } from "lucide-react";
-import { navTree } from "@/lib/navTree";
 import "./_components/Mobile.scss";
+
+// ✅ fallback so mobile never goes blank
+import { navTree as fallbackNavTree } from "@/lib/navTree";
+
+type NavNode = {
+  key: string;
+  label: string;
+  children?: NavNode[];
+};
 
 interface MobileDrawerProps {
   navigateTo: (id: string) => (e?: React.MouseEvent<HTMLAnchorElement>) => void;
   session: any;
   onClose: () => void;
+}
+
+function mapDbTreeToNavNodes(dbNodes: any[]): NavNode[] {
+  return (dbNodes ?? []).map((n: any) => ({
+    key: n.slug,
+    label: n.name,
+    children: (n.children ?? []).map((c: any) => ({
+      key: c.slug,
+      label: c.name,
+      children: (c.children ?? []).map((cc: any) => ({
+        key: cc.slug,
+        label: cc.name,
+      })),
+    })),
+  }));
+}
+
+function mapFallbackToNavNodes(nodes: any[]): NavNode[] {
+  // keep it simple: top level + one submenu level (matches your current mobile UI)
+  return (nodes ?? []).map((n: any) => ({
+    key: n.key,
+    label: n.label,
+    children: n.children?.map((c: any) => ({ key: c.key, label: c.label })) ?? undefined,
+  }));
 }
 
 export default function MobileDrawer({
@@ -21,6 +53,50 @@ export default function MobileDrawer({
   const [expanded, setExpanded] = useState<string | null>(null);
   const [isClosing, setIsClosing] = useState(false);
 
+  // ✅ start with fallback so it renders instantly
+  const [navTree, setNavTree] = useState<NavNode[]>(
+    mapFallbackToNavNodes(fallbackNavTree as any[])
+  );
+
+  // ✅ fetch DB nav + swap in if it works
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const res = await fetch("/api/nav", { cache: "no-store" });
+        if (!res.ok) {
+          console.error("Nav fetch failed:", res.status);
+          return;
+        }
+
+        const json = await res.json();
+        if (!json?.ok) {
+          console.error("Nav API returned error:", json?.error);
+          return;
+        }
+
+        const mapped = mapDbTreeToNavNodes(json.data);
+
+        if (!cancelled && mapped.length) {
+          setNavTree(mapped);
+          // reset expanded if it no longer exists
+          setExpanded((prev) => {
+            if (!prev) return null;
+            const exists = mapped.some((n) => n.key === prev);
+            return exists ? prev : null;
+          });
+        }
+      } catch (e) {
+        console.error("Nav fetch exception:", e);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -29,6 +105,7 @@ export default function MobileDrawer({
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const toggleExpand = (key: string) => {
@@ -94,11 +171,12 @@ export default function MobileDrawer({
               {/* Vertical divider before icon */}
               <div className="drawer-divider-vertical" />
 
-              {node.children ? (
+              {node.children?.length ? (
                 <button
                   onClick={() => toggleExpand(node.key)}
                   className="menu-toggle text-foreground"
                   aria-label={`Toggle ${node.label}`}
+                  type="button"
                 >
                   {expanded === node.key ? (
                     <MdExpandMore size={20} />
@@ -113,7 +191,7 @@ export default function MobileDrawer({
               )}
             </div>
 
-            {node.children && expanded === node.key && (
+            {node.children?.length && expanded === node.key && (
               <div className="mobile-submenu bg-background">
                 {node.children.map((child) => (
                   <a
@@ -146,6 +224,7 @@ export default function MobileDrawer({
             <button
               onClick={handleAccountClick}
               className="auth-button text-accent"
+              type="button"
             >
               Account
             </button>

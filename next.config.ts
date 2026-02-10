@@ -1,73 +1,82 @@
 // next.config.ts
-
 import type { NextConfig } from "next";
 
+const supabaseUrl =
+  process.env.NEXT_PUBLIC_SUPABASE_URL ??
+  process.env.NEXT_PUBLIC_SUPABASE_PROJECT_URL ??
+  "";
+
+let supabaseHostname = "";
+try {
+  supabaseHostname = supabaseUrl ? new URL(supabaseUrl).hostname : "";
+} catch {
+  supabaseHostname = "";
+}
+
 const nextConfig: NextConfig = {
-  images: {
-    remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "chsmesvozsjcgrwuimld.supabase.co",
-        pathname: "/storage/v1/object/public/avatars/**",
+  turbopack: {
+    rules: {
+      ".css": {
+        as: "*.css",
+        loaders: ["postcss-loader"],
       },
-    ],
+    },
   },
-  // Add CORS headers for OpenGraph images
+
+  images: {
+    remotePatterns: supabaseHostname
+      ? [
+          {
+            protocol: "https",
+            hostname: supabaseHostname,
+            pathname: "/storage/v1/object/public/**",
+          },
+        ]
+      : [],
+  },
+
   async headers() {
     return [
       {
-        source: '/opengraph-image.png',
+        source: "/opengraph-image.png",
         headers: [
-          {
-            key: 'Access-Control-Allow-Origin',
-            value: '*',
-          },
-          {
-            key: 'Cache-Control',
-            value: 'public, max-age=3600',
-          },
+          { key: "Access-Control-Allow-Origin", value: "*" },
+          { key: "Cache-Control", value: "public, max-age=3600" },
         ],
       },
       {
-        source: '/twitter-image.png',
+        source: "/twitter-image.png",
         headers: [
-          {
-            key: 'Access-Control-Allow-Origin',
-            value: '*',
-          },
-          {
-            key: 'Cache-Control',
-            value: 'public, max-age=3600',
-          },
+          { key: "Access-Control-Allow-Origin", value: "*" },
+          { key: "Cache-Control", value: "public, max-age=3600" },
         ],
       },
     ];
   },
+
   typescript: {
-    ignoreBuildErrors: true, // ⛔ Temporarily disables type-checking for production builds
+    ignoreBuildErrors: true,
   },
-  // Fix for Watchpack watcher errors
+
   webpack: (config, { dev }) => {
     if (dev) {
-      // Configure webpack watcher for development
       config.watchOptions = {
-        poll: 1000, // Check for changes every second
-        aggregateTimeout: 300, // Delay rebuild after first change
+        poll: 1000,
+        aggregateTimeout: 300,
         ignored: [
-          '**/node_modules/**',
-          '**/.git/**',
-          '**/.next/**',
-          '**/dist/**',
-          '**/build/**',
+          "**/node_modules/**",
+          "**/.git/**",
+          "**/.next/**",
+          "**/dist/**",
+          "**/build/**",
         ],
       };
     }
     return config;
   },
-  // Additional Next.js experimental features to reduce watcher load
+
   experimental: {
-    // Reduce the number of files being watched
-    optimizePackageImports: ['lucide-react', '@supabase/supabase-js'],
+    optimizePackageImports: ["lucide-react", "@supabase/supabase-js"],
   },
 };
 

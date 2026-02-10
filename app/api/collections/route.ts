@@ -1,6 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/utils/supabase/server";
 
+type CategoryRow = {
+  id: string;
+  name: string;
+  slug: string;
+  parent_id: string | null;
+  sort_order: number | null;
+  position: number | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+type CategoryNode = CategoryRow & { children: CategoryNode[] };
+
 function jsonError(status: number, code: string, message: string, details?: any) {
   return NextResponse.json(
     { ok: false, error: { code, message, details } },
@@ -8,159 +22,94 @@ function jsonError(status: number, code: string, message: string, details?: any)
   );
 }
 
-// TODO: Replace with your real role gating (admin/catalog manager)
-async function requireAdmin(supabase: ReturnType<typeof createServerClient>) {
-  const { data } = await supabase.auth.getUser();
-  if (!data.user) return { ok: false };
-  return { ok: true };
+function buildTree(rows: CategoryRow[]): CategoryNode[] {
+  const byId = new Map<string, CategoryNode>();
+  const roots: CategoryNode[] = [];
+
+  for (const r of rows) byId.set(r.id, { ...r, children: [] });
+
+  for (const r of rows) {
+    const node = byId.get(r.id)!;
+    if (r.parent_id && byId.has(r.parent_id)) {
+      byId.get(r.parent_id)!.children.push(node);
+    } else {
+      roots.push(node);
+    }
+  }
+
+  const sortNodes = (nodes: CategoryNode[]) => {
+    nodes.sort((a, b) => {
+      const ao = a.sort_order ?? a.position ?? 0;
+      const bo = b.sort_order ?? b.position ?? 0;
+      if (ao !== bo) return ao - bo;
+      return (a.name ?? "").localeCompare(b.name ?? "");
+    });
+    for (const n of nodes) sortNodes(n.children);
+  };
+
+  sortNodes(roots);
+  return roots;
 }
 
 /**
- * GET /api/collections
- * Public collections list.
+ * GET /api/categories
+ * Public NAV category tree/list
  *
- * Query:
- *  - q=search
+ * Query params:
+ * - q (optional) search name/slug
+ * - limit (default 50)
+ * - offset (default 0)
+ * - include=tree (optional) nested result
  */
 export async function GET(req: NextRequest) {
-  const supabase = createServerClient();
-
-  const { searchParams } = new URL(req.url);
-  const q = searchParams.get("q");
-
-  let query = supabase
-    .from("collections")
-    .select("id, slug, name, description, created_at")
-    .order("name", { ascending: true });
-
-  if (q) {
-    query = query.or(`name.ilike.%${q}%,slug.ilike.%${q}%`);
-  }
-
-  const { data, error } = await query;
-
-  if (error) {
-    return jsonError(500, "COLLECTION_LIST_FAILED", error.message);
-  }
-
-  return NextResponse.json({ ok: true, data });
-}
-
-/**
- * POST /api/collections
- * Admin create collection.
- *
- * Body:
- * { "name": "Featured", "slug": "featured", "description"?: "..." }
- */
-export async function POST(req: NextRequest) {
-  const supabase = createServerClient();
-
-  const gate = await requireAdmin(supabase);
-  if (!gate.ok) return jsonError(401, "UNAUTHORIZED", "Authentication required");
-
-  let body: any = null;
   try {
-    body = await req.json();
-  } catch {
-    return jsonError(400, "INVALID_JSON", "Body must be valid JSON");
-  }
+    const supabase = await createServerClient();
 
-  const name = body?.name;
-  const slug = body?.slug;
-  const description = body?.description ?? null;
+    const { searchParams } = new URL(req.url);
+    const q = searchParams.get("q")?.trim() || "";
+    const limit = Number(searchParams.get("limit") ?? 50);
+    const offset = Number(searchParams.get("offset") ?? 0);
 
-  if (!name || typeof name !== "string") {
-    return jsonError(400, "INVALID_NAME", "name is required");
-  }
-  if (!slug || typeof slug !== "string") {
-    return jsonError(400, "INVALID_SLUG", "slug is required");
-  }
-  if (description !== null && typeof description !== "string") {
-    return jsonError(400, "INVALID_DESCRIPTION", "description must be a string or null");
-  }
+    const include = (searchParams.get("include") || "").toLowerCase();
+    const wantTree = include.split(",").map((s) => s.trim()).includes("tree");
 
-  const { data, error } = await supabase
-    .from("collections")
-    .insert({ name, slug, description })
-    .select()
-    .single();
+    let query = supabase
+      .from("categories")
+      .select(
+        "id,name,slug,parent_id,sort_order,position,is_active,created_at,updated_at"
+      )
+      .eq("is_active", true)
+      .order("sort_order", { ascending: true })
+      .order("position", { ascending: true })
+      .order("name", { ascending: true });
 
-  if (error) {
-    return jsonError(500, "COLLECTION_CREATE_FAILED", error.message);
-  }
-
-  return NextResponse.json({ ok: true, data });
-}
-
-/**
- * PATCH /api/collections
- * Admin update collection.
- *
- * Body:
- * {
- *   "id": "uuid",
- *   "name"?: "...",
- *   "slug"?: "...",
- *   "description"?: "..." | null
- * }
- */
-export async function PATCH(req: NextRequest) {
-  const supabase = createServerClient();
-
-  const gate = await requireAdmin(supabase);
-  if (!gate.ok) return jsonError(401, "UNAUTHORIZED", "Authentication required");
-
-  let body: any = null;
-  try {
-    body = await req.json();
-  } catch {
-    return jsonError(400, "INVALID_JSON", "Body must be valid JSON");
-  }
-
-  const id = body?.id;
-  if (!id || typeof id !== "string") {
-    return jsonError(400, "INVALID_ID", "id is required");
-  }
-
-  const update: Record<string, any> = {};
-
-  if ("name" in body) {
-    if (!body.name || typeof body.name !== "string") {
-      return jsonError(400, "INVALID_NAME", "name must be a non-empty string");
+    if (q) {
+      query = query.or(`name.ilike.%${q}%,slug.ilike.%${q}%`);
     }
-    update.name = body.name;
-  }
 
-  if ("slug" in body) {
-    if (!body.slug || typeof body.slug !== "string") {
-      return jsonError(400, "INVALID_SLUG", "slug must be a non-empty string");
+    // if you request a tree, do NOT apply pagination (it breaks parent/child)
+    if (!wantTree) {
+      query = query.range(offset, offset + limit - 1);
     }
-    update.slug = body.slug;
-  }
 
-  if ("description" in body) {
-    const d = body.description;
-    if (d !== null && typeof d !== "string") {
-      return jsonError(400, "INVALID_DESCRIPTION", "description must be a string or null");
+    const { data, error } = await query;
+    if (error) return jsonError(500, "CATEGORY_LIST_FAILED", error.message, error);
+
+    const rows = (data ?? []) as CategoryRow[];
+
+    if (!wantTree) {
+      return NextResponse.json({
+        ok: true,
+        data: rows,
+        meta: { limit, offset },
+      });
     }
-    update.description = d;
+
+    return NextResponse.json({
+      ok: true,
+      data: buildTree(rows),
+    });
+  } catch (e: any) {
+    return jsonError(500, "CATEGORIES_ROUTE_CRASH", e?.message ?? "Unknown error", e);
   }
-
-  if (Object.keys(update).length === 0) {
-    return jsonError(400, "NO_FIELDS", "No updatable fields were provided");
-  }
-
-  const { data, error } = await supabase
-    .from("collections")
-    .update(update)
-    .eq("id", id)
-    .select()
-    .single();
-
-  if (error) {
-    return jsonError(500, "COLLECTION_UPDATE_FAILED", error.message);
-  }
-
-  return NextResponse.json({ ok: true, data });
 }
