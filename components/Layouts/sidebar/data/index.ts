@@ -65,7 +65,7 @@ export const NAV_DATA = [
           // ───────── Marketing ─────────
           {
             title: "Banners",
-            url: "/settings/banners",
+            url: "/settings/top-banner",
             icon: Icons.FourCircle, // ✅ Image icon removed
           },
           {
