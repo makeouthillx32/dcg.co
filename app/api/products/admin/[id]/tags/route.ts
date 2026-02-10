@@ -54,6 +54,11 @@ async function writeProductTagsArray(supabase: SupabaseClient, product_id: strin
 /**
  * POST /api/products/admin/[id]/tags
  * Body: { "tag_id": "uuid" }
+ *
+ * Supabase (confirmed):
+ * - tags(id, name, slug)
+ * - product_tags PK(product_id, tag_id)
+ * - products.tags is text[]
  */
 export async function POST(req: NextRequest, { params }: Params) {
   const supabase = await createServerClient();
@@ -76,14 +81,19 @@ export async function POST(req: NextRequest, { params }: Params) {
     return jsonError(400, "INVALID_TAG_ID", "tag_id is required");
   }
 
-  // 1) Lookup slug (also validates tag exists)
+  // validate tag + get slug
   const slugRes = await getTagSlug(supabase, tag_id);
   if (!slugRes.ok) {
     const status = slugRes.error.code === "PGRST116" ? 404 : 500;
-    return jsonError(status, status === 404 ? "TAG_NOT_FOUND" : "TAG_LOOKUP_FAILED", slugRes.error.message, slugRes.error);
+    return jsonError(
+      status,
+      status === 404 ? "TAG_NOT_FOUND" : "TAG_LOOKUP_FAILED",
+      slugRes.error.message,
+      slugRes.error
+    );
   }
 
-  // 2) Assign via join table (idempotent)
+  // assign (idempotent because PK is (product_id, tag_id))
   const { data: joinRow, error: joinErr } = await supabase
     .from("product_tags")
     .upsert({ product_id, tag_id }, { onConflict: "product_id,tag_id", ignoreDuplicates: false })
@@ -92,7 +102,7 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   if (joinErr) return jsonError(500, "ASSIGN_TAG_FAILED", joinErr.message, joinErr);
 
-  // 3) Sync products.tags (text[]) with slug
+  // sync products.tags (slug cache)
   const arrRes = await readProductTagsArray(supabase, product_id);
   if (!arrRes.ok) return jsonError(500, "PRODUCT_TAGS_FETCH_FAILED", arrRes.error.message, arrRes.error);
 
@@ -119,14 +129,18 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   const tag_id = searchParams.get("tag_id");
   if (!tag_id) return jsonError(400, "INVALID_TAG_ID", "tag_id query param is required");
 
-  // 1) Lookup slug (so we can remove it from products.tags)
+  // get slug to remove from cached array
   const slugRes = await getTagSlug(supabase, tag_id);
   if (!slugRes.ok) {
     const status = slugRes.error.code === "PGRST116" ? 404 : 500;
-    return jsonError(status, status === 404 ? "TAG_NOT_FOUND" : "TAG_LOOKUP_FAILED", slugRes.error.message, slugRes.error);
+    return jsonError(
+      status,
+      status === 404 ? "TAG_NOT_FOUND" : "TAG_LOOKUP_FAILED",
+      slugRes.error.message,
+      slugRes.error
+    );
   }
 
-  // 2) Delete join row (scoped)
   const { data: deleted, error: delErr } = await supabase
     .from("product_tags")
     .delete()
@@ -138,7 +152,6 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   if (delErr) return jsonError(500, "UNASSIGN_TAG_FAILED", delErr.message, delErr);
   if (!deleted) return jsonError(404, "NOT_FOUND", "Tag not assigned to this product");
 
-  // 3) Sync products.tags (remove slug)
   const arrRes = await readProductTagsArray(supabase, product_id);
   if (!arrRes.ok) return jsonError(500, "PRODUCT_TAGS_FETCH_FAILED", arrRes.error.message, arrRes.error);
 
