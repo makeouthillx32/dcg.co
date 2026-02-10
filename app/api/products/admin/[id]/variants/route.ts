@@ -1,45 +1,42 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/utils/supabase/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
-type Params = {
-  params: { id: string };
-};
+type Params = { params: { id: string } };
 
 function jsonError(status: number, code: string, message: string, details?: any) {
-  return NextResponse.json(
-    { ok: false, error: { code, message, details } },
-    { status }
-  );
+  return NextResponse.json({ ok: false, error: { code, message, details } }, { status });
 }
 
-// TODO: Replace with your real role gating (admin/catalog manager)
-async function requireAdmin(supabase: ReturnType<typeof createServerClient>) {
-  const { data } = await supabase.auth.getUser();
-  if (!data.user) return { ok: false };
-  return { ok: true };
+async function requireAdmin(supabase: SupabaseClient) {
+  const { data, error } = await supabase.auth.getUser();
+  if (error) return { ok: false, status: 401 as const, message: error.message };
+  if (!data.user) return { ok: false, status: 401 as const, message: "Authentication required" };
+  return { ok: true as const };
 }
 
 /**
  * POST /api/products/admin/[id]/variants
  *
- * Body:
+ * Body supports:
  * {
  *   "title": "Default",                 // required
  *   "sku": "SKU-123",                   // optional
- *   "price_cents": 1999,                // optional (falls back to product price if omitted)
+ *   "price_cents": 1999,                // optional (defaults to product price_cents)
  *   "compare_at_price_cents": 2499,     // optional
- *   "position": 0,                      // optional (defaults to last)
+ *   "position": 0,                      // optional (defaults to append)
  *
- *   "inventory_enabled": true,          // optional
- *   "stock_on_hand": 10,                // optional
- *   "low_stock_threshold": 2            // optional
+ *   // inventory (aligned to Supabase schema)
+ *   "track_inventory": true,            // optional (or legacy: inventory_enabled)
+ *   "allow_backorder": false,           // optional
+ *   "quantity": 10                      // optional (or legacy: stock_on_hand)
  * }
  */
 export async function POST(req: NextRequest, { params }: Params) {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
 
   const gate = await requireAdmin(supabase);
-  if (!gate.ok) return jsonError(401, "UNAUTHORIZED", "Authentication required");
+  if (!gate.ok) return jsonError(gate.status, "UNAUTHORIZED", gate.message);
 
   const productId = params.id;
   if (!productId) return jsonError(400, "INVALID_ID", "Missing product id");
@@ -57,11 +54,14 @@ export async function POST(req: NextRequest, { params }: Params) {
   }
 
   const sku = body?.sku ?? null;
+  if (sku !== null && typeof sku !== "string") {
+    return jsonError(400, "INVALID_SKU", "sku must be a string or null");
+  }
 
+  // position: append by default
   const positionRaw = body?.position;
-  let position: number | null = null;
+  let position: number;
 
-  // If position not provided, append
   if (typeof positionRaw === "number") {
     if (!Number.isFinite(positionRaw) || positionRaw < 0) {
       return jsonError(400, "INVALID_POSITION", "position must be a number >= 0");
@@ -75,13 +75,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       .order("position", { ascending: false })
       .limit(1);
 
-    if (existingErr) {
-      return jsonError(
-        500,
-        "VARIANT_POSITION_LOOKUP_FAILED",
-        existingErr.message
-      );
-    }
+    if (existingErr) return jsonError(500, "VARIANT_POSITION_LOOKUP_FAILED", existingErr.message, existingErr);
 
     const maxPos =
       existing && existing.length > 0 && typeof existing[0].position === "number"
@@ -91,7 +85,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     position = maxPos + 1;
   }
 
-  // If price not provided, default to product price
+  // price default: product.price_cents
   let price_cents = body?.price_cents;
   if (price_cents == null) {
     const { data: product, error: productErr } = await supabase
@@ -100,10 +94,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       .eq("id", productId)
       .single();
 
-    if (productErr) {
-      return jsonError(500, "PRODUCT_PRICE_LOOKUP_FAILED", productErr.message);
-    }
-
+    if (productErr) return jsonError(500, "PRODUCT_PRICE_LOOKUP_FAILED", productErr.message, productErr);
     price_cents = product.price_cents;
   }
 
@@ -118,36 +109,30 @@ export async function POST(req: NextRequest, { params }: Params) {
       !Number.isFinite(compare_at_price_cents) ||
       compare_at_price_cents < 0)
   ) {
-    return jsonError(
-      400,
-      "INVALID_COMPARE_PRICE",
-      "compare_at_price_cents must be a number >= 0 or null"
-    );
+    return jsonError(400, "INVALID_COMPARE_PRICE", "compare_at_price_cents must be >= 0 or null");
   }
 
-  // Inventory fields (optional)
-  const inventory_enabled =
-    typeof body?.inventory_enabled === "boolean" ? body.inventory_enabled : false;
+  // Inventory inputs (support legacy names)
+  const track_inventory =
+    typeof body?.track_inventory === "boolean"
+      ? body.track_inventory
+      : typeof body?.inventory_enabled === "boolean"
+        ? body.inventory_enabled
+        : false;
 
-  const stock_on_hand =
-    body?.stock_on_hand == null ? 0 : Number(body.stock_on_hand);
+  const allow_backorder =
+    typeof body?.allow_backorder === "boolean" ? body.allow_backorder : false;
 
-  if (!Number.isFinite(stock_on_hand) || stock_on_hand < 0) {
-    return jsonError(400, "INVALID_STOCK", "stock_on_hand must be a number >= 0");
+  const quantityRaw = body?.quantity ?? body?.stock_on_hand ?? null;
+  const quantity =
+    quantityRaw == null ? null : Number(quantityRaw);
+
+  if (quantity !== null && (!Number.isFinite(quantity) || quantity < 0)) {
+    return jsonError(400, "INVALID_QUANTITY", "quantity/stock_on_hand must be a number >= 0");
   }
 
-  const low_stock_threshold =
-    body?.low_stock_threshold == null ? 0 : Number(body.low_stock_threshold);
-
-  if (!Number.isFinite(low_stock_threshold) || low_stock_threshold < 0) {
-    return jsonError(
-      400,
-      "INVALID_LOW_STOCK",
-      "low_stock_threshold must be a number >= 0"
-    );
-  }
-
-  const { data, error } = await supabase
+  // 1) Create variant row using REAL columns
+  const { data: variant, error: vErr } = await supabase
     .from("product_variants")
     .insert({
       product_id: productId,
@@ -156,16 +141,43 @@ export async function POST(req: NextRequest, { params }: Params) {
       price_cents,
       compare_at_price_cents,
       position,
-      inventory_enabled,
-      stock_on_hand,
-      low_stock_threshold,
+      track_inventory,
+      allow_backorder,
+      // mirror cache if provided
+      inventory_qty: quantity ?? 0,
     })
-    .select()
+    .select("*")
     .single();
 
-  if (error) {
-    return jsonError(500, "VARIANT_CREATE_FAILED", error.message);
+  if (vErr) return jsonError(500, "VARIANT_CREATE_FAILED", vErr.message, vErr);
+
+  // 2) Upsert inventory row (source of truth) if caller provided quantity or track_inventory/backorder
+  let inventoryRow: any = null;
+  const wantsInventory =
+    ("track_inventory" in (body ?? {})) ||
+    ("inventory_enabled" in (body ?? {})) ||
+    ("allow_backorder" in (body ?? {})) ||
+    ("quantity" in (body ?? {})) ||
+    ("stock_on_hand" in (body ?? {}));
+
+  if (wantsInventory) {
+    const { data: inv, error: invErr } = await supabase
+      .from("inventory")
+      .upsert(
+        {
+          variant_id: variant.id,
+          track_inventory,
+          allow_backorder,
+          quantity: quantity ?? 0,
+        },
+        { onConflict: "variant_id" }
+      )
+      .select("*")
+      .single();
+
+    if (invErr) return jsonError(500, "INVENTORY_CREATE_FAILED", invErr.message, invErr);
+    inventoryRow = inv;
   }
 
-  return NextResponse.json({ ok: true, data });
+  return NextResponse.json({ ok: true, data: { variant, inventory: inventoryRow } });
 }
