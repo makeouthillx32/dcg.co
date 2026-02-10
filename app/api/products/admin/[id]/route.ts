@@ -12,6 +12,8 @@ async function requireAdmin(supabase: SupabaseClient) {
   const { data, error } = await supabase.auth.getUser();
   if (error) return { ok: false, status: 401 as const, message: error.message };
   if (!data.user) return { ok: false, status: 401 as const, message: "Authentication required" };
+
+  // TODO: Replace with real role check (profiles table / custom claim / etc.)
   return { ok: true as const };
 }
 
@@ -47,13 +49,13 @@ export async function GET(_req: NextRequest, { params }: Params) {
     .from("products")
     .select(
       `
-      *,
-      product_images (*),
-      product_variants (*),
-      product_categories (
-        categories (*)
-      )
-    `
+        *,
+        product_images (*),
+        product_variants (*),
+        product_categories (
+          categories (*)
+        )
+      `
     )
     .eq("id", id)
     .single();
@@ -63,7 +65,8 @@ export async function GET(_req: NextRequest, { params }: Params) {
     return jsonError(
       status,
       status === 404 ? "NOT_FOUND" : "PRODUCT_FETCH_FAILED",
-      status === 404 ? "Product not found" : error.message
+      status === 404 ? "Product not found" : error.message,
+      error
     );
   }
 
@@ -106,20 +109,17 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     return jsonError(400, "INVALID_JSON", "Body must be valid JSON");
   }
 
-  // keep this permissive because your schema differs between environments
+  // ✅ ALIGNED WITH YOUR SQL RESULT (only columns that exist)
   const allowed = new Set([
-    "slug",
-    "title",
-    "description",
-    "price_cents",
-    "compare_at_price_cents",
     "badge",
+    "compare_at_price_cents",
+    "description",
     "is_featured",
-    "status",
+    "price_cents",
     "search_text",
-    "seo_title",
-    "seo_description",
-    "og_image_override_url",
+    "slug",
+    "status",
+    "title",
   ]);
 
   const update: Record<string, any> = {};
@@ -131,7 +131,12 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     return jsonError(400, "NO_FIELDS", "No updatable fields were provided");
   }
 
-  const { data, error } = await supabase.from("products").update(update).eq("id", id).select().single();
+  const { data, error } = await supabase
+    .from("products")
+    .update(update)
+    .eq("id", id)
+    .select("*")
+    .single();
 
   if (error) return jsonError(500, "PRODUCT_UPDATE_FAILED", error.message, error);
 
@@ -147,11 +152,12 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   const id = params.id;
   if (!id) return jsonError(400, "INVALID_ID", "Missing product id");
 
+  // If "archived" isn't an allowed status in your DB, change this value to whatever you use.
   const { data, error } = await supabase
     .from("products")
     .update({ status: "archived" })
     .eq("id", id)
-    .select()
+    .select("*")
     .single();
 
   if (error) return jsonError(500, "PRODUCT_ARCHIVE_FAILED", error.message, error);
