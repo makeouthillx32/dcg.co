@@ -8,14 +8,20 @@ function jsonError(status: number, code: string, message: string, details?: any)
 
 async function requireAdmin(supabase: SupabaseClient) {
   const { data, error } = await supabase.auth.getUser();
-  if (error) return { ok: false, status: 401 as const, message: error.message };
-  if (!data.user) return { ok: false, status: 401 as const, message: "Authentication required" };
+  if (error) return { ok: false as const, status: 401 as const, message: error.message };
+  if (!data.user) return { ok: false as const, status: 401 as const, message: "Authentication required" };
   return { ok: true as const, user: data.user };
 }
 
 /**
  * GET /api/products/admin
  * Admin list (any status). Empty list returns ok:true, data:[]
+ *
+ * Query:
+ *  - limit (1..200) default 50
+ *  - offset (>=0)  default 0
+ *  - status = all | draft | active | archived (etc)
+ *  - q = search string (matches products.search_text via ILIKE)
  */
 export async function GET(req: NextRequest) {
   const supabase = await createServerClient();
@@ -63,13 +69,13 @@ export async function GET(req: NextRequest) {
 
   if (status !== "all") query = query.eq("status", status);
 
-  // You confirmed products.search_text exists
+  // you confirmed products.search_text exists
   if (q) query = query.ilike("search_text", `%${q}%`);
 
   const { data, error } = await query;
   if (error) return jsonError(500, "PRODUCT_ADMIN_LIST_FAILED", error.message, error);
 
-  // stable ordering of images per product
+  // Normalize + stable sort of images
   const normalized = (data ?? []).map((p: any) => {
     const imgs = (p.product_images ?? []).slice().sort((a: any, b: any) => {
       const sa = typeof a.sort_order === "number" ? a.sort_order : 0;
@@ -78,10 +84,26 @@ export async function GET(req: NextRequest) {
 
       const pa = typeof a.position === "number" ? a.position : 0;
       const pb = typeof b.position === "number" ? b.position : 0;
-      return pa - pb;
+      if (pa !== pb) return pa - pb;
+
+      const ca = a.created_at ? Date.parse(a.created_at) : 0;
+      const cb = b.created_at ? Date.parse(b.created_at) : 0;
+      return ca - cb;
     });
+
     return { ...p, product_images: imgs };
   });
+
+  // ✅ Debug guard: if THIS triggers, your UI will definitely get "Missing product id"
+  const missing = normalized.filter((p: any) => !p?.id);
+  if (missing.length) {
+    return jsonError(
+      500,
+      "MISSING_PRODUCT_ID",
+      "One or more products returned without an id (cannot manage products).",
+      { count: missing.length, sample: missing[0] }
+    );
+  }
 
   return NextResponse.json({
     ok: true,
@@ -93,6 +115,8 @@ export async function GET(req: NextRequest) {
 /**
  * POST /api/products/admin
  * Create product (draft)
+ *
+ * Body: { slug, title, description?, price_cents }
  */
 export async function POST(req: NextRequest) {
   const supabase = await createServerClient();
@@ -109,8 +133,14 @@ export async function POST(req: NextRequest) {
 
   const { slug, title, description = null, price_cents } = body ?? {};
 
-  if (!slug || !title || typeof price_cents !== "number") {
-    return jsonError(400, "INVALID_INPUT", "slug, title, and price_cents are required");
+  if (!slug || typeof slug !== "string") {
+    return jsonError(400, "INVALID_SLUG", "slug is required");
+  }
+  if (!title || typeof title !== "string") {
+    return jsonError(400, "INVALID_TITLE", "title is required");
+  }
+  if (typeof price_cents !== "number" || !Number.isFinite(price_cents) || price_cents < 0) {
+    return jsonError(400, "INVALID_PRICE", "price_cents must be a number >= 0");
   }
 
   const { data, error } = await supabase
@@ -122,7 +152,21 @@ export async function POST(req: NextRequest) {
       price_cents,
       status: "draft",
     })
-    .select(`id, slug, title, description, price_cents, status, created_at`)
+    .select(
+      `
+      id,
+      slug,
+      title,
+      description,
+      price_cents,
+      compare_at_price_cents,
+      currency,
+      badge,
+      is_featured,
+      status,
+      created_at
+    `
+    )
     .single();
 
   if (error) return jsonError(500, "PRODUCT_CREATE_FAILED", error.message, error);
