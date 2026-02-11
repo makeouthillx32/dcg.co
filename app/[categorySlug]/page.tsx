@@ -1,10 +1,12 @@
-import { createServerClient } from "@/utils/supabase/server";
+import { createServerClient, createServiceClient } from "@/utils/supabase/server";
 import { notFound } from "next/navigation";
 import CategoryPageClient from "./_components/CategoryPageClient";
+import StorefrontLayout from "@/components/storefront/StorefrontLayout";
 
 // Generate static params for all active categories at build time
 export async function generateStaticParams() {
-  const supabase = await createServerClient();
+  // ✅ Use service client for build-time data fetching (no cookies needed)
+  const supabase = createServiceClient();
   const { data: categories } = await supabase
     .from("categories")
     .select("slug")
@@ -121,12 +123,14 @@ export default async function CategoryPage({ params }: { params: Promise<{ categ
   }
 
   return (
-    <CategoryPageClient
-      category={category}
-      subcategories={subcategories || []}
-      products={products}
-      breadcrumbs={breadcrumbs}
-    />
+    <StorefrontLayout>
+      <CategoryPageClient
+        category={category}
+        subcategories={subcategories || []}
+        products={products}
+        breadcrumbs={breadcrumbs}
+      />
+    </StorefrontLayout>
   );
 }
 

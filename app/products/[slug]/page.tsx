@@ -1,121 +1,138 @@
-import { createServerClient } from "@/utils/supabase/server";
+import { createServerClient, createServiceClient } from "@/utils/supabase/server";
 import { notFound } from "next/navigation";
-import ProductDetailClient from "./_components/ProductDetailClient";
+import CategoryPageClient from "./_components/CategoryPageClient";
+import StorefrontLayout from "@/components/storefront/StorefrontLayout";
 
-// Generate static params for all active products at build time
+// Generate static params for all active categories at build time
 export async function generateStaticParams() {
-  const supabase = await createServerClient();
-  const { data: products } = await supabase
-    .from("products")
+  // ✅ Use service client for build-time data fetching (no cookies needed)
+  const supabase = createServiceClient();
+  const { data: categories } = await supabase
+    .from("categories")
     .select("slug")
-    .eq("status", "active");
+    .eq("is_active", true);
 
-  return products?.map((product) => ({
-    slug: product.slug,
+  return categories?.map((category) => ({
+    categorySlug: category.slug,
   })) ?? [];
 }
 
 // Generate metadata for SEO
-export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = await params;
+export async function generateMetadata({ params }: { params: Promise<{ categorySlug: string }> }) {
+  const { categorySlug } = await params;
   const supabase = await createServerClient();
 
-  const { data: product } = await supabase
-    .from("products")
-    .select("title, description")
-    .eq("slug", slug)
-    .eq("status", "active")
+  const { data: category } = await supabase
+    .from("categories")
+    .select("name")
+    .eq("slug", categorySlug)
+    .eq("is_active", true)
     .single();
 
-  if (!product) {
+  if (!category) {
     return {
-      title: "Product Not Found",
+      title: "Category Not Found",
     };
   }
 
   return {
-    title: product.title,
-    description: product.description || `Shop ${product.title}`,
+    title: category.name,
+    description: `Shop ${category.name} products`,
   };
 }
 
-export default async function ProductPage({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = await params;
+export default async function CategoryPage({ params }: { params: Promise<{ categorySlug: string }> }) {
+  const { categorySlug } = await params;
   const supabase = await createServerClient();
 
-  // Fetch product with all related data in parallel
-  const [productResult, imagesResult, variantsResult, tagsResult] = await Promise.all([
-    supabase
-      .from("products")
-      .select("*")
-      .eq("slug", slug)
-      .eq("status", "active")
-      .single(),
-    supabase
-      .from("product_images")
-      .select("*")
-      .eq("product_id", slug) // We'll need to join or fetch by ID
-      .order("position", { ascending: true }),
-    supabase
-      .from("product_variants")
-      .select("*")
-      .eq("product_id", slug) // We'll need to join or fetch by ID
-      .order("position", { ascending: true }),
-    supabase
-      .from("product_tags")
-      .select(`
-        tag_id,
-        tags (
-          id,
-          name,
-          slug
-        )
-      `)
-      .eq("product_id", slug), // We'll need to join or fetch by ID
-  ]);
+  // Fetch category data
+  const { data: category } = await supabase
+    .from("categories")
+    .select("*")
+    .eq("slug", categorySlug)
+    .eq("is_active", true)
+    .single();
 
-  // If product not found, show 404
-  if (!productResult.data) {
+  if (!category) {
     notFound();
   }
 
-  const product = productResult.data;
+  // Fetch subcategories (children of this category)
+  const { data: subcategories } = await supabase
+    .from("categories")
+    .select("*")
+    .eq("parent_id", category.id)
+    .eq("is_active", true)
+    .order("position", { ascending: true });
 
-  // Now fetch images, variants, and tags using the product ID
-  const [actualImages, actualVariants, actualTags] = await Promise.all([
-    supabase
-      .from("product_images")
-      .select("*")
-      .eq("product_id", product.id)
-      .order("position", { ascending: true }),
-    supabase
-      .from("product_variants")
-      .select("*")
-      .eq("product_id", product.id)
-      .order("position", { ascending: true }),
-    supabase
-      .from("product_tags")
-      .select(`
-        tag_id,
-        tags (
+  // Fetch products in this category
+  const { data: productCategories } = await supabase
+    .from("product_categories")
+    .select(`
+      product_id,
+      products (
+        id,
+        title,
+        slug,
+        price_cents,
+        compare_at_price_cents,
+        currency,
+        status,
+        badge,
+        is_featured,
+        product_images (
           id,
-          name,
-          slug
+          object_path,
+          bucket_name,
+          alt_text,
+          position,
+          is_primary
         )
-      `)
-      .eq("product_id", product.id),
-  ]);
+      )
+    `)
+    .eq("category_id", category.id);
 
-  // Combine all data
-  const productWithRelations = {
-    ...product,
-    images: actualImages.data || [],
-    variants: actualVariants.data || [],
-    tags: actualTags.data?.map((pt: any) => pt.tags).filter(Boolean) || [],
-  };
+  // Extract and filter active products with images
+  const products = (productCategories || [])
+    .map((pc: any) => pc.products)
+    .filter((p: any) => p && p.status === "active")
+    .map((product: any) => ({
+      ...product,
+      images: product.product_images || [],
+    }));
 
-  return <ProductDetailClient product={productWithRelations} />;
+  // Build breadcrumb trail
+  const breadcrumbs = [];
+  let currentCategory = category;
+  breadcrumbs.unshift(currentCategory);
+
+  // Traverse up to build full breadcrumb path
+  while (currentCategory.parent_id) {
+    const { data: parent } = await supabase
+      .from("categories")
+      .select("*")
+      .eq("id", currentCategory.parent_id)
+      .single();
+
+    if (parent) {
+      breadcrumbs.unshift(parent);
+      currentCategory = parent;
+    } else {
+      break;
+    }
+  }
+
+  return (
+    <StorefrontLayout>
+      <CategoryPageClient
+        category={category}
+        subcategories={subcategories || []}
+        products={products}
+        breadcrumbs={breadcrumbs}
+      />
+    </StorefrontLayout>
+  );
 }
 
-// Revalidate every hour
-export const revalidate = 3600;
+// Revalidate every 5 minutes (same as collections)
+export const revalidate = 300;

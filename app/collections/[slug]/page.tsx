@@ -1,10 +1,12 @@
-import { createServerClient } from "@/utils/supabase/server";
+import { createServerClient, createServiceClient } from "@/utils/supabase/server";
 import { notFound } from "next/navigation";
 import CollectionPageClient from "./_components/CollectionPageClient";
+import StorefrontLayout from "@/components/storefront/StorefrontLayout";
 
 // Generate static params for all collections at build time
 export async function generateStaticParams() {
-  const supabase = await createServerClient();
+  // ✅ Use service client for build-time data fetching (no cookies needed)
+  const supabase = createServiceClient();
   const { data: collections } = await supabase
     .from("collections")
     .select("slug");
@@ -88,7 +90,11 @@ export default async function CollectionPage({ params }: { params: Promise<{ slu
       images: product.product_images || [],
     }));
 
-  return <CollectionPageClient collection={collection} products={products} />;
+  return (
+    <StorefrontLayout>
+      <CollectionPageClient collection={collection} products={products} />
+    </StorefrontLayout>
+  );
 }
 
 // Revalidate every 5 minutes (collections change more often than products)
