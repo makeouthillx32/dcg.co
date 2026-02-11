@@ -101,13 +101,53 @@ function randId() {
 }
 
 /**
- * Builds a public URL for a storage object.
- * Works when bucket/object is public.
+ * Derive the base URL from SUPABASE_S3_ENDPOINT.
+ * Example: https://xxxx.storage.supabase.co/storage/v1/s3 -> https://xxxx.storage.supabase.co
+ */
+function deriveBaseFromS3Endpoint(s3?: string | null) {
+  if (!s3) return "";
+  return s3.replace(/\/storage\/v1\/s3\/?$/, "");
+}
+
+/**
+ * Resolve the storage base:
+ * - Prefer SUPABASE_S3_ENDPOINT base (if you want storage-domain delivery)
+ * - Fallback to NEXT_PUBLIC_SUPABASE_URL
+ *
+ * IMPORTANT: This only picks the HOST base. The public object path remains:
+ * /storage/v1/object/public/{bucket}/{object_path}
+ */
+function resolveStorageBase() {
+  const s3 = process.env.NEXT_PUBLIC_SUPABASE_S3_ENDPOINT || process.env.SUPABASE_S3_ENDPOINT;
+  const s3Base = deriveBaseFromS3Endpoint(s3 ?? "");
+  const supabaseBase =
+    process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_PROJECT_URL ?? "";
+
+  return s3Base || supabaseBase || "";
+}
+
+/**
+ * Builds a public URL for a storage object (bucket/object assumed public).
+ * - Ensures no double slashes
+ * - Encodes each path segment so weird characters don't break URLs
  */
 function publicStorageUrl(bucket: string, objectPath: string) {
-  const base = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const base = resolveStorageBase();
   if (!base) return null;
-  return `${base}/storage/v1/object/public/${bucket}/${objectPath}`;
+  if (!bucket || !objectPath) return null;
+
+  const cleanBase = base.replace(/\/+$/, "");
+  const cleanBucket = bucket.replace(/^\/+|\/+$/g, "");
+  const cleanObject = objectPath.replace(/^\/+/, "");
+
+  // Encode each segment of object path safely (keeps /)
+  const encodedObject = cleanObject
+    .split("/")
+    .filter(Boolean)
+    .map((seg) => encodeURIComponent(seg))
+    .join("/");
+
+  return `${cleanBase}/storage/v1/object/public/${cleanBucket}/${encodedObject}`;
 }
 
 /* ---------------- Component ---------------- */
@@ -170,8 +210,8 @@ export default function ProductModal({
         (data.status ?? "draft") === "active"
           ? "active"
           : (data.status ?? "draft") === "archived"
-            ? "archived"
-            : "draft"
+          ? "archived"
+          : "draft"
       );
     } catch (e: any) {
       console.error(e);
@@ -247,7 +287,7 @@ export default function ProductModal({
       const supabase = createBrowserClient();
 
       for (const file of files) {
-        // this is the object path inside the bucket
+        // Keep your upload logic as-is (random filename)
         const object_path = `products/${productId}/${randId()}.${fileExt(file.name)}`;
 
         const up = await supabase.storage.from(PRODUCT_IMAGE_BUCKET).upload(object_path, file, {

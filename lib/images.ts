@@ -1,5 +1,5 @@
 /**
- * Central image helpers for Supabase Storage + Next image optimization
+ * Central image helpers for Supabase Storage.
  *
  * Your DB stores:
  * - bucket_name
@@ -8,11 +8,12 @@
  * We build public:
  *   {base}/storage/v1/object/public/{bucket_name}/{object_path}
  *
- * And optionally build an optimized URL via Next:
- *   /_next/image?url=<encoded-public-url>&w=<width>&q=<quality>
+ * IMPORTANT (Next/Image):
+ * - If you are using <Image />, pass it the *public URL* returned by this file.
+ * - DO NOT pass "/_next/image?url=..." into <Image src>. Let Next optimize automatically.
  *
  * Base priority:
- * 1) NEXT_PUBLIC_SUPABASE_URL (classic)
+ * 1) NEXT_PUBLIC_SUPABASE_URL (classic project URL)
  * 2) SUPABASE_S3_ENDPOINT (derive base by removing /storage/v1/s3)
  */
 
@@ -26,19 +27,23 @@ export type DbImage = {
   is_public?: boolean | null;
 };
 
-export type ImagePickOptions = {
-  /** if true, return a Next-optimized URL (/_next/image?...) */
-  optimized?: boolean;
-  /** width used by Next optimizer */
-  width?: number;
-  /** quality used by Next optimizer (1-100) */
-  quality?: number;
-};
-
 function deriveStorageBaseFromS3Endpoint(s3?: string | null) {
   if (!s3) return "";
   // example: https://xxxx.storage.supabase.co/storage/v1/s3
   return s3.replace(/\/storage\/v1\/s3\/?$/, "");
+}
+
+function stripTrailingSlashes(s: string) {
+  return s.replace(/\/+$/, "");
+}
+
+function encodeObjectPath(path: string) {
+  // Encode each segment but keep "/" separators
+  return path
+    .split("/")
+    .filter(Boolean)
+    .map((seg) => encodeURIComponent(seg))
+    .join("/");
 }
 
 const SUPABASE_URL =
@@ -46,21 +51,30 @@ const SUPABASE_URL =
   process.env.NEXT_PUBLIC_SUPABASE_PROJECT_URL ??
   "";
 
-const STORAGE_BASE =
-  SUPABASE_URL || deriveStorageBaseFromS3Endpoint(process.env.SUPABASE_S3_ENDPOINT ?? "");
+const S3_BASE = deriveStorageBaseFromS3Endpoint(
+  // client-safe first, then server-only fallback
+  process.env.NEXT_PUBLIC_SUPABASE_S3_ENDPOINT ??
+    process.env.SUPABASE_S3_ENDPOINT ??
+    ""
+);
+
+// Keep classic behavior: prefer NEXT_PUBLIC_SUPABASE_URL if set
+const STORAGE_BASE = stripTrailingSlashes(SUPABASE_URL || S3_BASE || "");
 
 if (!STORAGE_BASE) {
-  console.warn(
-    "⚠️ No Supabase base URL found. Set NEXT_PUBLIC_SUPABASE_URL or SUPABASE_S3_ENDPOINT."
-  );
+  console.warn("⚠️ No Supabase base URL found. Set NEXT_PUBLIC_SUPABASE_URL (recommended).");
 }
 
-/** Build a public URL for a DB image row */
+/** Build a public URL for a DB image row (bucket/object assumed public). */
 export function supabasePublicUrlFromImage(img?: DbImage | null): string | null {
   if (!img?.bucket_name || !img?.object_path) return null;
   if (!STORAGE_BASE) return null;
 
-  return `${STORAGE_BASE}/storage/v1/object/public/${img.bucket_name}/${img.object_path}`;
+  const bucket = img.bucket_name.replace(/^\/+|\/+$/g, "");
+  const objectPath = img.object_path.replace(/^\/+/, "");
+  const encodedObjectPath = encodeObjectPath(objectPath);
+
+  return `${STORAGE_BASE}/storage/v1/object/public/${bucket}/${encodedObjectPath}`;
 }
 
 /**
@@ -92,42 +106,14 @@ export function pickPrimaryImage(images?: DbImage[] | null): DbImage | null {
 }
 
 /**
- * Build a Next.js optimized image URL from any absolute public URL.
- * This forces the browser to download the optimized asset (usually webp/avif).
- */
-export function toNextOptimizedImageUrl(
-  absoluteUrl: string,
-  opts?: { width?: number; quality?: number }
-): string {
-  const w = Math.max(16, Math.min(4096, Number(opts?.width ?? 800)));
-  const q = Math.max(1, Math.min(100, Number(opts?.quality ?? 80)));
-
-  // IMPORTANT: this is a *relative* path so it works in any env (localhost/vercel)
-  const encoded = encodeURIComponent(absoluteUrl);
-  return `/_next/image?url=${encoded}&w=${w}&q=${q}`;
-}
-
-/**
- * Returns:
- * - public url by default
- * - OR Next optimized url if options.optimized = true
+ * Returns the *public* image URL for the primary image.
  *
- * IMPORTANT: returns null if missing. No fake placeholder path.
+ * NOTE:
+ * - Use this URL directly in <Image src={...} /> or <img src={...} />.
+ * - Next.js will optimize automatically when you use <Image />.
  */
-export function getPrimaryImageUrl(
-  images?: DbImage[] | null,
-  options?: ImagePickOptions
-): string | null {
+export function getPrimaryImageUrl(images?: DbImage[] | null): string | null {
   const img = pickPrimaryImage(images);
   const publicUrl = supabasePublicUrlFromImage(img);
-  if (!publicUrl) return null;
-
-  if (options?.optimized) {
-    return toNextOptimizedImageUrl(publicUrl, {
-      width: options.width,
-      quality: options.quality,
-    });
-  }
-
-  return publicUrl;
+  return publicUrl ?? null;
 }

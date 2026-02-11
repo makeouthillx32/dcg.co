@@ -26,11 +26,6 @@ async function safeReadJson(res: Response) {
   }
 }
 
-function isUuid(v: unknown) {
-  if (typeof v !== "string") return false;
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
-}
-
 export default function ProductsPage() {
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -39,10 +34,8 @@ export default function ProductsPage() {
 
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Create modal
   const [createOpen, setCreateOpen] = useState(false);
 
-  // Manage modal
   const [manageOpen, setManageOpen] = useState(false);
   const [manageProductId, setManageProductId] = useState<string | null>(null);
 
@@ -50,8 +43,7 @@ export default function ProductsPage() {
     mode === "initial" ? setIsLoading(true) : setIsRefreshing(true);
 
     try {
-      // ✅ relative URL only (works in mobile dev, localhost, Vercel)
-      const url = new URL("/api/products/admin", window.location.href);
+      const url = new URL("/api/products/admin", window.location.origin);
       url.searchParams.set("limit", "50");
       url.searchParams.set("offset", "0");
       url.searchParams.set("status", "all");
@@ -88,24 +80,13 @@ export default function ProductsPage() {
     );
   }, [products, searchQuery]);
 
-  const openManage = (p: ProductRow) => {
-    const id = (p as any)?.id;
-
-    // ✅ hard guard so ProductModal never fetches with null/empty id
-    if (!isUuid(id)) {
-      console.error("Manage clicked but product id is invalid:", { product: p, id });
-      toast.error("Selected product has no valid id (check API response shape).");
+  const openManage = (productId: string | null | undefined) => {
+    if (!productId || typeof productId !== "string") {
+      toast.error("Missing product id");
       return;
     }
-
-    // ✅ set id first, then open
-    setManageProductId(id);
+    setManageProductId(productId);
     setManageOpen(true);
-  };
-
-  const closeManage = (v: boolean) => {
-    setManageOpen(v);
-    if (!v) setManageProductId(null); // ✅ prevents stale id / open-with-null weirdness
   };
 
   return (
@@ -132,12 +113,9 @@ export default function ProductsPage() {
           <ProductsTable
             products={filtered}
             isRefreshing={isRefreshing}
-            onManage={(p) => openManage(p)}
+            onManage={(p) => openManage(p?.id)}
             onArchive={async (p) => {
-              if (!isUuid((p as any)?.id)) {
-                toast.error("This product has no valid id.");
-                return;
-              }
+              if (!p?.id) return toast.error("Missing product id");
               if (!confirm(`Archive "${p.title}"?`)) return;
 
               try {
@@ -153,28 +131,28 @@ export default function ProductsPage() {
           />
         )}
 
-        {/* Create */}
+        {/* ✅ Create */}
         <CreateProductModal
           open={createOpen}
           onOpenChange={setCreateOpen}
-          onCreated={(newProductId) => {
+          onCreated={async () => {
             setCreateOpen(false);
             toast.success("Product created");
-            fetchProducts("refresh");
+            await fetchProducts("refresh");
 
-            // optional: immediately open manage
-            if (isUuid(newProductId)) {
-              setManageProductId(newProductId);
-              setManageOpen(true);
-            }
+            // IMPORTANT:
+            // Your current CreateProductModal DOES NOT pass back a newProductId,
+            // so we do NOT auto-open Manage here.
           }}
         />
 
-        {/* Manage */}
+        {/* ✅ Manage */}
         <ProductModal
-          key={manageProductId ?? "no-product"} // ✅ forces clean remount per product
           open={manageOpen}
-          onOpenChange={closeManage}
+          onOpenChange={(v) => {
+            setManageOpen(v);
+            if (!v) setManageProductId(null); // prevent stale/empty ids
+          }}
           productId={manageProductId}
           onChanged={() => fetchProducts("refresh")}
         />

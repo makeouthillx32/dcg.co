@@ -6,12 +6,43 @@ const supabaseUrl =
   process.env.NEXT_PUBLIC_SUPABASE_PROJECT_URL ??
   "";
 
-let supabaseHostname = "";
-try {
-  supabaseHostname = supabaseUrl ? new URL(supabaseUrl).hostname : "";
-} catch {
-  supabaseHostname = "";
+// Build a safe allow-list of hostnames (and strip schemes if someone pastes them)
+function toHostname(value: string) {
+  try {
+    if (!value) return "";
+    return value.includes("://") ? new URL(value).hostname : value;
+  } catch {
+    return "";
+  }
 }
+
+// If you provide SUPABASE_S3_ENDPOINT, also allow its hostname (storage domain)
+function deriveHostnameFromS3Endpoint(value: string) {
+  try {
+    if (!value) return "";
+    const url = value.includes("://") ? new URL(value) : null;
+    // if it's a full URL, hostname is what we want
+    return url?.hostname ?? "";
+  } catch {
+    return "";
+  }
+}
+
+const supabaseHostname = toHostname(supabaseUrl);
+const s3Hostname =
+  deriveHostnameFromS3Endpoint(process.env.NEXT_PUBLIC_SUPABASE_S3_ENDPOINT ?? "") ||
+  deriveHostnameFromS3Endpoint(process.env.SUPABASE_S3_ENDPOINT ?? "");
+
+// Optional: if you ever use another storage/transform host, add it here.
+const extraAllowedHosts = [
+  // "images.yourdomain.com",
+]
+  .map(toHostname)
+  .filter(Boolean);
+
+const allowedHosts = Array.from(
+  new Set([supabaseHostname, s3Hostname, ...extraAllowedHosts].filter(Boolean))
+);
 
 const nextConfig: NextConfig = {
   turbopack: {
@@ -24,15 +55,25 @@ const nextConfig: NextConfig = {
   },
 
   images: {
-    remotePatterns: supabaseHostname
-      ? [
-          {
-            protocol: "https",
-            hostname: supabaseHostname,
-            pathname: "/storage/v1/object/public/**",
-          },
-        ]
-      : [],
+    // ✅ Allow Next’s own optimizer route (fixes: "query string ... not configured in images.localPatterns")
+    // This is safe and only matches the internal /_next/image route.
+    localPatterns: [{ pathname: "/_next/image" }],
+
+    // ✅ Allow Supabase public storage (both project domain + storage domain if present)
+    remotePatterns: allowedHosts.flatMap((hostname) => [
+      {
+        protocol: "https",
+        hostname,
+        pathname: "/storage/v1/object/public/**",
+      },
+      // If you ever hit the storage domain directly for public objects, allow it too.
+      // (Some setups generate storage.<ref>.supabase.co URLs.)
+      {
+        protocol: "https",
+        hostname,
+        pathname: "/storage/v1/object/**",
+      },
+    ]),
   },
 
   async headers() {
