@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
   if (!gate.ok) return jsonError(gate.status, "UNAUTHORIZED", gate.message);
 
   const { searchParams } = new URL(req.url);
-  const limit = Math.min(Number(searchParams.get("limit") ?? 50), 200);
+  const limit = Math.min(Math.max(Number(searchParams.get("limit") ?? 50), 1), 200);
   const offset = Math.max(Number(searchParams.get("offset") ?? 0), 0);
   const status = (searchParams.get("status") ?? "all").toLowerCase();
   const q = (searchParams.get("q") ?? "").trim();
@@ -39,6 +39,7 @@ export async function GET(req: NextRequest) {
       description,
       price_cents,
       compare_at_price_cents,
+      currency,
       badge,
       is_featured,
       status,
@@ -47,8 +48,8 @@ export async function GET(req: NextRequest) {
       product_images (
         id,
         bucket_name,
-        storage_path:object_path,
-        alt:alt_text,
+        object_path,
+        alt_text,
         position,
         sort_order,
         is_primary,
@@ -61,6 +62,8 @@ export async function GET(req: NextRequest) {
     .range(offset, offset + limit - 1);
 
   if (status !== "all") query = query.eq("status", status);
+
+  // You confirmed products.search_text exists
   if (q) query = query.ilike("search_text", `%${q}%`);
 
   const { data, error } = await query;
