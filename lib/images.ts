@@ -117,3 +117,40 @@ export function getPrimaryImageUrl(images?: DbImage[] | null): string | null {
   const publicUrl = supabasePublicUrlFromImage(img);
   return publicUrl ?? null;
 }
+
+/**
+ * Generate a Next.js Image Optimization API URL.
+ * 
+ * USE CASE:
+ * - When you need to use <img> tags (not Next.js <Image />)
+ * - When you want manual control over image optimization params
+ * 
+ * IMPORTANT:
+ * - If using Next.js <Image /> component, pass the public URL directly
+ * - The <Image /> component handles optimization automatically
+ * - Only use this for plain <img> tags where you need Next optimization
+ *
+ * @param url - The source image URL (must be from an allowed domain in next.config.js)
+ * @param options - Optimization options
+ * @returns URL to Next.js image optimization endpoint
+ */
+export function toNextOptimizedImageUrl(
+  url: string,
+  options?: { width?: number; quality?: number }
+): string {
+  const { width = 800, quality = 75 } = options ?? {};
+  
+  const params = new URLSearchParams({
+    url: url,
+    w: width.toString(),
+    q: quality.toString(),
+  });
+  
+  return `/_next/image?${params.toString()}`;
+}
+
+/**
+ * Constant for the product images bucket name.
+ * Used across the app for consistent bucket reference.
+ */
+export const PRODUCT_IMAGE_BUCKET = "product-images";

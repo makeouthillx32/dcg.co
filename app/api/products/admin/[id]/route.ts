@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/utils/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-type Params = { params: { id: string } };
+// ✅ Updated for Next.js 15+ - params is now a Promise
+type Params = { params: Promise<{ id: string }> };
 
 function jsonError(status: number, code: string, message: string, details?: any) {
   return NextResponse.json({ ok: false, error: { code, message, details } }, { status });
@@ -44,7 +45,8 @@ export async function GET(_req: NextRequest, { params }: Params) {
   const gate = await requireAdmin(supabase);
   if (!gate.ok) return jsonError(gate.status, "UNAUTHORIZED", gate.message);
 
-  const id = params.id;
+  // ✅ Await the params Promise
+  const { id } = await params;
   if (!id) return jsonError(400, "INVALID_ID", "Missing product id");
 
   // ✅ Includes tags via join table:
@@ -112,7 +114,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const gate = await requireAdmin(supabase);
   if (!gate.ok) return jsonError(gate.status, "UNAUTHORIZED", gate.message);
 
-  const id = params.id;
+  // ✅ Await the params Promise
+  const { id } = await params;
   if (!id) return jsonError(400, "INVALID_ID", "Missing product id");
 
   let body: any;
@@ -173,7 +176,8 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   const gate = await requireAdmin(supabase);
   if (!gate.ok) return jsonError(gate.status, "UNAUTHORIZED", gate.message);
 
-  const id = params.id;
+  // ✅ Await the params Promise
+  const { id } = await params;
   if (!id) return jsonError(400, "INVALID_ID", "Missing product id");
 
   const { data, error } = await supabase

@@ -1,100 +1,24 @@
+// app/api/products/admin/[id]/tags/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/utils/supabase/server";
-import type { SupabaseClient } from "@supabase/supabase-js";
 
-type Params = { params: { id: string } };
+type Params = { params: Promise<{ id: string }> }; // ✅ Promise
 
 function jsonError(status: number, code: string, message: string, details?: any) {
   return NextResponse.json({ ok: false, error: { code, message, details } }, { status });
 }
 
-async function requireAdmin(supabase: SupabaseClient) {
-  const { data, error } = await supabase.auth.getUser();
-  if (error) return { ok: false, status: 401 as const, message: error.message };
-  if (!data.user) return { ok: false, status: 401 as const, message: "Authentication required" };
-  return { ok: true as const };
-}
-
-function isUuid(v: string) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
-}
-
-function normalizeSlug(v: any) {
-  if (typeof v !== "string") return "";
-  return v.trim().toLowerCase();
-}
-
-async function readProductTagsArray(supabase: SupabaseClient, product_id: string) {
-  const { data, error } = await supabase
-    .from("products")
-    .select("id, tags")
-    .eq("id", product_id)
-    .single();
-
-  if (error) return { ok: false as const, error };
-
-  const arr = Array.isArray((data as any)?.tags) ? ((data as any).tags as string[]) : [];
-  return { ok: true as const, tags: arr };
-}
-
-async function writeProductTagsArray(supabase: SupabaseClient, product_id: string, tags: string[]) {
-  const { data, error } = await supabase
-    .from("products")
-    .update({ tags })
-    .eq("id", product_id)
-    .select("id, tags")
-    .single();
-
-  if (error) return { ok: false as const, error };
-  return { ok: true as const, data };
-}
-
-async function getTagById(supabase: SupabaseClient, tag_id: string) {
-  const { data, error } = await supabase
-    .from("tags")
-    .select("id, slug, name")
-    .eq("id", tag_id)
-    .single();
-
-  if (error) return { ok: false as const, error };
-  return { ok: true as const, data };
-}
-
-async function getTagBySlug(supabase: SupabaseClient, slug: string) {
-  const { data, error } = await supabase
-    .from("tags")
-    .select("id, slug, name")
-    .eq("slug", slug)
-    .single();
-
-  if (error) return { ok: false as const, error };
-  return { ok: true as const, data };
-}
-
-async function upsertTagBySlug(supabase: SupabaseClient, slug: string, name: string) {
-  const { data, error } = await supabase
-    .from("tags")
-    .upsert({ slug, name }, { onConflict: "slug" })
-    .select("id, slug, name")
-    .single();
-
-  if (error) return { ok: false as const, error };
-  return { ok: true as const, data };
-}
-
-/**
- * POST /api/products/admin/[id]/tags
- * UI sends: { slug, name }
- * Also supports legacy: { tag_id }
- */
 export async function POST(req: NextRequest, { params }: Params) {
   const supabase = await createServerClient();
 
-  const gate = await requireAdmin(supabase);
-  if (!gate.ok) return jsonError(gate.status, "UNAUTHORIZED", gate.message);
+  // ✅ Await params
+  const { id } = await params;
+  if (!id) return jsonError(400, "INVALID_ID", "Missing product id");
 
-  const product_id = params.id;
-  if (!product_id) return jsonError(400, "INVALID_ID", "Missing product id");
+  const { data: userData, error: authError } = await supabase.auth.getUser();
+  if (authError || !userData.user) {
+    return jsonError(401, "UNAUTHORIZED", "Authentication required");
+  }
 
   let body: any;
   try {
@@ -103,129 +27,73 @@ export async function POST(req: NextRequest, { params }: Params) {
     return jsonError(400, "INVALID_JSON", "Body must be valid JSON");
   }
 
-  const tag_id = body?.tag_id;
-  const slugRaw = body?.slug;
-  const nameRaw = body?.name;
-
-  let tag: { id: string; slug: string; name: string } | null = null;
-
-  if (typeof tag_id === "string" && isUuid(tag_id)) {
-    const r = await getTagById(supabase, tag_id);
-    if (!r.ok) {
-      const status = r.error.code === "PGRST116" ? 404 : 500;
-      return jsonError(status, status === 404 ? "TAG_NOT_FOUND" : "TAG_LOOKUP_FAILED", r.error.message, r.error);
-    }
-    tag = r.data as any;
-  } else {
-    const slug = normalizeSlug(slugRaw);
-    const name = typeof nameRaw === "string" ? nameRaw.trim() : "";
-
-    if (!slug) return jsonError(400, "INVALID_SLUG", "slug is required");
-    if (!name) return jsonError(400, "INVALID_NAME", "name is required");
-
-    const up = await upsertTagBySlug(supabase, slug, name);
-    if (!up.ok) return jsonError(500, "TAG_UPSERT_FAILED", up.error.message, up.error);
-    tag = up.data as any;
+  const { slug, name } = body;
+  if (!slug || !name) {
+    return jsonError(400, "MISSING_FIELDS", "slug and name are required");
   }
 
-  // Attach (idempotent because PK is (product_id, tag_id))
-  const { data: joinRows, error: joinErr } = await supabase
+  // 1. Upsert tag
+  const { data: tag, error: tagError } = await supabase
+    .from("tags")
+    .upsert({ slug, name }, { onConflict: "slug" })
+    .select("*")
+    .single();
+
+  if (tagError) {
+    return jsonError(500, "TAG_UPSERT_FAILED", tagError.message, tagError);
+  }
+
+  // 2. Link to product
+  const { error: linkError } = await supabase
     .from("product_tags")
-    .upsert({ product_id, tag_id: tag!.id }, { onConflict: "product_id,tag_id" })
-    .select("*");
+    .insert({ product_id: id, tag_id: tag.id })
+    .select();
 
-  if (joinErr) return jsonError(500, "ASSIGN_TAG_FAILED", joinErr.message, joinErr);
+  if (linkError) {
+    // Ignore duplicate key errors
+    if (!linkError.message.includes("duplicate")) {
+      return jsonError(500, "TAG_LINK_FAILED", linkError.message, linkError);
+    }
+  }
 
-  // Sync products.tags (slug cache)
-  const arrRes = await readProductTagsArray(supabase, product_id);
-  if (!arrRes.ok) return jsonError(500, "PRODUCT_TAGS_FETCH_FAILED", arrRes.error.message, arrRes.error);
-
-  const next = Array.from(new Set([...(arrRes.tags ?? []), tag!.slug]));
-  const saveRes = await writeProductTagsArray(supabase, product_id, next);
-  if (!saveRes.ok) return jsonError(500, "PRODUCT_TAGS_UPDATE_FAILED", saveRes.error.message, saveRes.error);
-
-  return NextResponse.json({
-    ok: true,
-    data: {
-      tag,
-      join: joinRows?.[0] ?? null,
-      product_tags: saveRes.data.tags,
-    },
-  });
+  return NextResponse.json({ ok: true, data: tag });
 }
 
-/**
- * DELETE /api/products/admin/[id]/tags
- * UI sends: { tag: "<uuid-or-slug>" }
- * Also supports query: ?tag_id=uuid
- */
 export async function DELETE(req: NextRequest, { params }: Params) {
   const supabase = await createServerClient();
 
-  const gate = await requireAdmin(supabase);
-  if (!gate.ok) return jsonError(gate.status, "UNAUTHORIZED", gate.message);
+  // ✅ Await params
+  const { id } = await params;
+  if (!id) return jsonError(400, "INVALID_ID", "Missing product id");
 
-  const product_id = params.id;
-  if (!product_id) return jsonError(400, "INVALID_ID", "Missing product id");
+  const { data: userData, error: authError } = await supabase.auth.getUser();
+  if (authError || !userData.user) {
+    return jsonError(401, "UNAUTHORIZED", "Authentication required");
+  }
 
-  const { searchParams } = new URL(req.url);
-  const tagIdFromQuery = searchParams.get("tag_id");
-
-  let body: any = null;
+  let body: any;
   try {
     body = await req.json();
   } catch {
-    // allow empty body if query is provided
+    return jsonError(400, "INVALID_JSON", "Body must be valid JSON");
   }
 
-  const tagValue = (body?.tag ?? tagIdFromQuery) as string | null;
-  if (!tagValue || typeof tagValue !== "string") {
-    return jsonError(400, "INVALID_TAG", "Provide { tag: <uuid-or-slug> } or ?tag_id=");
+  const { tag } = body; // Can be tag ID or slug
+
+  if (!tag) {
+    return jsonError(400, "MISSING_TAG", "tag (id or slug) is required");
   }
 
-  let tag: { id: string; slug: string; name?: string } | null = null;
-
-  if (isUuid(tagValue)) {
-    const r = await getTagById(supabase, tagValue);
-    if (!r.ok) {
-      const status = r.error.code === "PGRST116" ? 404 : 500;
-      return jsonError(status, status === 404 ? "TAG_NOT_FOUND" : "TAG_LOOKUP_FAILED", r.error.message, r.error);
-    }
-    tag = r.data as any;
-  } else {
-    const slug = normalizeSlug(tagValue);
-    const r = await getTagBySlug(supabase, slug);
-    if (!r.ok) {
-      const status = r.error.code === "PGRST116" ? 404 : 500;
-      return jsonError(status, status === 404 ? "TAG_NOT_FOUND" : "TAG_LOOKUP_FAILED", r.error.message, r.error);
-    }
-    tag = r.data as any;
-  }
-
-  const { data: deleted, error: delErr } = await supabase
+  // Delete from product_tags junction table
+  const { error } = await supabase
     .from("product_tags")
     .delete()
-    .eq("product_id", product_id)
-    .eq("tag_id", tag!.id)
-    .select("*")
-    .maybeSingle();
+    .eq("product_id", id)
+    .or(`tag_id.eq.${tag},tags.slug.eq.${tag}`);
 
-  if (delErr) return jsonError(500, "UNASSIGN_TAG_FAILED", delErr.message, delErr);
-  if (!deleted) return jsonError(404, "NOT_FOUND", "Tag not assigned to this product");
+  if (error) {
+    return jsonError(500, "TAG_REMOVE_FAILED", error.message, error);
+  }
 
-  const arrRes = await readProductTagsArray(supabase, product_id);
-  if (!arrRes.ok) return jsonError(500, "PRODUCT_TAGS_FETCH_FAILED", arrRes.error.message, arrRes.error);
-
-  const next = (arrRes.tags ?? []).filter((t) => t !== tag!.slug);
-  const saveRes = await writeProductTagsArray(supabase, product_id, next);
-  if (!saveRes.ok) return jsonError(500, "PRODUCT_TAGS_UPDATE_FAILED", saveRes.error.message, saveRes.error);
-
-  return NextResponse.json({
-    ok: true,
-    data: {
-      tag,
-      deleted,
-      product_tags: saveRes.data.tags,
-    },
-  });
+  return NextResponse.json({ ok: true });
 }

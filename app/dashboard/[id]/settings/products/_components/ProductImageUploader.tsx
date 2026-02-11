@@ -11,8 +11,25 @@ function ext(name: string) {
   const i = name.lastIndexOf(".");
   return i >= 0 ? name.slice(i + 1).toLowerCase() : "jpg";
 }
+
 function id() {
   return Math.random().toString(16).slice(2) + Date.now().toString(16);
+}
+
+async function safeReadJson(res: Response) {
+  const text = await res.text();
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { 
+      ok: false, 
+      error: { 
+        code: "NON_JSON_RESPONSE", 
+        message: text.slice(0, 300) 
+      } 
+    };
+  }
 }
 
 export function ProductImageUploader({
@@ -33,41 +50,42 @@ export function ProductImageUploader({
     try {
       const supabase = createBrowserClient();
 
-      // This is the object path inside the bucket
-      const object_path = `products/${productId}/${id()}.${ext(file.name)}`;
+      // ✅ ALWAYS use products/ prefix for consistency
+      const object_path = `products/${productId}/${id()}.jpg`;
 
-      // 1) upload file to bucket
+      console.log('[ProductImageUploader] Uploading to:', object_path);
+
+      // 1) Upload file to bucket
       const up = await supabase.storage.from(PRODUCT_IMAGE_BUCKET).upload(object_path, file, {
         upsert: false,
         cacheControl: "3600",
-        contentType: file.type || "image/*",
+        contentType: file.type || "image/jpeg",
       });
 
-      if (up.error) throw new Error(up.error.message);
+      if (up.error) {
+        console.error('[ProductImageUploader] Storage error:', up.error);
+        throw new Error(up.error.message);
+      }
 
-      // 2) insert row into product_images via your API (DB metadata)
+      console.log('[ProductImageUploader] Storage success:', up.data);
+
+      // 2) Insert row into product_images via your API (DB metadata)
       const res = await fetch(`/api/products/admin/${productId}/images`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           bucket_name: PRODUCT_IMAGE_BUCKET,
-          object_path,
+          object_path, // ✅ Includes products/ prefix
           alt_text: altText.trim() ? altText.trim() : null,
-          // optional defaults (only if your API accepts them)
           is_public: true,
           is_primary: false,
           sort_order: 0,
         }),
       });
 
-      const text = await res.text();
-      let json: any = null;
-      try {
-        json = text ? JSON.parse(text) : null;
-      } catch {
-        // If the route returned HTML, show the first chunk to debug quickly
-        throw new Error(text?.slice(0, 200) || `Image insert failed: ${res.status}`);
-      }
+      const json = await safeReadJson(res);
+
+      console.log('[ProductImageUploader] DB insert response:', json);
 
       if (!res.ok || !json?.ok) {
         throw new Error(json?.error?.message ?? `Image insert failed: ${res.status}`);
@@ -78,7 +96,7 @@ export function ProductImageUploader({
       setAltText("");
       onUploaded?.();
     } catch (e: any) {
-      console.error(e);
+      console.error('[ProductImageUploader] Error:', e);
       toast.error(e?.message ?? "Upload failed");
     } finally {
       setIsUploading(false);
@@ -101,7 +119,7 @@ export function ProductImageUploader({
         {isUploading ? "Uploading…" : "Upload Image"}
       </Button>
       <div className="text-xs text-[hsl(var(--muted-foreground))]">
-        Uploads to: <code>{PRODUCT_IMAGE_BUCKET}</code>
+        Uploads to: <code>{PRODUCT_IMAGE_BUCKET}/products/[productId]/</code>
       </div>
     </div>
   );
