@@ -1,30 +1,9 @@
 // components/home/_components/pageTree.ts
-// NOTE: We are intentionally keeping the SAME export names + structure.
-// Only the "meaning" / comments are being rebranded to storefront concepts.
-// Component file names will be swapped later (we'll keep imports stable for now).
+// NOTE: Keep SAME export names + structure.
+// We’re stripping this down to only components that exist right now.
 
-import HomePage from "@/components/home/Landing"; // Storefront Landing
-import AboutUsPage from "@/components/home/AboutUs"; // Brand Story / About
-import BoardPage from "@/components/home/BoardofDirectors"; // Placeholder page
-import Title9Page from "@/components/home/Title9Information"; // Placeholder page
-import Careers from "@/components/home/About/Careers"; // Placeholder page
-import JobsPage from "@/components/home/Jobs"; // Placeholder page
-import ProgramsAndServices from "@/components/home/ProgramsandServices/programsndseevices"; // SHOP hub
-import Transportation from "@/components/home/services/Transportation"; // Placeholder collection page
-import EarlyChildhood from "@/components/home/services/EarlyChildhood"; // Placeholder collection page
-import SupportedLiving from "@/components/home/services/SupportedLiving"; // Placeholder collection page
-import Artists from "@/components/home/services/Artists"; // Placeholder collection page
-import AutismDayCamp from "@/components/home/LearnAndConnect/AutismDayCamp"; // Placeholder collection page
-import Employment from "@/components/home/services/Employment"; // Placeholder collection page
-import BusinessServices from "@/components/home/BusinessServices/main"; // Special page placeholder
-import CMSPage from "@/components/home/BusinessServices/cms"; // Special page placeholder
-import Pickup from "@/components/home/BusinessServices/pickup"; // Special page placeholder
-import CARF from "@/components/home/services/CARF"; // Special page placeholder
-import ThriftStore from "@/components/home/services/ThriftStore"; // Special page placeholder
-import Shredding from "@/components/home/BusinessServices/Shredding"; // Special page placeholder
-import GetInvolved from "@/components/home/GetInvolved/main"; // Special page placeholder
-import DonateNow from "@/components/home/GetInvolved/donatenow"; // Special page placeholder
-import LearnConnect from "@/components/home/LearnAndConnect/main"; // Special page placeholder
+import HomePage from "@/components/home/Landing";
+import AboutUsPage from "@/components/home/AboutUs";
 import TermsPage from "@/components/home/TermsPage";
 import PrivacyPolicy from "@/components/home/PrivacyPolicy";
 
@@ -35,99 +14,74 @@ export interface PageConfig {
   anchorId?: string;
 }
 
-/**
- * Storefront Page Map (single source of truth)
- * - "home" = storefront landing
- * - "shop" = shop hub (category browser)
- * - leaf nodes = collection pages (placeholder components for now)
- * - special pages = New Releases, Restocks, Gift Card, Best Sellers, etc.
- *
- * IMPORTANT:
- * We keep the same export names and object shape so routing keeps working.
- */
 export const pageTree: Record<string, PageConfig> = {
-  // ✅ Storefront Landing
-  home: { Component: HomePage },
+  // ✅ Landing
+  home: { Component: HomePage, anchorId: "home" },
 
-  // ✅ Shop hub (category browser)
+  // ✅ Keep keys for routing/nav stability, but point everything to existing pages
   shop: {
-    Component: ProgramsAndServices,
+    Component: HomePage,
     backKey: "home",
     backLabel: "Back to Home",
     anchorId: "shop",
   },
 
-  // ✅ Top-level special pages from your nav
   "new-releases": {
-    Component: BusinessServices,
+    Component: HomePage,
     backKey: "home",
     backLabel: "Back to Home",
     anchorId: "new-releases",
   },
   restocks: {
-    Component: CMSPage,
+    Component: HomePage,
     backKey: "home",
     backLabel: "Back to Home",
     anchorId: "restocks",
   },
-
-  // ✅ Cowkids hub
   cowkids: {
-    Component: Pickup,
+    Component: HomePage,
     backKey: "home",
     backLabel: "Back to Home",
     anchorId: "cowkids",
   },
-
-  // ✅ Cowboy Valentine page
   "cowboy-valentine": {
-    Component: CARF,
+    Component: HomePage,
     backKey: "home",
     backLabel: "Back to Home",
     anchorId: "cowboy-valentine",
   },
-
-  // ✅ Shop Occasions hub
   occasions: {
-    Component: ThriftStore,
+    Component: HomePage,
     backKey: "home",
     backLabel: "Back to Home",
     anchorId: "occasions",
   },
-
-  // ✅ Gift Card page
   "gift-card": {
-    Component: Shredding,
+    Component: HomePage,
     backKey: "home",
     backLabel: "Back to Home",
     anchorId: "gift-card",
   },
-
-  // ✅ Best Sellers page
   "best-sellers": {
-    Component: GetInvolved,
+    Component: HomePage,
     backKey: "home",
     backLabel: "Back to Home",
     anchorId: "best-sellers",
   },
-
-  // ✅ Country/Region (currency selector placeholder)
   region: {
-    Component: DonateNow,
+    Component: HomePage,
     backKey: "home",
     backLabel: "Back to Home",
     anchorId: "region",
   },
-
-  // ✅ Account hub placeholder (optional)
   account: {
-    Component: LearnConnect,
+    Component: HomePage,
     backKey: "home",
     backLabel: "Back to Home",
     anchorId: "account",
   },
 
-  // ✅ Brand/info placeholder (kept)
+  // ✅ Brand/info
   about: {
     Component: AboutUsPage,
     backKey: "home",
@@ -135,7 +89,7 @@ export const pageTree: Record<string, PageConfig> = {
     anchorId: "about",
   },
 
-  // ✅ Legal pages
+  // ✅ Legal
   terms: {
     Component: TermsPage,
     backKey: "home",
@@ -149,351 +103,331 @@ export const pageTree: Record<string, PageConfig> = {
     anchorId: "privacy",
   },
 
-  // ------------------------------------------------------------------
-  // ✅ SHOP: Category/collection pages (placeholders using existing components)
-  // ------------------------------------------------------------------
-
-  // Shop → Desert Girl Exclusives
+  // ✅ Keep all existing route keys, map to HomePage for now
   "desert-girl-exclusives": {
-    Component: Transportation,
+    Component: HomePage,
     backKey: "shop",
     backLabel: "Back to Shop",
     anchorId: "desert-girl-exclusives",
   },
   "dg-graphics-adults": {
-    Component: EarlyChildhood,
+    Component: HomePage,
     backKey: "desert-girl-exclusives",
     backLabel: "Back to Exclusives",
     anchorId: "dg-graphics-adults",
   },
   "dg-graphics-minis": {
-    Component: SupportedLiving,
+    Component: HomePage,
     backKey: "desert-girl-exclusives",
     backLabel: "Back to Exclusives",
     anchorId: "dg-graphics-minis",
   },
   "dg-clothing": {
-    Component: Artists,
+    Component: HomePage,
     backKey: "desert-girl-exclusives",
     backLabel: "Back to Exclusives",
     anchorId: "dg-clothing",
   },
 
-  // Shop → Tops
   tops: {
-    Component: AutismDayCamp,
+    Component: HomePage,
     backKey: "shop",
     backLabel: "Back to Shop",
     anchorId: "tops",
   },
   "graphic-tees": {
-    Component: Employment,
+    Component: HomePage,
     backKey: "tops",
     backLabel: "Back to Tops",
     anchorId: "graphic-tees",
   },
   "dg-graphic-tees": {
-    Component: JobsPage,
+    Component: HomePage,
     backKey: "tops",
     backLabel: "Back to Tops",
     anchorId: "dg-graphic-tees",
   },
   "tops-blouses": {
-    Component: BoardPage,
+    Component: HomePage,
     backKey: "tops",
     backLabel: "Back to Tops",
     anchorId: "tops-blouses",
   },
   "tanks-mesh": {
-    Component: Title9Page,
+    Component: HomePage,
     backKey: "tops",
     backLabel: "Back to Tops",
     anchorId: "tanks-mesh",
   },
   outerwear: {
-    Component: Careers,
+    Component: HomePage,
     backKey: "tops",
     backLabel: "Back to Tops",
     anchorId: "outerwear",
   },
 
-  // Shop → Bottoms & Sets
   bottoms: {
-    Component: ProgramsAndServices,
+    Component: HomePage,
     backKey: "shop",
     backLabel: "Back to Shop",
     anchorId: "bottoms",
   },
   denim: {
-    Component: Transportation,
+    Component: HomePage,
     backKey: "bottoms",
     backLabel: "Back to Bottoms & Sets",
     anchorId: "denim",
   },
   dresses: {
-    Component: EarlyChildhood,
+    Component: HomePage,
     backKey: "bottoms",
     backLabel: "Back to Bottoms & Sets",
     anchorId: "dresses",
   },
   shorts: {
-    Component: SupportedLiving,
+    Component: HomePage,
     backKey: "bottoms",
     backLabel: "Back to Bottoms & Sets",
     anchorId: "shorts",
   },
   lounge: {
-    Component: Artists,
+    Component: HomePage,
     backKey: "bottoms",
     backLabel: "Back to Bottoms & Sets",
     anchorId: "lounge",
   },
 
-  // Shop → Jewelry & Accessories
   accessories: {
-    Component: BusinessServices,
+    Component: HomePage,
     backKey: "shop",
     backLabel: "Back to Shop",
     anchorId: "accessories",
   },
   "authentic-jewelry": {
-    Component: CMSPage,
+    Component: HomePage,
     backKey: "accessories",
     backLabel: "Back to Jewelry & Accessories",
     anchorId: "authentic-jewelry",
   },
   necklaces: {
-    Component: Pickup,
+    Component: HomePage,
     backKey: "accessories",
     backLabel: "Back to Jewelry & Accessories",
     anchorId: "necklaces",
   },
   bracelets: {
-    Component: CARF,
+    Component: HomePage,
     backKey: "accessories",
     backLabel: "Back to Jewelry & Accessories",
     anchorId: "bracelets",
   },
   bags: {
-    Component: ThriftStore,
+    Component: HomePage,
     backKey: "accessories",
     backLabel: "Back to Jewelry & Accessories",
     anchorId: "bags",
   },
   backpacks: {
-    Component: Shredding,
+    Component: HomePage,
     backKey: "accessories",
     backLabel: "Back to Jewelry & Accessories",
     anchorId: "backpacks",
   },
   headwear: {
-    Component: GetInvolved,
+    Component: HomePage,
     backKey: "accessories",
     backLabel: "Back to Jewelry & Accessories",
     anchorId: "headwear",
   },
   "trucker-caps": {
-    Component: DonateNow,
+    Component: HomePage,
     backKey: "headwear",
     backLabel: "Back to Headwear",
     anchorId: "trucker-caps",
   },
   belts: {
-    Component: LearnConnect,
+    Component: HomePage,
     backKey: "accessories",
     backLabel: "Back to Jewelry & Accessories",
     anchorId: "belts",
   },
   buckles: {
-    Component: AboutUsPage,
+    Component: HomePage,
     backKey: "accessories",
     backLabel: "Back to Jewelry & Accessories",
     anchorId: "buckles",
   },
   scarves: {
-    Component: TermsPage,
+    Component: HomePage,
     backKey: "accessories",
     backLabel: "Back to Jewelry & Accessories",
     anchorId: "scarves",
   },
 
-  // Shop → The Extras
   extras: {
-    Component: PrivacyPolicy,
+    Component: HomePage,
     backKey: "shop",
     backLabel: "Back to Shop",
     anchorId: "extras",
   },
   bralettes: {
-    Component: BoardPage,
+    Component: HomePage,
     backKey: "extras",
     backLabel: "Back to The Extras",
     anchorId: "bralettes",
   },
   swim: {
-    Component: Title9Page,
+    Component: HomePage,
     backKey: "extras",
     backLabel: "Back to The Extras",
     anchorId: "swim",
   },
   footwear: {
-    Component: Careers,
+    Component: HomePage,
     backKey: "extras",
     backLabel: "Back to The Extras",
     anchorId: "footwear",
   },
   drinkware: {
-    Component: JobsPage,
+    Component: HomePage,
     backKey: "extras",
     backLabel: "Back to The Extras",
     anchorId: "drinkware",
   },
   "home-decor": {
-    Component: Employment,
+    Component: HomePage,
     backKey: "extras",
     backLabel: "Back to The Extras",
     anchorId: "home-decor",
   },
   supplies: {
-    Component: AutismDayCamp,
+    Component: HomePage,
     backKey: "extras",
     backLabel: "Back to The Extras",
     anchorId: "supplies",
   },
 
-  // Shop → Deals / Sales
   sale: {
-    Component: Shredding,
+    Component: HomePage,
     backKey: "shop",
     backLabel: "Back to Shop",
     anchorId: "sale",
   },
   "mystery-bags": {
-    Component: GetInvolved,
+    Component: HomePage,
     backKey: "sale",
     backLabel: "Back to Deals / Sales",
     anchorId: "mystery-bags",
   },
   "deals-women": {
-    Component: DonateNow,
+    Component: HomePage,
     backKey: "sale",
     backLabel: "Back to Deals / Sales",
     anchorId: "deals-women",
   },
   "deals-cowkids": {
-    Component: LearnConnect,
+    Component: HomePage,
     backKey: "sale",
     backLabel: "Back to Deals / Sales",
     anchorId: "deals-cowkids",
   },
   "deals-footwear": {
-    Component: AboutUsPage,
+    Component: HomePage,
     backKey: "sale",
     backLabel: "Back to Deals / Sales",
     anchorId: "deals-footwear",
   },
   "deals-july": {
-    Component: TermsPage,
+    Component: HomePage,
     backKey: "sale",
     backLabel: "Back to Deals / Sales",
     anchorId: "deals-july",
   },
   "sale-samples": {
-    Component: PrivacyPolicy,
+    Component: HomePage,
     backKey: "sale",
     backLabel: "Back to Deals / Sales",
     anchorId: "sale-samples",
   },
   "sale-christmas": {
-    Component: BoardPage,
+    Component: HomePage,
     backKey: "sale",
     backLabel: "Back to Deals / Sales",
     anchorId: "sale-christmas",
   },
   "sale-sweater": {
-    Component: Title9Page,
+    Component: HomePage,
     backKey: "sale",
     backLabel: "Back to Deals / Sales",
     anchorId: "sale-sweater",
   },
 
-  // ------------------------------------------------------------------
-  // ✅ COWKIDS subpages (placeholders)
-  // ------------------------------------------------------------------
   "kids-graphics": {
-    Component: Transportation,
+    Component: HomePage,
     backKey: "cowkids",
     backLabel: "Back to Cowkids",
     anchorId: "kids-graphics",
   },
   "mini-darlins": {
-    Component: EarlyChildhood,
+    Component: HomePage,
     backKey: "cowkids",
     backLabel: "Back to Cowkids",
     anchorId: "mini-darlins",
   },
   "mini-buckarros": {
-    Component: SupportedLiving,
+    Component: HomePage,
     backKey: "cowkids",
     backLabel: "Back to Cowkids",
     anchorId: "mini-buckarros",
   },
   "kids-swim": {
-    Component: Artists,
+    Component: HomePage,
     backKey: "cowkids",
     backLabel: "Back to Cowkids",
     anchorId: "kids-swim",
   },
   "kids-home-accessories": {
-    Component: AutismDayCamp,
+    Component: HomePage,
     backKey: "cowkids",
     backLabel: "Back to Cowkids",
     anchorId: "kids-home-accessories",
   },
 
-  // ------------------------------------------------------------------
-  // ✅ OCCASIONS subpages (placeholders)
-  // ------------------------------------------------------------------
   galentine: {
-    Component: Employment,
+    Component: HomePage,
     backKey: "occasions",
     backLabel: "Back to Shop Occasions",
     anchorId: "galentine",
   },
   "date-night": {
-    Component: BusinessServices,
+    Component: HomePage,
     backKey: "occasions",
     backLabel: "Back to Shop Occasions",
     anchorId: "date-night",
   },
   "denim-edit": {
-    Component: CMSPage,
+    Component: HomePage,
     backKey: "occasions",
     backLabel: "Back to Shop Occasions",
     anchorId: "denim-edit",
   },
   "spring-transition": {
-    Component: Pickup,
+    Component: HomePage,
     backKey: "occasions",
     backLabel: "Back to Shop Occasions",
     anchorId: "spring-transition",
   },
   "luck-of-the-cowboy": {
-    Component: CARF,
+    Component: HomePage,
     backKey: "occasions",
     backLabel: "Back to Shop Occasions",
     anchorId: "luck-of-the-cowboy",
   },
 };
 
-/**
- * Hash → canonical page keys
- * These should match nav keys + your router behavior.
- */
 export const sectionId: Record<string, string> = {
   home: "home",
   shop: "shop",
-
   "new-releases": "new-releases",
   restocks: "restocks",
   cowkids: "cowkids",
@@ -504,7 +438,6 @@ export const sectionId: Record<string, string> = {
   region: "region",
   account: "account",
 
-  // Shop groups
   "desert-girl-exclusives": "desert-girl-exclusives",
   "dg-graphics-adults": "dg-graphics-adults",
   "dg-graphics-minis": "dg-graphics-minis",
@@ -553,21 +486,18 @@ export const sectionId: Record<string, string> = {
   "sale-christmas": "sale-christmas",
   "sale-sweater": "sale-sweater",
 
-  // Cowkids
   "kids-graphics": "kids-graphics",
   "mini-darlins": "mini-darlins",
   "mini-buckarros": "mini-buckarros",
   "kids-swim": "kids-swim",
   "kids-home-accessories": "kids-home-accessories",
 
-  // Occasions
   galentine: "galentine",
   "date-night": "date-night",
   "denim-edit": "denim-edit",
   "spring-transition": "spring-transition",
   "luck-of-the-cowboy": "luck-of-the-cowboy",
 
-  // Legal + brand placeholder
   terms: "terms",
   privacy: "privacy",
   about: "about",
