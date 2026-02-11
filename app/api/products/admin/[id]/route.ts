@@ -17,9 +17,12 @@ async function requireAdmin(supabase: SupabaseClient) {
   return { ok: true as const };
 }
 
+/** Normalize + sort-friendly shape */
 function normalizeImage(img: any) {
   const storage_path = img.storage_path ?? img.object_path ?? null;
   const alt = img.alt ?? img.alt_text ?? null;
+
+  // prefer explicit ordering fields you actually have
   const position =
     typeof img.position === "number"
       ? img.position
@@ -27,12 +30,12 @@ function normalizeImage(img: any) {
         ? img.sort_order
         : 0;
 
-  return {
-    ...img,
-    storage_path,
-    alt,
-    position,
-  };
+  return { ...img, storage_path, alt, position };
+}
+
+function normalizeVariant(v: any) {
+  const position = typeof v.position === "number" ? v.position : 0;
+  return { ...v, position };
 }
 
 export async function GET(_req: NextRequest, { params }: Params) {
@@ -44,18 +47,22 @@ export async function GET(_req: NextRequest, { params }: Params) {
   const id = params.id;
   if (!id) return jsonError(400, "INVALID_ID", "Missing product id");
 
-  // ✅ Use (*) so we never request columns that don't exist
+  // ✅ Includes tags via join table:
+  // product_tags(tag_id) -> tags(id, slug, name)
   const { data, error } = await supabase
     .from("products")
     .select(
       `
-        *,
-        product_images (*),
-        product_variants (*),
-        product_categories (
-          categories (*)
-        )
-      `
+      *,
+      product_images (*),
+      product_variants (*),
+      product_categories (
+        categories (*)
+      ),
+      product_tags (
+        tags (*)
+      )
+    `
     )
     .eq("id", id)
     .single();
@@ -76,11 +83,16 @@ export async function GET(_req: NextRequest, { params }: Params) {
   const images = (data?.product_images ?? [])
     .map(normalizeImage)
     .slice()
-    .sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0));
+    .sort((a: any, b: any) => (Number(a.position ?? 0) - Number(b.position ?? 0)));
 
   const variants = (data?.product_variants ?? [])
+    .map(normalizeVariant)
     .slice()
-    .sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0));
+    .sort((a: any, b: any) => (Number(a.position ?? 0) - Number(b.position ?? 0)));
+
+  // Flatten tags (will be [] if no rows in product_tags, which matches your SQL results)
+  const tags =
+    data?.product_tags?.map((pt: any) => pt.tags).filter(Boolean) ?? [];
 
   return NextResponse.json({
     ok: true,
@@ -89,6 +101,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
       product_images: images,
       product_variants: variants,
       categories,
+      tags,
     },
   });
 }
@@ -109,7 +122,12 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     return jsonError(400, "INVALID_JSON", "Body must be valid JSON");
   }
 
-  // ✅ ALIGNED WITH YOUR SQL RESULT (only columns that exist)
+  // ✅ ALIGNED WITH YOUR SQL RESULT for products columns
+  // Current products columns you showed:
+  // badge, brand, compare_at_price_cents, currency, description, featured,
+  // id, is_featured, price_cents, search_text, slug, status, tags, title, created_at, updated_at, created_by
+  //
+  // If you want to keep this strict, keep just the fields your UI edits.
   const allowed = new Set([
     "badge",
     "compare_at_price_cents",
@@ -120,6 +138,12 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     "slug",
     "status",
     "title",
+
+    // OPTIONAL: uncomment if you want these editable via PATCH
+    // "brand",
+    // "featured",
+    // "currency",
+    // "tags",
   ]);
 
   const update: Record<string, any> = {};
@@ -152,7 +176,6 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   const id = params.id;
   if (!id) return jsonError(400, "INVALID_ID", "Missing product id");
 
-  // If "archived" isn't an allowed status in your DB, change this value to whatever you use.
   const { data, error } = await supabase
     .from("products")
     .update({ status: "archived" })
