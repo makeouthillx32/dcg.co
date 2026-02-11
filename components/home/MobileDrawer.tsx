@@ -3,92 +3,95 @@
 import React, { useState, useRef, useEffect } from "react";
 import { MdExpandMore, MdChevronRight, MdArrowForwardIos } from "react-icons/md";
 import { X } from "lucide-react";
-import "./_components/Mobile.scss";
+import Link from "next/link";
+import type { NavNode as UnifiedNavNode } from "@/lib/navigation";
 
-// ✅ fallback so mobile never goes blank
-import { navTree as fallbackNavTree } from "@/lib/navTree";
-
+// Simplified nav node for mobile rendering
 type NavNode = {
   key: string;
   label: string;
+  href: string;
+  routeType: "real" | "hash";
   children?: NavNode[];
 };
 
 interface MobileDrawerProps {
-  navigateTo: (id: string) => (e?: React.MouseEvent<HTMLAnchorElement>) => void;
   session: any;
   onClose: () => void;
 }
 
-function mapDbTreeToNavNodes(dbNodes: any[]): NavNode[] {
-  return (dbNodes ?? []).map((n: any) => ({
-    key: n.slug,
-    label: n.name,
-    children: (n.children ?? []).map((c: any) => ({
-      key: c.slug,
-      label: c.name,
-      children: (c.children ?? []).map((cc: any) => ({
-        key: cc.slug,
-        label: cc.name,
-      })),
-    })),
-  }));
+/**
+ * Transform unified nav nodes to mobile-friendly format
+ * Only keep categories and flatten to 2 levels max
+ */
+function transformNavTree(nodes: UnifiedNavNode[]): NavNode[] {
+  return nodes
+    .filter((node) => {
+      // Only show categories and collections in mobile nav
+      return node.type === "category" || node.type === "collection";
+    })
+    .map((node) => ({
+      key: node.key,
+      label: node.label,
+      href: node.href,
+      routeType: node.routeType,
+      children: node.children
+        ? node.children
+            .filter((child) => child.type === "category" || child.type === "collection")
+            .map((child) => ({
+              key: child.key,
+              label: child.label,
+              href: child.href,
+              routeType: child.routeType,
+              // Don't include grandchildren in mobile for simplicity
+            }))
+        : undefined,
+    }));
 }
 
-function mapFallbackToNavNodes(nodes: any[]): NavNode[] {
-  // keep it simple: top level + one submenu level (matches your current mobile UI)
-  return (nodes ?? []).map((n: any) => ({
-    key: n.key,
-    label: n.label,
-    children: n.children?.map((c: any) => ({ key: c.key, label: c.label })) ?? undefined,
-  }));
-}
-
-export default function MobileDrawer({
-  navigateTo,
-  session,
-  onClose,
-}: MobileDrawerProps) {
+export default function MobileDrawer({ session, onClose }: MobileDrawerProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [isClosing, setIsClosing] = useState(false);
+  const [navTree, setNavTree] = useState<NavNode[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // ✅ start with fallback so it renders instantly
-  const [navTree, setNavTree] = useState<NavNode[]>(
-    mapFallbackToNavNodes(fallbackNavTree as any[])
-  );
-
-  // ✅ fetch DB nav + swap in if it works
+  // Fetch navigation tree from API
   useEffect(() => {
     let cancelled = false;
 
     (async () => {
       try {
-        const res = await fetch("/api/nav", { cache: "no-store" });
+        const res = await fetch("/api/navigation/tree", { 
+          cache: "no-store",
+          next: { revalidate: 300 } // 5 minutes
+        });
+        
         if (!res.ok) {
-          console.error("Nav fetch failed:", res.status);
+          console.error("Navigation fetch failed:", res.status);
+          setLoading(false);
           return;
         }
 
         const json = await res.json();
-        if (!json?.ok) {
-          console.error("Nav API returned error:", json?.error);
+        
+        if (!json?.nodes) {
+          console.error("Invalid navigation response:", json);
+          setLoading(false);
           return;
         }
 
-        const mapped = mapDbTreeToNavNodes(json.data);
+        const transformed = transformNavTree(json.nodes);
 
-        if (!cancelled && mapped.length) {
-          setNavTree(mapped);
-          // reset expanded if it no longer exists
-          setExpanded((prev) => {
-            if (!prev) return null;
-            const exists = mapped.some((n) => n.key === prev);
-            return exists ? prev : null;
-          });
+        if (!cancelled) {
+          setNavTree(transformed);
+          setLoading(false);
         }
       } catch (e) {
-        console.error("Nav fetch exception:", e);
+        console.error("Navigation fetch error:", e);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     })();
 
@@ -97,6 +100,7 @@ export default function MobileDrawer({
     };
   }, []);
 
+  // Click outside to close
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -120,11 +124,15 @@ export default function MobileDrawer({
     }, 400);
   };
 
-  const handleClickAndClose =
-    (key: string) => (e: React.MouseEvent<HTMLAnchorElement>) => {
-      navigateTo(key)(e);
+  const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, routeType: string) => {
+    if (routeType === "hash") {
+      // Hash navigation - let browser handle it
       handleClose();
-    };
+    } else {
+      // Real route - Next.js Link will handle it
+      handleClose();
+    }
+  };
 
   const handleAccountClick = () => {
     window.location.href = "/profile/me";
@@ -154,72 +162,109 @@ export default function MobileDrawer({
       <div className="drawer-divider-horizontal" />
 
       <div className="mobile-menu-container bg-background">
-        {navTree.map((node) => (
-          <div key={node.key} className="mobile-section">
-            {/* Section top divider */}
-            <div className="drawer-divider-horizontal" />
+        {loading ? (
+          // Loading skeleton
+          <div className="px-4 py-6 text-center text-sm text-muted-foreground">
+            Loading navigation...
+          </div>
+        ) : navTree.length === 0 ? (
+          // Empty state
+          <div className="px-4 py-6 text-center text-sm text-muted-foreground">
+            No categories available
+          </div>
+        ) : (
+          // Navigation items
+          navTree.map((node) => (
+            <div key={node.key} className="mobile-section">
+              {/* Section top divider */}
+              <div className="drawer-divider-horizontal" />
 
-            <div className="mobile-menu-item text-foreground">
-              <a
-                href="#"
-                onClick={handleClickAndClose(node.key)}
-                className="menu-link text-foreground no-underline"
-              >
-                {node.label}
-              </a>
+              <div className="mobile-menu-item text-foreground">
+                {node.routeType === "hash" ? (
+                  // Hash navigation (static pages)
+                  <a
+                    href={node.href}
+                    onClick={(e) => handleNavClick(e, node.routeType)}
+                    className="menu-link text-foreground no-underline"
+                  >
+                    {node.label}
+                  </a>
+                ) : (
+                  // Real route (categories/collections)
+                  <Link
+                    href={node.href}
+                    onClick={(e) => handleNavClick(e, node.routeType)}
+                    className="menu-link text-foreground no-underline"
+                  >
+                    {node.label}
+                  </Link>
+                )}
 
-              {/* Vertical divider before icon */}
-              <div className="drawer-divider-vertical" />
+                {/* Vertical divider before icon */}
+                <div className="drawer-divider-vertical" />
 
-              {node.children?.length ? (
-                <button
-                  onClick={() => toggleExpand(node.key)}
-                  className="menu-toggle text-foreground"
-                  aria-label={`Toggle ${node.label}`}
-                  type="button"
-                >
-                  {expanded === node.key ? (
-                    <MdExpandMore size={20} />
-                  ) : (
-                    <MdChevronRight size={20} />
-                  )}
-                </button>
-              ) : (
-                <span className="menu-icon-slot" aria-hidden="true">
-                  <MdArrowForwardIos size={14} />
-                </span>
+                {node.children?.length ? (
+                  <button
+                    onClick={() => toggleExpand(node.key)}
+                    className="menu-toggle text-foreground"
+                    aria-label={`Toggle ${node.label}`}
+                    type="button"
+                  >
+                    {expanded === node.key ? (
+                      <MdExpandMore size={20} />
+                    ) : (
+                      <MdChevronRight size={20} />
+                    )}
+                  </button>
+                ) : (
+                  <span className="menu-icon-slot" aria-hidden="true">
+                    <MdArrowForwardIos size={14} />
+                  </span>
+                )}
+              </div>
+
+              {/* Submenu */}
+              {node.children?.length && expanded === node.key && (
+                <div className="mobile-submenu bg-background">
+                  {node.children.map((child) => (
+                    <React.Fragment key={child.key}>
+                      {child.routeType === "hash" ? (
+                        <a
+                          href={child.href}
+                          onClick={(e) => handleNavClick(e, child.routeType)}
+                          className="submenu-link text-foreground no-underline"
+                        >
+                          {child.label}
+                        </a>
+                      ) : (
+                        <Link
+                          href={child.href}
+                          onClick={(e) => handleNavClick(e, child.routeType)}
+                          className="submenu-link text-foreground no-underline"
+                        >
+                          {child.label}
+                        </Link>
+                      )}
+                    </React.Fragment>
+                  ))}
+                </div>
               )}
             </div>
+          ))
+        )}
 
-            {node.children?.length && expanded === node.key && (
-              <div className="mobile-submenu bg-background">
-                {node.children.map((child) => (
-                  <a
-                    key={child.key}
-                    href="#"
-                    onClick={handleClickAndClose(child.key)}
-                    className="submenu-link text-foreground no-underline"
-                  >
-                    {child.label}
-                  </a>
-                ))}
-              </div>
-            )}
-          </div>
-        ))}
-
-        {/* Auth */}
+        {/* Auth Section */}
         <div className="drawer-divider-horizontal" />
 
         <div className="mobile-auth-section bg-background">
           {!session ? (
-            <a
+            <Link
               href="/sign-in"
               onClick={handleClose}
               className="auth-button text-accent no-underline"
             >
               Sign In
-            </a>
+            </Link>
           ) : (
             <button
               onClick={handleAccountClick}
