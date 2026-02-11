@@ -19,9 +19,20 @@ function isUuid(v: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
 }
 
+function normalizeSlug(v: any) {
+  if (typeof v !== "string") return "";
+  return v.trim().toLowerCase();
+}
+
 async function readProductTagsArray(supabase: SupabaseClient, product_id: string) {
-  const { data, error } = await supabase.from("products").select("id, tags").eq("id", product_id).single();
+  const { data, error } = await supabase
+    .from("products")
+    .select("id, tags")
+    .eq("id", product_id)
+    .single();
+
   if (error) return { ok: false as const, error };
+
   const arr = Array.isArray((data as any)?.tags) ? ((data as any).tags as string[]) : [];
   return { ok: true as const, tags: arr };
 }
@@ -39,19 +50,28 @@ async function writeProductTagsArray(supabase: SupabaseClient, product_id: strin
 }
 
 async function getTagById(supabase: SupabaseClient, tag_id: string) {
-  const { data, error } = await supabase.from("tags").select("id, slug, name").eq("id", tag_id).single();
+  const { data, error } = await supabase
+    .from("tags")
+    .select("id, slug, name")
+    .eq("id", tag_id)
+    .single();
+
   if (error) return { ok: false as const, error };
   return { ok: true as const, data };
 }
 
 async function getTagBySlug(supabase: SupabaseClient, slug: string) {
-  const { data, error } = await supabase.from("tags").select("id, slug, name").eq("slug", slug).single();
+  const { data, error } = await supabase
+    .from("tags")
+    .select("id, slug, name")
+    .eq("slug", slug)
+    .single();
+
   if (error) return { ok: false as const, error };
   return { ok: true as const, data };
 }
 
 async function upsertTagBySlug(supabase: SupabaseClient, slug: string, name: string) {
-  // Assumes tags.slug is unique (typical). If not unique, you’ll want to add a unique index.
   const { data, error } = await supabase
     .from("tags")
     .upsert({ slug, name }, { onConflict: "slug" })
@@ -83,10 +103,9 @@ export async function POST(req: NextRequest, { params }: Params) {
     return jsonError(400, "INVALID_JSON", "Body must be valid JSON");
   }
 
-  // Accept either { slug, name } OR { tag_id }
   const tag_id = body?.tag_id;
-  const slug = body?.slug;
-  const name = body?.name;
+  const slugRaw = body?.slug;
+  const nameRaw = body?.name;
 
   let tag: { id: string; slug: string; name: string } | null = null;
 
@@ -98,12 +117,11 @@ export async function POST(req: NextRequest, { params }: Params) {
     }
     tag = r.data as any;
   } else {
-    if (!slug || typeof slug !== "string") {
-      return jsonError(400, "INVALID_SLUG", "slug is required");
-    }
-    if (!name || typeof name !== "string") {
-      return jsonError(400, "INVALID_NAME", "name is required");
-    }
+    const slug = normalizeSlug(slugRaw);
+    const name = typeof nameRaw === "string" ? nameRaw.trim() : "";
+
+    if (!slug) return jsonError(400, "INVALID_SLUG", "slug is required");
+    if (!name) return jsonError(400, "INVALID_NAME", "name is required");
 
     const up = await upsertTagBySlug(supabase, slug, name);
     if (!up.ok) return jsonError(500, "TAG_UPSERT_FAILED", up.error.message, up.error);
@@ -111,15 +129,14 @@ export async function POST(req: NextRequest, { params }: Params) {
   }
 
   // Attach (idempotent because PK is (product_id, tag_id))
-  const { data: joinRow, error: joinErr } = await supabase
+  const { data: joinRows, error: joinErr } = await supabase
     .from("product_tags")
     .upsert({ product_id, tag_id: tag!.id }, { onConflict: "product_id,tag_id" })
-    .select("*")
-    .single();
+    .select("*");
 
   if (joinErr) return jsonError(500, "ASSIGN_TAG_FAILED", joinErr.message, joinErr);
 
-  // Keep products.tags (text[]) in sync as a slug cache (optional but you already have it)
+  // Sync products.tags (slug cache)
   const arrRes = await readProductTagsArray(supabase, product_id);
   if (!arrRes.ok) return jsonError(500, "PRODUCT_TAGS_FETCH_FAILED", arrRes.error.message, arrRes.error);
 
@@ -131,7 +148,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     ok: true,
     data: {
       tag,
-      join: joinRow,
+      join: joinRows?.[0] ?? null,
       product_tags: saveRes.data.tags,
     },
   });
@@ -151,7 +168,6 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   const product_id = params.id;
   if (!product_id) return jsonError(400, "INVALID_ID", "Missing product id");
 
-  // Support either body { tag } or query ?tag_id=
   const { searchParams } = new URL(req.url);
   const tagIdFromQuery = searchParams.get("tag_id");
 
@@ -167,7 +183,6 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     return jsonError(400, "INVALID_TAG", "Provide { tag: <uuid-or-slug> } or ?tag_id=");
   }
 
-  // Resolve to tag record
   let tag: { id: string; slug: string; name?: string } | null = null;
 
   if (isUuid(tagValue)) {
@@ -178,7 +193,8 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     }
     tag = r.data as any;
   } else {
-    const r = await getTagBySlug(supabase, tagValue);
+    const slug = normalizeSlug(tagValue);
+    const r = await getTagBySlug(supabase, slug);
     if (!r.ok) {
       const status = r.error.code === "PGRST116" ? 404 : 500;
       return jsonError(status, status === 404 ? "TAG_NOT_FOUND" : "TAG_LOOKUP_FAILED", r.error.message, r.error);
@@ -186,7 +202,6 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     tag = r.data as any;
   }
 
-  // Delete join row
   const { data: deleted, error: delErr } = await supabase
     .from("product_tags")
     .delete()
@@ -198,7 +213,6 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   if (delErr) return jsonError(500, "UNASSIGN_TAG_FAILED", delErr.message, delErr);
   if (!deleted) return jsonError(404, "NOT_FOUND", "Tag not assigned to this product");
 
-  // Update products.tags cache
   const arrRes = await readProductTagsArray(supabase, product_id);
   if (!arrRes.ok) return jsonError(500, "PRODUCT_TAGS_FETCH_FAILED", arrRes.error.message, arrRes.error);
 
