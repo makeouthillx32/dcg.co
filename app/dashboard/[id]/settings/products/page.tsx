@@ -11,13 +11,12 @@ import ProductsSearchBar from "./_components/ProductsSearchBar";
 import ProductActionBar from "./_components/ProductActionBar";
 import ProductsTable, { ProductRow } from "./_components/ProductsTable";
 
-// ✅ create modal (we’ll add this next)
 import CreateProductModal from "./_components/CreateProductModal";
-
-// ✅ manage modal (the big one you pasted)
 import ProductModal from "./_components/ProductModal";
 
 import "./_components/products.scss";
+
+/* ---------------- helpers ---------------- */
 
 async function safeReadJson(res: Response) {
   const text = await res.text();
@@ -25,9 +24,18 @@ async function safeReadJson(res: Response) {
   try {
     return JSON.parse(text);
   } catch {
-    return { ok: false, error: { code: "NON_JSON_RESPONSE", message: text.slice(0, 300) } };
+    return {
+      ok: false,
+      error: { code: "NON_JSON_RESPONSE", message: text.slice(0, 300) },
+    };
   }
 }
+
+function isValidId(id: unknown): id is string {
+  return typeof id === "string" && id.length > 0;
+}
+
+/* ---------------- page ---------------- */
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<ProductRow[]>([]);
@@ -37,12 +45,12 @@ export default function ProductsPage() {
 
   const [searchQuery, setSearchQuery] = useState("");
 
-  // ✅ Create modal open
   const [createOpen, setCreateOpen] = useState(false);
 
-  // ✅ Manage modal open + selected product
   const [manageOpen, setManageOpen] = useState(false);
   const [manageProductId, setManageProductId] = useState<string | null>(null);
+
+  /* ---------------- fetch ---------------- */
 
   const fetchProducts = async (mode: "initial" | "refresh" = "refresh") => {
     mode === "initial" ? setIsLoading(true) : setIsRefreshing(true);
@@ -57,14 +65,16 @@ export default function ProductsPage() {
       const res = await fetch(url.toString(), { cache: "no-store" });
       const json = await safeReadJson(res);
 
-      if (!res.ok || !json?.ok) throw new Error(json?.error?.message ?? `Failed: ${res.status}`);
+      if (!res.ok || !json?.ok) {
+        throw new Error(json?.error?.message ?? `Failed: ${res.status}`);
+      }
 
       setProducts((json.data ?? []) as ProductRow[]);
       setError(null);
 
       if (mode !== "initial") toast.success("Products refreshed");
     } catch (e: any) {
-      console.error(e);
+      console.error("❌ fetchProducts failed:", e);
       setError(e?.message ?? "Failed to load products.");
     } finally {
       mode === "initial" ? setIsLoading(false) : setIsRefreshing(false);
@@ -76,14 +86,21 @@ export default function ProductsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /* ---------------- filter ---------------- */
+
   const filtered = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
     if (!q) return products;
 
     return products.filter((p) =>
-      [p.title, p.slug, p.badge ?? "", p.status ?? ""].join(" ").toLowerCase().includes(q)
+      [p.title, p.slug, p.badge ?? "", p.status ?? ""]
+        .join(" ")
+        .toLowerCase()
+        .includes(q)
     );
   }, [products, searchQuery]);
+
+  /* ---------------- render ---------------- */
 
   return (
     <ShowcaseSection title="Products">
@@ -110,15 +127,33 @@ export default function ProductsPage() {
             products={filtered}
             isRefreshing={isRefreshing}
             onManage={(p) => {
+              if (!isValidId(p.id)) {
+                console.error("🚨 Product missing id:", p);
+                toast.error("This product is missing an ID. Refresh the page.");
+                return;
+              }
+
               setManageProductId(p.id);
               setManageOpen(true);
             }}
             onArchive={async (p) => {
+              if (!isValidId(p.id)) {
+                toast.error("Cannot archive product with missing ID.");
+                return;
+              }
+
               if (!confirm(`Archive "${p.title}"?`)) return;
+
               try {
-                const res = await fetch(`/api/products/admin/${p.id}`, { method: "DELETE" });
+                const res = await fetch(`/api/products/admin/${p.id}`, {
+                  method: "DELETE",
+                });
                 const json = await safeReadJson(res);
-                if (!res.ok || !json?.ok) throw new Error(json?.error?.message ?? "Archive failed");
+
+                if (!res.ok || !json?.ok) {
+                  throw new Error(json?.error?.message ?? "Archive failed");
+                }
+
                 toast.success("Archived");
                 fetchProducts("refresh");
               } catch (e: any) {
@@ -128,25 +163,33 @@ export default function ProductsPage() {
           />
         )}
 
-        {/* ✅ Create */}
+        {/* Create */}
         <CreateProductModal
           open={createOpen}
           onOpenChange={setCreateOpen}
           onCreated={(newProductId) => {
+            if (!isValidId(newProductId)) {
+              console.error("🚨 Created product missing id:", newProductId);
+              toast.error("Product created but ID missing. Refresh required.");
+              return;
+            }
+
             setCreateOpen(false);
             toast.success("Product created");
             fetchProducts("refresh");
 
-            // optional: immediately open manage
             setManageProductId(newProductId);
             setManageOpen(true);
           }}
         />
 
-        {/* ✅ Manage */}
+        {/* Manage */}
         <ProductModal
           open={manageOpen}
-          onOpenChange={(v) => setManageOpen(v)}
+          onOpenChange={(v) => {
+            if (!v) setManageProductId(null);
+            setManageOpen(v);
+          }}
           productId={manageProductId}
           onChanged={() => fetchProducts("refresh")}
         />
