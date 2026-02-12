@@ -1,78 +1,42 @@
-// components/home/Home.tsx or wherever it lives
+// components/shop/Home.tsx
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useEffect } from "react";
 import Header from "@/components/Layouts/shop/Header";
-import SectionPanel from "@/components/shop/SectionPanel";
-import BackButton from "@/components/shop/BackButton";
-import AnchorSection from "@/components/shop/AnchorSection";
-import { pageTree, sectionId } from "@/components/shop/pageTree";
 import Footer from "@/components/footer";
 import useThemeCookie from "@/lib/useThemeCookie";
 
+import Landing from "@/components/shop/Landing";
+
 export default function Home() {
   useThemeCookie();
-  const [currentPage, setCurrentPage] = useState<string>("home");
 
-  const goTo = useCallback((hash: string) => {
-    const [base, sub] = hash.split("/");
-    const pageKey = sub && sectionId[sub] ? sub : base;
-    const target = sectionId[pageKey] ?? pageKey;
-    
-    if (pageTree[target]) {
-      setCurrentPage(target);
-      
-      requestAnimationFrame(() => {
-        setTimeout(() => {
-          const scrollToId = sub || target;
-          const el = document.getElementById(scrollToId);
-          if (el) {
-            el.scrollIntoView({ behavior: "smooth", block: "start" });
-          } else {
-            document.documentElement.scrollIntoView({ behavior: "smooth" });
-          }
-        }, 10);
-      });
-    } else {
-      setCurrentPage("home");
-    }
-  }, []);
-
-  const navigateTo = (page: string) => (e?: React.MouseEvent) => {
-    e?.preventDefault();
-    history.pushState(null, "", `#${page}`);
-    goTo(page);
-  };
-
+  // Optional: if user hits /#something, smoothly scroll (ONLY for sections on Landing)
   useEffect(() => {
-    const sync = () => {
-      const hash = location.hash.replace("#", "") || "home";
-      goTo(hash);
-    };
-    sync();
-    window.addEventListener("hashchange", sync);
-    return () => window.removeEventListener("hashchange", sync);
-  }, [goTo]);
+    const scrollToHash = () => {
+      const id = window.location.hash.replace("#", "");
+      if (!id) return;
 
-  const config = pageTree[currentPage];
-  if (!config) return null;
-  
-  const { Component, backKey, backLabel, anchorId } = config;
+      // Let layout render first
+      requestAnimationFrame(() => {
+        const el = document.getElementById(id);
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    };
+
+    scrollToHash();
+    window.addEventListener("hashchange", scrollToHash);
+    return () => window.removeEventListener("hashchange", scrollToHash);
+  }, []);
 
   return (
     <div className="flex min-h-screen flex-col bg-primary-foreground text-foreground">
-      {/* ✅ No props needed */}
       <Header />
 
       <main className="flex-grow">
-        <SectionPanel currentPage={currentPage}>
-          {backKey && <BackButton navigateTo={navigateTo} backKey={backKey} label={backLabel} />}
-          {anchorId && <AnchorSection id={anchorId} />}
-          <Component navigateTo={navigateTo} />
-        </SectionPanel>
+        <Landing />
       </main>
 
-      {/* ✅ No props needed */}
       <Footer />
     </div>
   );
