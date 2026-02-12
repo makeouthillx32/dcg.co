@@ -2,28 +2,8 @@
 import { notFound } from "next/navigation";
 import { getPublishedStaticPageBySlug } from "@/lib/landing/static-pages.server";
 
-function renderContent(page: { content: string; content_format: "html" | "markdown" }) {
-  if (page.content_format === "html") {
-    return (
-      <div className="prose max-w-none" dangerouslySetInnerHTML={{ __html: page.content }} />
-    );
-  }
-
-  return (
-    <div className="prose max-w-none">
-      {page.content.split("\n").map((line, i) =>
-        line.trim() ? (
-          <p key={i} className="mb-3">{line}</p>
-        ) : (
-          <div key={i} className="h-3" />
-        )
-      )}
-    </div>
-  );
-}
-
-export default async function Page({ params }: { params: { slug: string } }) {
-  const page = await getPublishedStaticPageBySlug(params.slug);
+export default async function Page({ params }: { params: { slug?: string } }) {
+  const page = await getPublishedStaticPageBySlug(params?.slug);
   if (!page) return notFound();
 
   return (
@@ -32,7 +12,13 @@ export default async function Page({ params }: { params: { slug: string } }) {
       {page.meta_description ? (
         <p className="mt-3 text-muted-foreground">{page.meta_description}</p>
       ) : null}
-      <div className="mt-8">{renderContent(page)}</div>
+      <div className="mt-8 prose max-w-none">
+        {page.content_format === "html" ? (
+          <div dangerouslySetInnerHTML={{ __html: page.content }} />
+        ) : (
+          page.content.split("\n").map((line, i) => <p key={i}>{line}</p>)
+        )}
+      </div>
     </section>
   );
 }
