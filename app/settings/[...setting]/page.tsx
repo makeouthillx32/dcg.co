@@ -12,16 +12,6 @@ type DynComp = FC<{}>;
 const settingsMap: Record<string, DynComp> = {
   // Add default root component
   "": dynamic(() => import("@/components/settings/profile-settings")) as DynComp,
-  catalog: dynamic(() => import("@/components/settings/catalog-settings")) as DynComp,
-  profile: dynamic(() => import("@/components/settings/profile-settings")) as DynComp,
-  CMS: dynamic(() => import("@/components/settings/cms-settings")) as DynComp,
-  "CMS/schedule": dynamic(
-    () => import("@/components/settings/cms-settings")
-  ) as DynComp,
-  
-  // Tools settings - only include existing ones
-  "Tools/punch-card-maker": dynamic(() => import("@/components/settings/punch-card-maker-settings")) as DynComp,
-  "Tools/timesheet-calculator": dynamic(() => import("@/components/settings/timesheet-calculator-settings")) as DynComp,
 };
 
 // Map settings to icons
