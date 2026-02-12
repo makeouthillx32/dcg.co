@@ -41,8 +41,7 @@ export default function Footer() {
           { name: "New Releases", href: "/new-releases" },
           { name: "Restocks", href: "/restocks" },
 
-          // ✅ If these are sections on the landing page, keep them as landing anchors
-          // Use "/#..." so they work from ANY page (not just the homepage)
+          // ✅ Landing sections
           { name: "Best Sellers", href: "/#best-sellers" },
           { name: "Gift Card", href: "/#gift-card" },
         ],
@@ -52,7 +51,7 @@ export default function Footer() {
         links: [
           { name: "Contact", href: "/contact" },
 
-          // ✅ CMS-driven pages (Option B)
+          // ✅ CMS-driven pages (Option B) — update to your real slugs if/when they exist
           { name: "Shipping", href: "/pages/shipping" },
           { name: "Returns", href: "/pages/returns" },
           { name: "Size Guide", href: "/pages/size-guide" },
@@ -61,16 +60,15 @@ export default function Footer() {
       {
         title: "About",
         links: [
-          // ✅ CMS-driven pages (Option B)
-          { name: "Our Story", href: "/pages/about" },
+          // ✅ CMS-driven pages (your real slug)
+          { name: "Our Story", href: "/pages/about-us" },
 
-          // ✅ If FAQ is a section on landing, keep as "/#faq"
-          // If you move FAQ into CMS later, change to "/pages/faq"
+          // ✅ Landing section
           { name: "FAQs", href: "/#faq" },
 
-          // ✅ Legal CMS pages (Option B)
-          { name: "Privacy Policy", href: "/legal/privacy" },
-          { name: "Terms", href: "/legal/terms" },
+          // ✅ Legal CMS pages (your real slugs)
+          { name: "Privacy Policy", href: "/legal/privacy-policy" },
+          { name: "Terms", href: "/legal/terms-and-conditions" },
         ],
       },
     ];
@@ -197,10 +195,10 @@ export default function Footer() {
         <div className="mt-12 flex flex-col gap-4 border-t border-[var(--border)] pt-8 text-xs text-[var(--muted-foreground)] md:flex-row md:items-center md:justify-between">
           <p>© {new Date().getFullYear()} Desert Cowgirl™. All rights reserved.</p>
           <div className="flex flex-wrap gap-x-6 gap-y-2">
-            <Link className="hover:underline" href="/legal/privacy">
+            <Link className="hover:underline" href="/legal/privacy-policy">
               Privacy
             </Link>
-            <Link className="hover:underline" href="/legal/terms">
+            <Link className="hover:underline" href="/legal/terms-and-conditions">
               Terms
             </Link>
             <Link className="hover:underline" href="/contact">
