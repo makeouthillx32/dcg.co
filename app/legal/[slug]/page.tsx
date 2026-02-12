@@ -1,33 +1,38 @@
-// lib/landing/static-pages.server.ts
-import { createServerClient } from "@/utils/supabase/server";
+// app/legal/[slug]/page.tsx
+import { notFound } from "next/navigation";
+import { getPublishedStaticPageBySlug } from "@/lib/landing/static-pages.server";
 
-export type StaticPageRow = {
-  id: string;
-  slug: string;
-  title: string;
-  content: string;
-  content_format: "html" | "markdown";
-  meta_description: string | null;
-  is_published: boolean;
-  published_at: string | null;
-  version: number;
-};
+function renderContent(page: { content: string; content_format: "html" | "markdown" }) {
+  if (page.content_format === "html") {
+    return (
+      <div className="prose max-w-none" dangerouslySetInnerHTML={{ __html: page.content }} />
+    );
+  }
 
-function normalizeSlug(slug: string) {
-  return slug.replace(/^\/+/, "").trim();
+  return (
+    <div className="prose max-w-none">
+      {page.content.split("\n").map((line, i) =>
+        line.trim() ? (
+          <p key={i} className="mb-3">{line}</p>
+        ) : (
+          <div key={i} className="h-3" />
+        )
+      )}
+    </div>
+  );
 }
 
-export async function getPublishedStaticPageBySlug(slug: string) {
-  const supabase = await createServerClient();
+export default async function Page({ params }: { params: { slug: string } }) {
+  const page = await getPublishedStaticPageBySlug(params.slug);
+  if (!page) return notFound();
 
-  const { data, error } = await supabase
-    .from("static_pages")
-    .select("*")
-    .eq("slug", normalizeSlug(slug))
-    .eq("is_published", true)
-    .maybeSingle();
-
-  if (error) throw new Error(error.message);
-
-  return data as StaticPageRow | null;
+  return (
+    <section className="mx-auto w-full max-w-5xl px-4 py-12">
+      <h1 className="text-3xl font-semibold tracking-tight">{page.title}</h1>
+      {page.meta_description ? (
+        <p className="mt-3 text-muted-foreground">{page.meta_description}</p>
+      ) : null}
+      <div className="mt-8">{renderContent(page)}</div>
+    </section>
+  );
 }
