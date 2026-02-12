@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { createClient } from '@/utils/supabase/client';
 import { LoadingState } from './LoadingState';
 import { ErrorAlert } from './ErrorAlert';
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { createClient } from '@/utils/supabase/client';
 import { HeroSlideModal } from './HeroSlideModal';
 import { DeleteConfirmModal } from './DeleteConfirmModal';
 import { LoadingState } from './LoadingState';
