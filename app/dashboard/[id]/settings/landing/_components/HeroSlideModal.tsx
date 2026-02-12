@@ -1,12 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { createClient } from '@/utils/supabase/client';
-import { HeroSlideModal } from './HeroSlideModal';
-import { DeleteConfirmModal } from './DeleteConfirmModal';
-import { Plus, Eye, EyeOff, Edit2, Trash2, GripVertical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Upload, X, Image as ImageIcon } from 'lucide-react';
 
 type HeroSlide = {
   id: string;
@@ -25,369 +22,488 @@ type HeroSlide = {
   text_color: 'dark' | 'light';
   position: number;
   is_active: boolean;
-  blurhash: string | null;
-  width: number | null;
-  height: number | null;
-  created_at: string;
-  updated_at: string;
 };
 
-export function HeroCarouselManager() {
-  const [slides, setSlides] = useState<HeroSlide[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedSlide, setSelectedSlide] = useState<HeroSlide | null>(null);
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [draggedSlide, setDraggedSlide] = useState<HeroSlide | null>(null);
+type Props = {
+  mode: 'create' | 'edit';
+  slide?: HeroSlide;
+  onClose: () => void;
+  onSuccess: () => void;
+};
 
+const RECOMMENDED_WIDTH = 2880;
+const RECOMMENDED_HEIGHT = 1050;
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+
+export function HeroSlideModal({ mode, slide, onClose, onSuccess }: Props) {
+  const [formData, setFormData] = useState({
+    pill_text: slide?.pill_text || '',
+    headline_line1: slide?.headline_line1 || '',
+    headline_line2: slide?.headline_line2 || '',
+    subtext: slide?.subtext || '',
+    primary_button_label: slide?.primary_button_label || 'Shop Now',
+    primary_button_href: slide?.primary_button_href || '/shop',
+    secondary_button_label: slide?.secondary_button_label || '',
+    secondary_button_href: slide?.secondary_button_href || '',
+    alt_text: slide?.alt_text || '',
+    text_alignment: slide?.text_alignment || 'left' as const,
+    text_color: slide?.text_color || 'dark' as const,
+    is_active: slide?.is_active ?? true,
+  });
+
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const supabase = createClient();
 
-  useEffect(() => {
-    fetchSlides();
-  }, []);
+  function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-  async function fetchSlides() {
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      setError('Please select an image file');
+      return;
+    }
+
+    // Validate file size
+    if (file.size > MAX_FILE_SIZE) {
+      setError('Image must be smaller than 10MB');
+      return;
+    }
+
+    // Create preview
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        setImageDimensions({ width: img.width, height: img.height });
+
+        // Warn if dimensions don't match recommended size
+        if (img.width !== RECOMMENDED_WIDTH || img.height !== RECOMMENDED_HEIGHT) {
+          setError(
+            `⚠️ Recommended size is ${RECOMMENDED_WIDTH}×${RECOMMENDED_HEIGHT}px. Your image is ${img.width}×${img.height}px.`
+          );
+        } else {
+          setError(null);
+        }
+      };
+      img.src = e.target?.result as string;
+      setImagePreview(e.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+
+    setImageFile(file);
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setUploading(true);
+    setError(null);
+
     try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('hero_slides')
-        .select('*')
-        .order('position', { ascending: true });
+      let objectPath = slide?.object_path || '';
 
-      if (error) throw error;
-      setSlides(data || []);
+      // Upload new image if file was selected
+      if (imageFile) {
+        const fileExt = imageFile.name.split('.').pop();
+        const fileName = `slide-${Date.now()}.${fileExt}`;
+        const filePath = `slides/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('hero-images')
+          .upload(filePath, imageFile, {
+            cacheControl: '3600',
+            upsert: false,
+          });
+
+        if (uploadError) throw uploadError;
+        objectPath = filePath;
+
+        // If editing, delete old image
+        if (mode === 'edit' && slide?.object_path) {
+          await supabase.storage
+            .from('hero-images')
+            .remove([slide.object_path]);
+        }
+      } else if (mode === 'create') {
+        throw new Error('Please select an image');
+      }
+
+      // Prepare database payload
+      const payload = {
+        bucket_name: 'hero-images',
+        object_path: objectPath,
+        alt_text: formData.alt_text || null,
+        pill_text: formData.pill_text || null,
+        headline_line1: formData.headline_line1,
+        headline_line2: formData.headline_line2 || null,
+        subtext: formData.subtext || null,
+        primary_button_label: formData.primary_button_label,
+        primary_button_href: formData.primary_button_href,
+        secondary_button_label: formData.secondary_button_label || null,
+        secondary_button_href: formData.secondary_button_href || null,
+        text_alignment: formData.text_alignment,
+        text_color: formData.text_color,
+        is_active: formData.is_active,
+        width: imageDimensions?.width || null,
+        height: imageDimensions?.height || null,
+      };
+
+      if (mode === 'create') {
+        // Get max position
+        const { data: maxData } = await supabase
+          .from('hero_slides')
+          .select('position')
+          .order('position', { ascending: false })
+          .limit(1);
+
+        const { error: insertError } = await supabase
+          .from('hero_slides')
+          .insert({
+            ...payload,
+            position: (maxData?.[0]?.position ?? -1) + 1,
+          });
+
+        if (insertError) throw insertError;
+      } else {
+        const { error: updateError } = await supabase
+          .from('hero_slides')
+          .update(payload)
+          .eq('id', slide!.id);
+
+        if (updateError) throw updateError;
+      }
+
+      onSuccess();
     } catch (err: any) {
       setError(err.message);
     } finally {
-      setLoading(false);
+      setUploading(false);
     }
-  }
-
-  async function handleToggleActive(slide: HeroSlide) {
-    try {
-      const { error } = await supabase
-        .from('hero_slides')
-        .update({ is_active: !slide.is_active })
-        .eq('id', slide.id);
-
-      if (error) throw error;
-      await fetchSlides();
-    } catch (err: any) {
-      setError(err.message);
-    }
-  }
-
-  async function handleDelete() {
-    if (!selectedSlide) return;
-
-    try {
-      // Delete image from storage
-      const { error: storageError } = await supabase.storage
-        .from(selectedSlide.bucket_name)
-        .remove([selectedSlide.object_path]);
-
-      if (storageError) throw storageError;
-
-      // Delete database record
-      const { error: dbError } = await supabase
-        .from('hero_slides')
-        .delete()
-        .eq('id', selectedSlide.id);
-
-      if (dbError) throw dbError;
-
-      setIsDeleteModalOpen(false);
-      setSelectedSlide(null);
-      await fetchSlides();
-    } catch (err: any) {
-      setError(err.message);
-    }
-  }
-
-  async function handleReorder(newOrder: HeroSlide[]) {
-    try {
-      const updates = newOrder.map((slide, index) => ({
-        id: slide.id,
-        position: index,
-      }));
-
-      for (const update of updates) {
-        await supabase
-          .from('hero_slides')
-          .update({ position: update.position })
-          .eq('id', update.id);
-      }
-
-      await fetchSlides();
-    } catch (err: any) {
-      setError(err.message);
-    }
-  }
-
-  function handleDragStart(slide: HeroSlide) {
-    setDraggedSlide(slide);
-  }
-
-  function handleDragOver(e: React.DragEvent) {
-    e.preventDefault();
-  }
-
-  function handleDrop(targetSlide: HeroSlide) {
-    if (!draggedSlide || draggedSlide.id === targetSlide.id) return;
-
-    const newSlides = [...slides];
-    const draggedIndex = newSlides.findIndex(s => s.id === draggedSlide.id);
-    const targetIndex = newSlides.findIndex(s => s.id === targetSlide.id);
-
-    const [removed] = newSlides.splice(draggedIndex, 1);
-    newSlides.splice(targetIndex, 0, removed);
-
-    handleReorder(newSlides);
-    setDraggedSlide(null);
-  }
-
-  function getImageUrl(slide: HeroSlide): string {
-    const { data } = supabase.storage
-      .from(slide.bucket_name)
-      .getPublicUrl(slide.object_path);
-    return data.publicUrl;
-  }
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-[hsl(var(--primary))] border-t-transparent" />
-          <p className="text-sm text-[hsl(var(--muted-foreground))]">Loading slides...</p>
-        </div>
-      </div>
-    );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Action Bar */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Button onClick={() => setIsCreateModalOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add New Slide
-          </Button>
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center rounded-md bg-[hsl(var(--muted))] px-2.5 py-0.5 text-xs font-medium text-[hsl(var(--foreground))]">
-              {slides.length} total
-            </span>
-            <span className="inline-flex items-center rounded-md bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-700 dark:bg-green-500/10 dark:text-green-400">
-              {slides.filter(s => s.is_active).length} active
-            </span>
-          </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-y-auto" onClick={onClose}>
+      <div
+        className="relative w-full max-w-3xl rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--background))] shadow-lg my-8"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-[hsl(var(--border))] p-6">
+          <h2 className="text-xl font-semibold text-[hsl(var(--foreground))]">
+            {mode === 'create' ? 'Add New Hero Slide' : 'Edit Hero Slide'}
+          </h2>
+          <button
+            onClick={onClose}
+            className="rounded-md p-1 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))] transition-colors"
+          >
+            <X className="h-5 w-5" />
+          </button>
         </div>
-      </div>
 
-      {/* Error Alert */}
-      {error && (
-        <div className="rounded-lg border border-[hsl(var(--destructive))] bg-[hsl(var(--destructive))]/10 p-4">
-          <div className="flex items-start gap-3">
-            <svg className="h-5 w-5 flex-shrink-0 text-[hsl(var(--destructive))]" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
-            </svg>
-            <div className="flex-1">
-              <p className="text-sm font-medium text-[hsl(var(--destructive))]">{error}</p>
+        {/* Body */}
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          {/* Error Alert */}
+          {error && (
+            <div className={`rounded-lg border p-4 ${
+              error.startsWith('⚠️')
+                ? 'border-yellow-200 bg-yellow-50 dark:border-yellow-500/20 dark:bg-yellow-500/10'
+                : 'border-[hsl(var(--destructive))] bg-[hsl(var(--destructive))]/10'
+            }`}>
+              <p className={`text-sm ${
+                error.startsWith('⚠️')
+                  ? 'text-yellow-800 dark:text-yellow-200'
+                  : 'text-[hsl(var(--destructive))]'
+              }`}>
+                {error}
+              </p>
             </div>
-            <button
-              onClick={() => setError(null)}
-              className="flex-shrink-0 text-[hsl(var(--destructive))] hover:text-[hsl(var(--destructive))]/80"
-            >
-              <span className="sr-only">Dismiss</span>
-              <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
-              </svg>
-            </button>
-          </div>
-        </div>
-      )}
+          )}
 
-      {/* Slides Grid */}
-      {slides.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-16">
-            <svg className="h-16 w-16 text-[hsl(var(--muted-foreground))]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
-              <rect x="3" y="3" width="18" height="18" rx="2" />
-              <circle cx="8.5" cy="8.5" r="1.5" />
-              <path d="m21 15-5-5L5 21" />
-            </svg>
-            <h3 className="mt-4 text-lg font-semibold text-[hsl(var(--foreground))]">No hero slides yet</h3>
-            <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">
-              Create your first hero slide to get started with the carousel
+          {/* Image Upload */}
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-[hsl(var(--foreground))]">
+              Hero Image *
+            </label>
+            <p className="text-xs text-[hsl(var(--muted-foreground))]">
+              Recommended: {RECOMMENDED_WIDTH}×{RECOMMENDED_HEIGHT}px • Max 10MB
             </p>
-            <Button onClick={() => setIsCreateModalOpen(true)} className="mt-6">
-              <Plus className="mr-2 h-4 w-4" />
-              Add First Slide
-            </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {slides.map((slide) => (
-            <Card
-              key={slide.id}
-              className={`group relative overflow-hidden transition-all ${
-                !slide.is_active ? 'opacity-60' : ''
-              } ${draggedSlide?.id === slide.id ? 'ring-2 ring-[hsl(var(--primary))]' : ''}`}
-              draggable
-              onDragStart={() => handleDragStart(slide)}
-              onDragOver={handleDragOver}
-              onDrop={() => handleDrop(slide)}
-            >
-              {/* Drag Handle */}
-              <div className="absolute left-2 top-2 z-10 cursor-grab rounded-md bg-[hsl(var(--background))]/80 p-1.5 opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100">
-                <GripVertical className="h-4 w-4 text-[hsl(var(--muted-foreground))]" />
-              </div>
 
-              {/* Position Badge */}
-              <div className="absolute right-2 top-2 z-10 rounded-full bg-[hsl(var(--background))]/90 px-2.5 py-1 text-xs font-semibold text-[hsl(var(--foreground))] backdrop-blur-sm">
-                #{slide.position + 1}
-              </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleImageSelect}
+              className="hidden"
+            />
 
-              {/* Image Preview */}
-              <div className="relative aspect-[21/9] overflow-hidden">
-                <img
-                  src={getImageUrl(slide)}
-                  alt={slide.alt_text || ''}
-                  className="h-full w-full object-cover"
-                />
-                {!slide.is_active && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-                    <span className="rounded-full bg-[hsl(var(--background))] px-3 py-1 text-xs font-medium text-[hsl(var(--muted-foreground))]">
-                      Inactive
-                    </span>
+            {imagePreview ? (
+              <div className="relative aspect-[21/9] overflow-hidden rounded-lg border border-[hsl(var(--border))]">
+                <img src={imagePreview} alt="Preview" className="h-full w-full object-cover" />
+                <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 hover:opacity-100 transition-opacity">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Upload className="mr-2 h-4 w-4" />
+                    Change Image
+                  </Button>
+                </div>
+                {imageDimensions && (
+                  <div className="absolute bottom-2 right-2 rounded-md bg-black/70 px-2 py-1 text-xs text-white backdrop-blur-sm">
+                    {imageDimensions.width} × {imageDimensions.height}px
                   </div>
                 )}
               </div>
-
-              {/* Content */}
-              <CardContent className="p-4">
-                {slide.pill_text && (
-                  <span className="mb-2 inline-block rounded-full bg-[hsl(var(--primary))]/10 px-2.5 py-0.5 text-xs font-medium text-[hsl(var(--primary))]">
-                    {slide.pill_text}
-                  </span>
-                )}
-                <h3 className="line-clamp-1 font-semibold text-[hsl(var(--foreground))]">
-                  {slide.headline_line1}
-                </h3>
-                {slide.headline_line2 && (
-                  <h4 className="mt-1 line-clamp-1 text-sm text-[hsl(var(--muted-foreground))]">
-                    {slide.headline_line2}
-                  </h4>
-                )}
-                {slide.subtext && (
-                  <p className="mt-2 line-clamp-2 text-xs text-[hsl(var(--muted-foreground))]">
-                    {slide.subtext}
+            ) : (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="flex w-full flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-[hsl(var(--border))] bg-[hsl(var(--muted))]/30 p-12 transition-colors hover:bg-[hsl(var(--muted))]/50"
+              >
+                <ImageIcon className="h-12 w-12 text-[hsl(var(--muted-foreground))]" />
+                <div className="text-center">
+                  <p className="text-sm font-medium text-[hsl(var(--foreground))]">
+                    Click to upload image
                   </p>
-                )}
-
-                {/* Metadata */}
-                <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                  <span className="inline-flex items-center rounded-md bg-[hsl(var(--muted))] px-2 py-0.5 text-xs font-medium text-[hsl(var(--muted-foreground))]">
-                    {slide.text_alignment}
-                  </span>
-                  <span className="inline-flex items-center rounded-md bg-[hsl(var(--muted))] px-2 py-0.5 text-xs font-medium text-[hsl(var(--muted-foreground))]">
-                    {slide.text_color} text
-                  </span>
-                  {slide.width && slide.height && (
-                    <span className="inline-flex items-center rounded-md bg-[hsl(var(--muted))] px-2 py-0.5 text-xs font-medium text-[hsl(var(--muted-foreground))]">
-                      {slide.width}×{slide.height}
-                    </span>
-                  )}
+                  <p className="text-xs text-[hsl(var(--muted-foreground))]">
+                    PNG, JPG, WEBP up to 10MB
+                  </p>
                 </div>
+              </button>
+            )}
+          </div>
 
-                {/* Actions */}
-                <div className="mt-4 flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => handleToggleActive(slide)}
-                    title={slide.is_active ? 'Deactivate' : 'Activate'}
-                  >
-                    {slide.is_active ? (
-                      <Eye className="h-4 w-4" />
-                    ) : (
-                      <EyeOff className="h-4 w-4" />
-                    )}
-                  </Button>
+          {/* Text Overlay Section */}
+          <div className="space-y-4 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted))]/20 p-4">
+            <h3 className="font-semibold text-[hsl(var(--foreground))]">Text Overlay</h3>
 
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => {
-                      setSelectedSlide(slide);
-                      setIsEditModalOpen(true);
-                    }}
-                    title="Edit slide"
-                  >
-                    <Edit2 className="h-4 w-4" />
-                  </Button>
+            {/* Pill Text */}
+            <div className="space-y-2">
+              <label htmlFor="pill_text" className="block text-sm font-medium text-[hsl(var(--foreground))]">
+                Pill Text (Optional)
+              </label>
+              <input
+                id="pill_text"
+                type="text"
+                className="w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus:border-[hsl(var(--ring))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))]/20"
+                value={formData.pill_text}
+                onChange={(e) => setFormData({ ...formData, pill_text: e.target.value })}
+                placeholder="Desert Cowgirl • Western-inspired"
+              />
+            </div>
 
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => {
-                      setSelectedSlide(slide);
-                      setIsDeleteModalOpen(true);
-                    }}
-                    title="Delete slide"
-                    className="text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive))]/10 hover:text-[hsl(var(--destructive))]"
+            {/* Headline Line 1 */}
+            <div className="space-y-2">
+              <label htmlFor="headline_line1" className="block text-sm font-medium text-[hsl(var(--foreground))]">
+                Headline Line 1 *
+              </label>
+              <input
+                id="headline_line1"
+                type="text"
+                required
+                className="w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus:border-[hsl(var(--ring))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))]/20"
+                value={formData.headline_line1}
+                onChange={(e) => setFormData({ ...formData, headline_line1: e.target.value })}
+                placeholder="Where Desert Meets Style"
+              />
+            </div>
+
+            {/* Headline Line 2 */}
+            <div className="space-y-2">
+              <label htmlFor="headline_line2" className="block text-sm font-medium text-[hsl(var(--foreground))]">
+                Headline Line 2 (Optional)
+              </label>
+              <input
+                id="headline_line2"
+                type="text"
+                className="w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus:border-[hsl(var(--ring))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))]/20"
+                value={formData.headline_line2}
+                onChange={(e) => setFormData({ ...formData, headline_line2: e.target.value })}
+                placeholder="Authentic Western Fashion"
+              />
+            </div>
+
+            {/* Subtext */}
+            <div className="space-y-2">
+              <label htmlFor="subtext" className="block text-sm font-medium text-[hsl(var(--foreground))]">
+                Subtext (Optional)
+              </label>
+              <textarea
+                id="subtext"
+                rows={2}
+                className="w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus:border-[hsl(var(--ring))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))]/20"
+                value={formData.subtext}
+                onChange={(e) => setFormData({ ...formData, subtext: e.target.value })}
+                placeholder="Discover timeless pieces for the modern cowgirl"
+              />
+            </div>
+
+            {/* Alt Text */}
+            <div className="space-y-2">
+              <label htmlFor="alt_text" className="block text-sm font-medium text-[hsl(var(--foreground))]">
+                Alt Text (SEO)
+              </label>
+              <input
+                id="alt_text"
+                type="text"
+                className="w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus:border-[hsl(var(--ring))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))]/20"
+                value={formData.alt_text}
+                onChange={(e) => setFormData({ ...formData, alt_text: e.target.value })}
+                placeholder="Woman in western boots and denim"
+              />
+            </div>
+          </div>
+
+          {/* Text Styling */}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-[hsl(var(--foreground))]">
+                Text Alignment
+              </label>
+              <div className="flex gap-2">
+                {(['left', 'center', 'right'] as const).map((alignment) => (
+                  <label
+                    key={alignment}
+                    className="flex flex-1 cursor-pointer items-center justify-center rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm transition-colors hover:bg-[hsl(var(--muted))]/50 has-[:checked]:border-[hsl(var(--ring))] has-[:checked]:bg-[hsl(var(--primary))]/10 has-[:checked]:text-[hsl(var(--primary))]"
                   >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                    <input
+                      type="radio"
+                      name="text_alignment"
+                      value={alignment}
+                      checked={formData.text_alignment === alignment}
+                      onChange={(e) => setFormData({ ...formData, text_alignment: e.target.value as any })}
+                      className="sr-only"
+                    />
+                    <span className="capitalize">{alignment}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-[hsl(var(--foreground))]">
+                Text Color
+              </label>
+              <div className="flex gap-2">
+                {(['dark', 'light'] as const).map((color) => (
+                  <label
+                    key={color}
+                    className="flex flex-1 cursor-pointer items-center justify-center rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm transition-colors hover:bg-[hsl(var(--muted))]/50 has-[:checked]:border-[hsl(var(--ring))] has-[:checked]:bg-[hsl(var(--primary))]/10 has-[:checked]:text-[hsl(var(--primary))]"
+                  >
+                    <input
+                      type="radio"
+                      name="text_color"
+                      value={color}
+                      checked={formData.text_color === color}
+                      onChange={(e) => setFormData({ ...formData, text_color: e.target.value as any })}
+                      className="sr-only"
+                    />
+                    <span className="capitalize">{color}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Call-to-Action Buttons */}
+          <div className="space-y-4 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted))]/20 p-4">
+            <h3 className="font-semibold text-[hsl(var(--foreground))]">Call-to-Action Buttons</h3>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <label htmlFor="primary_button_label" className="block text-sm font-medium text-[hsl(var(--foreground))]">
+                  Primary Button Label *
+                </label>
+                <input
+                  id="primary_button_label"
+                  type="text"
+                  required
+                  className="w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm text-[hsl(var(--foreground))] focus:border-[hsl(var(--ring))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))]/20"
+                  value={formData.primary_button_label}
+                  onChange={(e) => setFormData({ ...formData, primary_button_label: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label htmlFor="primary_button_href" className="block text-sm font-medium text-[hsl(var(--foreground))]">
+                  Primary Button Link *
+                </label>
+                <input
+                  id="primary_button_href"
+                  type="text"
+                  required
+                  className="w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm text-[hsl(var(--foreground))] focus:border-[hsl(var(--ring))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))]/20"
+                  value={formData.primary_button_href}
+                  onChange={(e) => setFormData({ ...formData, primary_button_href: e.target.value })}
+                  placeholder="/shop"
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <label htmlFor="secondary_button_label" className="block text-sm font-medium text-[hsl(var(--foreground))]">
+                  Secondary Button Label (Optional)
+                </label>
+                <input
+                  id="secondary_button_label"
+                  type="text"
+                  className="w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm text-[hsl(var(--foreground))] focus:border-[hsl(var(--ring))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))]/20"
+                  value={formData.secondary_button_label}
+                  onChange={(e) => setFormData({ ...formData, secondary_button_label: e.target.value })}
+                  placeholder="New Releases"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label htmlFor="secondary_button_href" className="block text-sm font-medium text-[hsl(var(--foreground))]">
+                  Secondary Button Link
+                </label>
+                <input
+                  id="secondary_button_href"
+                  type="text"
+                  className="w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm text-[hsl(var(--foreground))] focus:border-[hsl(var(--ring))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))]/20"
+                  value={formData.secondary_button_href}
+                  onChange={(e) => setFormData({ ...formData, secondary_button_href: e.target.value })}
+                  placeholder="/collections/new-releases"
+                  disabled={!formData.secondary_button_label}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Status */}
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={formData.is_active}
+              onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+              className="h-4 w-4 rounded border-[hsl(var(--input))] text-[hsl(var(--primary))] focus:ring-2 focus:ring-[hsl(var(--ring))]/20"
+            />
+            <span className="text-sm font-medium text-[hsl(var(--foreground))]">
+              Active (visible in carousel)
+            </span>
+          </label>
+        </form>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-3 border-t border-[hsl(var(--border))] p-6">
+          <Button type="button" variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" onClick={handleSubmit} disabled={uploading}>
+            {uploading ? 'Uploading...' : mode === 'create' ? 'Create Slide' : 'Save Changes'}
+          </Button>
         </div>
-      )}
-
-      {/* Modals */}
-      {isCreateModalOpen && (
-        <HeroSlideModal
-          mode="create"
-          onClose={() => setIsCreateModalOpen(false)}
-          onSuccess={() => {
-            setIsCreateModalOpen(false);
-            fetchSlides();
-          }}
-        />
-      )}
-
-      {isEditModalOpen && selectedSlide && (
-        <HeroSlideModal
-          mode="edit"
-          slide={selectedSlide}
-          onClose={() => {
-            setIsEditModalOpen(false);
-            setSelectedSlide(null);
-          }}
-          onSuccess={() => {
-            setIsEditModalOpen(false);
-            setSelectedSlide(null);
-            fetchSlides();
-          }}
-        />
-      )}
-
-      {isDeleteModalOpen && selectedSlide && (
-        <DeleteConfirmModal
-          title="Delete Hero Slide"
-          message={`Are you sure you want to delete the slide "${selectedSlide.headline_line1}"? This action cannot be undone and will also delete the image from storage.`}
-          onConfirm={handleDelete}
-          onCancel={() => {
-            setIsDeleteModalOpen(false);
-            setSelectedSlide(null);
-          }}
-        />
-      )}
+      </div>
     </div>
   );
 }
