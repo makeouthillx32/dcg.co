@@ -13,14 +13,21 @@ export type StaticPageRow = {
   version: number;
 };
 
-function normalizeSlug(slug: string) {
-  // " /privacy-policy " -> "privacy-policy"
-  return slug.replace(/^\/+/, "").trim();
+function normalizeSlug(slug: unknown) {
+  if (typeof slug !== "string") return null;
+
+  const s = slug.trim();
+  if (!s) return null;
+
+  // "/privacy-policy" -> "privacy-policy"
+  return s.replace(/^\/+/, "");
 }
 
-export async function getPublishedStaticPageBySlug(slug: string) {
-  const supabase = await createServerClient();
+export async function getPublishedStaticPageBySlug(slug: unknown) {
   const normalized = normalizeSlug(slug);
+  if (!normalized) return null;
+
+  const supabase = await createServerClient();
 
   const { data, error } = await supabase
     .from("static_pages")
