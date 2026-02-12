@@ -1,7 +1,11 @@
 // app/pages/[slug]/page.tsx
 import { notFound } from 'next/navigation';
 import { Metadata } from 'next';
-import { getPublishedStaticPageBySlug, getAllPublishedStaticPages } from '@/lib/landing/static-pages.server';
+import { getPublishedStaticPageBySlug } from '@/lib/landing/static-pages.server';
+
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic';
+export const revalidate = 60; // Revalidate every 60 seconds
 
 type Props = {
   params: Promise<{ slug: string }>;
@@ -30,13 +34,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-// Generate static params for all published pages
-export async function generateStaticParams() {
-  const pages = await getAllPublishedStaticPages();
-  return pages.map((page) => ({
-    slug: page.slug,
-  }));
-}
+// Dynamic route - no static generation needed
+// Pages will be generated on-demand and cached
 
 // Render content based on format
 function renderContent(page: { content: string; content_format: 'html' | 'markdown' }) {
