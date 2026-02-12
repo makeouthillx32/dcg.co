@@ -2,77 +2,103 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { ChevronDown } from "lucide-react";
-
-// ✅ fallback to old dummy nav so UI always shows something
-import { navTree as fallbackNavTree } from "@/lib/navTree";
-
+import Link from "next/link";
+import type { NavNode as UnifiedNavNode } from "@/lib/navigation";
 import "./_components/Desktop.scss";
 
+// Simplified nav node for desktop rendering
 type NavNode = {
   key: string;
   label: string;
+  href: string;
+  routeType: "real" | "hash";
   children?: NavNode[];
 };
 
-interface DesktopNavProps {
-  navigateTo: (key: string) => (e?: React.MouseEvent) => void;
+/**
+ * Transform unified nav nodes to desktop-friendly format
+ * Only keep categories and collections
+ */
+function transformNavTree(nodes: UnifiedNavNode[]): NavNode[] {
+  return nodes
+    .filter((node) => {
+      // Only show categories and collections in desktop nav
+      return node.type === "category" || node.type === "collection";
+    })
+    .map((node) => ({
+      key: node.key,
+      label: node.label,
+      href: node.href,
+      routeType: node.routeType,
+      children: node.children
+        ? node.children
+            .filter((child) => child.type === "category" || child.type === "collection")
+            .map((child) => ({
+              key: child.key,
+              label: child.label,
+              href: child.href,
+              routeType: child.routeType,
+              // Include grandchildren for desktop mega menu
+              children: child.children
+                ? child.children
+                    .filter((gc) => gc.type === "category" || gc.type === "collection")
+                    .map((gc) => ({
+                      key: gc.key,
+                      label: gc.label,
+                      href: gc.href,
+                      routeType: gc.routeType,
+                    }))
+                : undefined,
+            }))
+        : undefined,
+    }));
 }
 
-function mapDbTreeToNavNodes(dbNodes: any[]): NavNode[] {
-  return (dbNodes ?? []).map((n: any) => ({
-    key: n.slug,
-    label: n.name,
-    children: (n.children ?? []).map((c: any) => ({
-      key: c.slug,
-      label: c.name,
-      children: (c.children ?? []).map((cc: any) => ({
-        key: cc.slug,
-        label: cc.name,
-      })),
-    })),
-  }));
-}
-
-export default function DesktopNav({ navigateTo }: DesktopNavProps) {
-  // ✅ start with fallback so it renders immediately
-  const [navTree, setNavTree] = useState<NavNode[]>(
-    (fallbackNavTree as any[]).map((n) => ({
-      key: n.key,
-      label: n.label,
-      children: n.children?.map((c: any) => ({ key: c.key, label: c.label })) ?? undefined,
-    }))
-  );
-
+export default function DesktopNav() {
+  const [navTree, setNavTree] = useState<NavNode[]>([]);
+  const [loading, setLoading] = useState(true);
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [hoverTimeout, setHoverTimeout] = useState<NodeJS.Timeout | null>(null);
 
   const navRefs = useRef<(HTMLElement | null)[]>([]);
   const dropdownRefs = useRef<(HTMLDivElement | null)[]>([]);
 
-  // ✅ Fetch DB-backed nav (and swap in if it works)
+  // Fetch navigation tree from API
   useEffect(() => {
     let cancelled = false;
 
     (async () => {
       try {
-        const res = await fetch("/api/nav", { cache: "no-store" });
+        const res = await fetch("/api/navigation/tree", {
+          cache: "no-store",
+          next: { revalidate: 300 }, // 5 minutes
+        });
 
         if (!res.ok) {
-          console.error("Nav fetch failed:", res.status);
+          console.error("Navigation fetch failed:", res.status);
+          setLoading(false);
           return;
         }
 
         const json = await res.json();
 
-        if (!json?.ok) {
-          console.error("Nav API returned error:", json?.error);
+        if (!json?.nodes) {
+          console.error("Invalid navigation response:", json);
+          setLoading(false);
           return;
         }
 
-        const mapped = mapDbTreeToNavNodes(json.data);
-        if (!cancelled && mapped.length) setNavTree(mapped);
+        const transformed = transformNavTree(json.nodes);
+
+        if (!cancelled) {
+          setNavTree(transformed);
+          setLoading(false);
+        }
       } catch (e) {
-        console.error("Nav fetch exception:", e);
+        console.error("Navigation fetch error:", e);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     })();
 
@@ -131,23 +157,20 @@ export default function DesktopNav({ navigateTo }: DesktopNavProps) {
     setHoverTimeout(timeout);
   };
 
-  const handleNavClick =
-    (key: string, hasChildren: boolean) => (e: React.MouseEvent) => {
-      if (hasChildren) {
-        e.preventDefault();
-        setOpenKey(openKey === key ? null : key);
-      } else {
-        navigateTo(key)(e);
-        setOpenKey(null);
-      }
-    };
+  const handleNavClick = (hasChildren: boolean) => (e: React.MouseEvent) => {
+    if (hasChildren) {
+      e.preventDefault();
+    } else {
+      // Link component will handle navigation
+      setOpenKey(null);
+    }
+  };
 
-  const handleSubmenuClick = (key: string) => (e: React.MouseEvent) => {
-    navigateTo(key)(e);
+  const handleSubmenuClick = () => {
     setOpenKey(null);
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent, index: number) => {
+  const handleKeyDown = (e: React.KeyboardEvent, index: number, key: string) => {
     const node = navTree[index];
     if (!node) return;
 
@@ -188,7 +211,7 @@ export default function DesktopNav({ navigateTo }: DesktopNavProps) {
       case " ":
         if (node.children?.length) {
           e.preventDefault();
-          setOpenKey(openKey === node.key ? null : node.key);
+          setOpenKey(openKey === key ? null : key);
         }
         break;
     }
@@ -199,6 +222,26 @@ export default function DesktopNav({ navigateTo }: DesktopNavProps) {
       if (hoverTimeout) clearTimeout(hoverTimeout);
     };
   }, [hoverTimeout]);
+
+  if (loading) {
+    return (
+      <nav className="nav-container" aria-label="Primary">
+        <div className="nav-menu">
+          <div className="text-sm text-muted-foreground">Loading...</div>
+        </div>
+      </nav>
+    );
+  }
+
+  if (navTree.length === 0) {
+    return (
+      <nav className="nav-container" aria-label="Primary">
+        <div className="nav-menu">
+          <div className="text-sm text-muted-foreground">No navigation available</div>
+        </div>
+      </nav>
+    );
+  }
 
   return (
     <nav className="nav-container" aria-label="Primary">
@@ -217,8 +260,8 @@ export default function DesktopNav({ navigateTo }: DesktopNavProps) {
                     navRefs.current[index] = el;
                   }}
                   className="nav-top-link text-foreground hover:text-primary bg-transparent border-none cursor-pointer transition-colors duration-200 px-4 py-2 rounded-md hover:bg-muted/50"
-                  onClick={handleNavClick(node.key, true)}
-                  onKeyDown={(e) => handleKeyDown(e, index)}
+                  onClick={handleNavClick(true)}
+                  onKeyDown={(e) => handleKeyDown(e, index, node.key)}
                   aria-expanded={openKey === node.key}
                   aria-haspopup="true"
                   tabIndex={0}
@@ -252,33 +295,63 @@ export default function DesktopNav({ navigateTo }: DesktopNavProps) {
                 >
                   <div className="p-2">
                     {node.children.map((child) => (
-                      <a
-                        key={child.key}
-                        href={`#${child.key}`}
-                        onClick={handleSubmenuClick(child.key)}
-                        className="nav-sub-link block text-popover-foreground hover:text-primary hover:bg-muted/50 no-underline px-3 py-2 rounded-sm transition-colors duration-150 text-sm"
-                        role="menuitem"
-                        tabIndex={openKey === node.key ? 0 : -1}
-                      >
-                        {child.label}
-                      </a>
+                      <React.Fragment key={child.key}>
+                        {child.routeType === "hash" ? (
+                          <a
+                            href={child.href}
+                            onClick={handleSubmenuClick}
+                            className="nav-sub-link block text-popover-foreground hover:text-primary hover:bg-muted/50 no-underline px-3 py-2 rounded-sm transition-colors duration-150 text-sm"
+                            role="menuitem"
+                            tabIndex={openKey === node.key ? 0 : -1}
+                          >
+                            {child.label}
+                          </a>
+                        ) : (
+                          <Link
+                            href={child.href}
+                            onClick={handleSubmenuClick}
+                            className="nav-sub-link block text-popover-foreground hover:text-primary hover:bg-muted/50 no-underline px-3 py-2 rounded-sm transition-colors duration-150 text-sm"
+                            role="menuitem"
+                            tabIndex={openKey === node.key ? 0 : -1}
+                          >
+                            {child.label}
+                          </Link>
+                        )}
+                      </React.Fragment>
                     ))}
                   </div>
                 </div>
               </>
             ) : (
-              <a
-                ref={(el) => {
-                  navRefs.current[index] = el;
-                }}
-                href={`#${node.key}`}
-                onClick={handleNavClick(node.key, false)}
-                className="nav-top-link text-foreground hover:text-primary no-underline transition-colors duration-200 px-4 py-2 rounded-md hover:bg-muted/50 inline-block"
-                onKeyDown={(e) => handleKeyDown(e, index)}
-                tabIndex={0}
-              >
-                {node.label}
-              </a>
+              <>
+                {node.routeType === "hash" ? (
+                  <a
+                    ref={(el) => {
+                      navRefs.current[index] = el;
+                    }}
+                    href={node.href}
+                    onClick={handleNavClick(false)}
+                    className="nav-top-link text-foreground hover:text-primary no-underline transition-colors duration-200 px-4 py-2 rounded-md hover:bg-muted/50 inline-block"
+                    onKeyDown={(e) => handleKeyDown(e, index, node.key)}
+                    tabIndex={0}
+                  >
+                    {node.label}
+                  </a>
+                ) : (
+                  <Link
+                    ref={(el) => {
+                      navRefs.current[index] = el;
+                    }}
+                    href={node.href}
+                    onClick={handleNavClick(false)}
+                    className="nav-top-link text-foreground hover:text-primary no-underline transition-colors duration-200 px-4 py-2 rounded-md hover:bg-muted/50 inline-block"
+                    onKeyDown={(e) => handleKeyDown(e, index, node.key)}
+                    tabIndex={0}
+                  >
+                    {node.label}
+                  </Link>
+                )}
+              </>
             )}
           </div>
         ))}

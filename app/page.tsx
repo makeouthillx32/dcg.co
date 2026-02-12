@@ -1,5 +1,5 @@
 // app/page.tsx
-import Home from "@/components/home/Home";
+import Home from "@/components/shop/Home";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
