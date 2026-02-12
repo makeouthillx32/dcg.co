@@ -33,33 +33,44 @@ export default function Footer() {
   const isOwnerOrAdmin = role === "owner" || role === "admin";
 
   const sections: FooterSection[] = useMemo(() => {
-    // ✅ Always visible (Shopify-ish baseline)
+    // ✅ Always visible baseline
     const base: FooterSection[] = [
       {
         title: "Shop",
         links: [
           { name: "New Releases", href: "/new-releases" },
           { name: "Restocks", href: "/restocks" },
-          { name: "Best Sellers", href: "#best-sellers" }, // Hash for pageTree
-          { name: "Gift Card", href: "#gift-card" }, // Hash for pageTree
+
+          // ✅ If these are sections on the landing page, keep them as landing anchors
+          // Use "/#..." so they work from ANY page (not just the homepage)
+          { name: "Best Sellers", href: "/#best-sellers" },
+          { name: "Gift Card", href: "/#gift-card" },
         ],
       },
       {
         title: "Customer Care",
         links: [
           { name: "Contact", href: "/contact" },
-          { name: "Shipping", href: "/shipping" },
-          { name: "Returns", href: "/returns" },
-          { name: "Size Guide", href: "/size-guide" },
+
+          // ✅ CMS-driven pages (Option B)
+          { name: "Shipping", href: "/pages/shipping" },
+          { name: "Returns", href: "/pages/returns" },
+          { name: "Size Guide", href: "/pages/size-guide" },
         ],
       },
       {
         title: "About",
         links: [
-          { name: "Our Story", href: "#about" }, // ✅ Hash navigation for pageTree
-          { name: "FAQs", href: "#faq" }, // ✅ Hash navigation for pageTree
-          { name: "Privacy Policy", href: "#privacy" }, // ✅ Hash navigation for pageTree
-          { name: "Terms", href: "#terms" }, // ✅ Hash navigation for pageTree
+          // ✅ CMS-driven pages (Option B)
+          { name: "Our Story", href: "/pages/about" },
+
+          // ✅ If FAQ is a section on landing, keep as "/#faq"
+          // If you move FAQ into CMS later, change to "/pages/faq"
+          { name: "FAQs", href: "/#faq" },
+
+          // ✅ Legal CMS pages (Option B)
+          { name: "Privacy Policy", href: "/legal/privacy" },
+          { name: "Terms", href: "/legal/terms" },
         ],
       },
     ];
@@ -83,7 +94,7 @@ export default function Footer() {
       {
         title: "Your Account",
         links: [
-          { name: "Account", href: "#account" }, // Hash for pageTree
+          { name: "Account", href: "/account" },
           { name: "Orders", href: "/account/orders" },
           { name: "Saved", href: "/account/saved" },
           { name: "Sign Out", href: "/auth/logout" },
@@ -132,7 +143,10 @@ export default function Footer() {
               </div>
             ) : (
               <div className="inline-flex w-fit items-center rounded-full border border-[var(--border)] px-3 py-1 text-xs text-[var(--muted-foreground)]">
-                New here? <Link className="ml-1 underline underline-offset-2" href="/sign-up">Join the Barn</Link>
+                New here?{" "}
+                <Link className="ml-1 underline underline-offset-2" href="/sign-up">
+                  Join the Barn
+                </Link>
               </div>
             )}
 
@@ -167,13 +181,7 @@ export default function Footer() {
                         <a href={link.href} target="_blank" rel="noopener noreferrer" className="hover:underline">
                           {link.name}
                         </a>
-                      ) : link.href.startsWith('#') ? (
-                        // ✅ Use regular <a> for hash navigation (pageTree)
-                        <a href={link.href} className="hover:underline">
-                          {link.name}
-                        </a>
                       ) : (
-                        // ✅ Use Next.js Link for real routes
                         <Link href={link.href} className="hover:underline">
                           {link.name}
                         </Link>
@@ -189,10 +197,15 @@ export default function Footer() {
         <div className="mt-12 flex flex-col gap-4 border-t border-[var(--border)] pt-8 text-xs text-[var(--muted-foreground)] md:flex-row md:items-center md:justify-between">
           <p>© {new Date().getFullYear()} Desert Cowgirl™. All rights reserved.</p>
           <div className="flex flex-wrap gap-x-6 gap-y-2">
-            {/* ✅ Hash navigation for footer legal links */}
-            <a className="hover:underline" href="#privacy">Privacy</a>
-            <a className="hover:underline" href="#terms">Terms</a>
-            <Link className="hover:underline" href="/contact">Contact</Link>
+            <Link className="hover:underline" href="/legal/privacy">
+              Privacy
+            </Link>
+            <Link className="hover:underline" href="/legal/terms">
+              Terms
+            </Link>
+            <Link className="hover:underline" href="/contact">
+              Contact
+            </Link>
           </div>
         </div>
       </div>
