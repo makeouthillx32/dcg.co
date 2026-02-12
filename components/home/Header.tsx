@@ -2,20 +2,14 @@
 
 import React, { useState, useEffect } from "react";
 import { Menu, X, User } from "lucide-react";
+import Link from "next/link";
 import { useTheme } from "@/app/provider";
 import SwitchtoDarkMode from "@/components/SwitchtoDarkMode";
 import useLoginSession from "@/lib/useLoginSession";
 import MobileDrawer from "@/components/home/MobileDrawer";
 import DesktopNav from "@/components/home/DesktopNav";
 
-interface HeaderProps {
-  theme: string;
-  mobileMenuOpen: boolean;
-  setMobileMenuOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  navigateTo: (key: string) => (e?: React.MouseEvent) => void;
-}
-
-const Header: React.FC<HeaderProps> = ({ navigateTo }) => {
+const Header: React.FC = () => {
   const session = useLoginSession();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { themeType } = useTheme();
@@ -26,7 +20,7 @@ const Header: React.FC<HeaderProps> = ({ navigateTo }) => {
 
   const closeMobileMenu = () => setMobileMenuOpen(false);
 
-  // Optional: prevent background scroll when drawer is open (mobile)
+  // Prevent background scroll when drawer is open (mobile)
   useEffect(() => {
     if (mobileMenuOpen) {
       document.body.style.overflow = "hidden";
@@ -35,38 +29,38 @@ const Header: React.FC<HeaderProps> = ({ navigateTo }) => {
       };
     }
   }, [mobileMenuOpen]);
-  // 🔒 Force-close mobile drawer when switching to desktop
-useEffect(() => {
-  if (typeof window === "undefined") return;
 
-  const mediaQuery = window.matchMedia("(min-width: 768px)");
+  // Force-close mobile drawer when switching to desktop
+  useEffect(() => {
+    if (typeof window === "undefined") return;
 
-  const handleResize = () => {
-    if (mediaQuery.matches) {
-      setMobileMenuOpen(false);
-      document.body.style.overflow = "";
-    }
-  };
+    const mediaQuery = window.matchMedia("(min-width: 768px)");
 
-  // Run once on mount (important if page loads wide)
-  handleResize();
+    const handleResize = () => {
+      if (mediaQuery.matches) {
+        setMobileMenuOpen(false);
+        document.body.style.overflow = "";
+      }
+    };
 
-  // Listen for breakpoint change
-  if (mediaQuery.addEventListener) {
-    mediaQuery.addEventListener("change", handleResize);
-  } else {
-    mediaQuery.addListener(handleResize); // Safari fallback
-  }
+    // Run once on mount (important if page loads wide)
+    handleResize();
 
-  return () => {
-    if (mediaQuery.removeEventListener) {
-      mediaQuery.removeEventListener("change", handleResize);
+    // Listen for breakpoint change
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener("change", handleResize);
     } else {
-      mediaQuery.removeListener(handleResize);
+      mediaQuery.addListener(handleResize); // Safari fallback
     }
-  };
-}, []);
 
+    return () => {
+      if (mediaQuery.removeEventListener) {
+        mediaQuery.removeEventListener("change", handleResize);
+      } else {
+        mediaQuery.removeListener(handleResize);
+      }
+    };
+  }, []);
 
   return (
     <div className="relative">
@@ -92,11 +86,7 @@ useEffect(() => {
 
           {/* CENTER: Logo */}
           <div className="header-logo">
-            <a
-              href="#"
-              onClick={navigateTo("home")}
-              className="logo-link focus:ring-primary"
-            >
+            <Link href="/" className="logo-link focus:ring-primary">
               <img
                 src={
                   themeType === "dark"
@@ -106,12 +96,12 @@ useEffect(() => {
                 alt="DART Logo"
                 className="logo-image"
               />
-            </a>
+            </Link>
           </div>
 
           {/* CENTER (Desktop): Desktop Nav */}
           <div className="header-nav">
-            <DesktopNav navigateTo={navigateTo} />
+            <DesktopNav />
           </div>
 
           {/* RIGHT: Auth + Theme */}
@@ -119,7 +109,7 @@ useEffect(() => {
             {/* Desktop Auth */}
             <div className="header-auth">
               {!session ? (
-                <a
+                <Link
                   href="/sign-in"
                   className="auth-button text-accent hover:text-accent focus:ring-accent"
                   aria-label="Sign in"
@@ -131,7 +121,7 @@ useEffect(() => {
                   <span className="hidden md:inline-flex items-center">
                     <User className="w-5 h-5" aria-hidden="true" />
                   </span>
-                </a>
+                </Link>
               ) : (
                 <button
                   onClick={handleAccountClick}
@@ -168,11 +158,7 @@ useEffect(() => {
           />
 
           <div className="mobile-drawer-shell" role="dialog" aria-modal="true">
-            <MobileDrawer
-              navigateTo={navigateTo}
-              session={session}
-              onClose={closeMobileMenu}
-            />
+            <MobileDrawer session={session} onClose={closeMobileMenu} />
           </div>
         </>
       )}
