@@ -1,7 +1,11 @@
 // app/legal/[slug]/page.tsx
 import { notFound } from 'next/navigation';
 import { Metadata } from 'next';
-import { getPublishedStaticPageBySlug, getAllPublishedStaticPages } from '@/lib/landing/static-pages.server';
+import { getPublishedStaticPageBySlug } from '@/lib/landing/static-pages.server';
+
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic';
+export const revalidate = 60; // Revalidate every 60 seconds
 
 type Props = {
   params: Promise<{ slug: string }>;
@@ -32,17 +36,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-// Generate static params for legal pages only
-export async function generateStaticParams() {
-  const pages = await getAllPublishedStaticPages();
-  
-  // Filter to only legal pages
-  const legalPages = pages.filter((page) => LEGAL_SLUGS.includes(page.slug));
-  
-  return legalPages.map((page) => ({
-    slug: page.slug,
-  }));
-}
+// Dynamic route - pages generated on-demand
+// Legal pages: privacy-policy, terms-and-conditions
 
 // Render content based on format
 function renderContent(page: { content: string; content_format: 'html' | 'markdown' }) {
