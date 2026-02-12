@@ -1,4 +1,8 @@
 
+// ================================================
+// ERROR ALERT
+// ================================================
+
 type ErrorAlertProps = {
   message: string;
   onClose: () => void;
@@ -6,23 +10,24 @@ type ErrorAlertProps = {
 
 export function ErrorAlert({ message, onClose }: ErrorAlertProps) {
   return (
-    <div className="alert alert--error">
-      <svg
-        width="20"
-        height="20"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-      >
-        <circle cx="12" cy="12" r="10" />
-        <line x1="12" y1="8" x2="12" y2="12" />
-        <line x1="12" y1="16" x2="12.01" y2="16" />
-      </svg>
-      <span>{message}</span>
-      <button onClick={onClose} className="alert__close">
-        ×
-      </button>
+    <div className="rounded-lg border border-[hsl(var(--destructive))] bg-[hsl(var(--destructive))]/10 p-4">
+      <div className="flex items-start gap-3">
+        <svg className="h-5 w-5 flex-shrink-0 text-[hsl(var(--destructive))]" viewBox="0 0 20 20" fill="currentColor">
+          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
+        </svg>
+        <div className="flex-1">
+          <p className="text-sm font-medium text-[hsl(var(--destructive))]">{message}</p>
+        </div>
+        <button
+          onClick={onClose}
+          className="flex-shrink-0 text-[hsl(var(--destructive))] hover:text-[hsl(var(--destructive))]/80 transition-colors"
+        >
+          <span className="sr-only">Dismiss</span>
+          <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+          </svg>
+        </button>
+      </div>
     </div>
   );
 }

@@ -1,7 +1,9 @@
-
 // ================================================
 // DELETE CONFIRM MODAL
 // ================================================
+
+import { Button } from '@/components/ui/button';
+import { AlertTriangle } from 'lucide-react';
 
 type DeleteConfirmModalProps = {
   title: string;
@@ -17,40 +19,40 @@ export function DeleteConfirmModal({
   onCancel,
 }: DeleteConfirmModalProps) {
   return (
-    <div className="modal-overlay" onClick={onCancel}>
-      <div className="modal modal--sm" onClick={(e) => e.stopPropagation()}>
-        <div className="modal__header">
-          <h2>{title}</h2>
-          <button className="modal__close" onClick={onCancel}>
-            ×
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onCancel}>
+      <div
+        className="relative w-full max-w-md rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--background))] shadow-lg"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-[hsl(var(--border))] p-6">
+          <h2 className="text-lg font-semibold text-[hsl(var(--foreground))]">{title}</h2>
+          <button
+            onClick={onCancel}
+            className="rounded-md p-1 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))] transition-colors"
+          >
+            <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+            </svg>
           </button>
         </div>
 
-        <div className="modal__body">
-          <div className="alert alert--warning">
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-              <line x1="12" y1="9" x2="12" y2="13" />
-              <line x1="12" y1="17" x2="12.01" y2="17" />
-            </svg>
-            <span>{message}</span>
+        {/* Body */}
+        <div className="p-6">
+          <div className="flex items-start gap-3 rounded-lg border border-yellow-200 bg-yellow-50 p-4 dark:border-yellow-500/20 dark:bg-yellow-500/10">
+            <AlertTriangle className="h-5 w-5 flex-shrink-0 text-yellow-600 dark:text-yellow-500" />
+            <p className="text-sm text-yellow-800 dark:text-yellow-200">{message}</p>
           </div>
         </div>
 
-        <div className="modal__footer">
-          <button className="btn btn--secondary" onClick={onCancel}>
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-3 border-t border-[hsl(var(--border))] p-6">
+          <Button variant="outline" onClick={onCancel}>
             Cancel
-          </button>
-          <button className="btn btn--danger" onClick={onConfirm}>
+          </Button>
+          <Button variant="destructive" onClick={onConfirm}>
             Delete
-          </button>
+          </Button>
         </div>
       </div>
     </div>

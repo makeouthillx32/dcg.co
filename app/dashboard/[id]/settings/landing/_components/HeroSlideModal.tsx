@@ -1,7 +1,12 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
+import { HeroSlideModal } from './HeroSlideModal';
+import { DeleteConfirmModal } from './DeleteConfirmModal';
+import { Plus, Eye, EyeOff, Edit2, Trash2, GripVertical } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 
 type HeroSlide = {
   id: string;
@@ -20,463 +25,369 @@ type HeroSlide = {
   text_color: 'dark' | 'light';
   position: number;
   is_active: boolean;
+  blurhash: string | null;
+  width: number | null;
+  height: number | null;
+  created_at: string;
+  updated_at: string;
 };
 
-type Props = {
-  mode: 'create' | 'edit';
-  slide?: HeroSlide;
-  onClose: () => void;
-  onSuccess: () => void;
-};
-
-const RECOMMENDED_WIDTH = 2880;
-const RECOMMENDED_HEIGHT = 1050;
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-
-export function HeroSlideModal({ mode, slide, onClose, onSuccess }: Props) {
-  const [formData, setFormData] = useState({
-    pill_text: slide?.pill_text || '',
-    headline_line1: slide?.headline_line1 || '',
-    headline_line2: slide?.headline_line2 || '',
-    subtext: slide?.subtext || '',
-    primary_button_label: slide?.primary_button_label || 'Shop Now',
-    primary_button_href: slide?.primary_button_href || '/shop',
-    secondary_button_label: slide?.secondary_button_label || '',
-    secondary_button_href: slide?.secondary_button_href || '',
-    alt_text: slide?.alt_text || '',
-    text_alignment: slide?.text_alignment || 'left' as const,
-    text_color: slide?.text_color || 'dark' as const,
-    is_active: slide?.is_active ?? true,
-  });
-
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(
-    slide ? null : null // We'll fetch the URL if editing
-  );
-  const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
-  const [uploading, setUploading] = useState(false);
+export function HeroCarouselManager() {
+  const [slides, setSlides] = useState<HeroSlide[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedSlide, setSelectedSlide] = useState<HeroSlide | null>(null);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [draggedSlide, setDraggedSlide] = useState<HeroSlide | null>(null);
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const supabase = createClient();
 
-  function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  useEffect(() => {
+    fetchSlides();
+  }, []);
 
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-      setError('Please select an image file');
-      return;
-    }
-
-    // Validate file size
-    if (file.size > MAX_FILE_SIZE) {
-      setError('Image must be smaller than 10MB');
-      return;
-    }
-
-    // Create preview
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onload = () => {
-        setImageDimensions({ width: img.width, height: img.height });
-
-        // Warn if dimensions don't match recommended size
-        if (img.width !== RECOMMENDED_WIDTH || img.height !== RECOMMENDED_HEIGHT) {
-          setError(
-            `⚠️ Recommended size is ${RECOMMENDED_WIDTH}×${RECOMMENDED_HEIGHT}px. Your image is ${img.width}×${img.height}px.`
-          );
-        } else {
-          setError(null);
-        }
-      };
-      img.src = e.target?.result as string;
-      setImagePreview(e.target?.result as string);
-    };
-    reader.readAsDataURL(file);
-
-    setImageFile(file);
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setUploading(true);
-    setError(null);
-
+  async function fetchSlides() {
     try {
-      let objectPath = slide?.object_path || '';
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('hero_slides')
+        .select('*')
+        .order('position', { ascending: true });
 
-      // Upload new image if file was selected
-      if (imageFile) {
-        const fileExt = imageFile.name.split('.').pop();
-        const fileName = `slide-${Date.now()}.${fileExt}`;
-        const filePath = `slides/${fileName}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from('hero-images')
-          .upload(filePath, imageFile, {
-            cacheControl: '3600',
-            upsert: false,
-          });
-
-        if (uploadError) throw uploadError;
-        objectPath = filePath;
-
-        // If editing, delete old image
-        if (mode === 'edit' && slide?.object_path) {
-          await supabase.storage
-            .from('hero-images')
-            .remove([slide.object_path]);
-        }
-      } else if (mode === 'create') {
-        throw new Error('Please select an image');
-      }
-
-      // Prepare database payload
-      const payload = {
-        bucket_name: 'hero-images',
-        object_path: objectPath,
-        alt_text: formData.alt_text || null,
-        pill_text: formData.pill_text || null,
-        headline_line1: formData.headline_line1,
-        headline_line2: formData.headline_line2 || null,
-        subtext: formData.subtext || null,
-        primary_button_label: formData.primary_button_label,
-        primary_button_href: formData.primary_button_href,
-        secondary_button_label: formData.secondary_button_label || null,
-        secondary_button_href: formData.secondary_button_href || null,
-        text_alignment: formData.text_alignment,
-        text_color: formData.text_color,
-        is_active: formData.is_active,
-        width: imageDimensions?.width || RECOMMENDED_WIDTH,
-        height: imageDimensions?.height || RECOMMENDED_HEIGHT,
-      };
-
-      if (mode === 'create') {
-        // Get next position
-        const { data: maxPos } = await supabase
-          .from('hero_slides')
-          .select('position')
-          .order('position', { ascending: false })
-          .limit(1)
-          .single();
-
-        const { error: insertError } = await supabase
-          .from('hero_slides')
-          .insert({
-            ...payload,
-            position: (maxPos?.position ?? -1) + 1,
-          });
-
-        if (insertError) throw insertError;
-      } else {
-        const { error: updateError } = await supabase
-          .from('hero_slides')
-          .update(payload)
-          .eq('id', slide!.id);
-
-        if (updateError) throw updateError;
-      }
-
-      onSuccess();
+      if (error) throw error;
+      setSlides(data || []);
     } catch (err: any) {
       setError(err.message);
     } finally {
-      setUploading(false);
+      setLoading(false);
     }
   }
 
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal modal--large" onClick={(e) => e.stopPropagation()}>
-        <div className="modal__header">
-          <h2>{mode === 'create' ? 'Add New Hero Slide' : 'Edit Hero Slide'}</h2>
-          <button className="modal__close" onClick={onClose}>×</button>
+  async function handleToggleActive(slide: HeroSlide) {
+    try {
+      const { error } = await supabase
+        .from('hero_slides')
+        .update({ is_active: !slide.is_active })
+        .eq('id', slide.id);
+
+      if (error) throw error;
+      await fetchSlides();
+    } catch (err: any) {
+      setError(err.message);
+    }
+  }
+
+  async function handleDelete() {
+    if (!selectedSlide) return;
+
+    try {
+      // Delete image from storage
+      const { error: storageError } = await supabase.storage
+        .from(selectedSlide.bucket_name)
+        .remove([selectedSlide.object_path]);
+
+      if (storageError) throw storageError;
+
+      // Delete database record
+      const { error: dbError } = await supabase
+        .from('hero_slides')
+        .delete()
+        .eq('id', selectedSlide.id);
+
+      if (dbError) throw dbError;
+
+      setIsDeleteModalOpen(false);
+      setSelectedSlide(null);
+      await fetchSlides();
+    } catch (err: any) {
+      setError(err.message);
+    }
+  }
+
+  async function handleReorder(newOrder: HeroSlide[]) {
+    try {
+      const updates = newOrder.map((slide, index) => ({
+        id: slide.id,
+        position: index,
+      }));
+
+      for (const update of updates) {
+        await supabase
+          .from('hero_slides')
+          .update({ position: update.position })
+          .eq('id', update.id);
+      }
+
+      await fetchSlides();
+    } catch (err: any) {
+      setError(err.message);
+    }
+  }
+
+  function handleDragStart(slide: HeroSlide) {
+    setDraggedSlide(slide);
+  }
+
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault();
+  }
+
+  function handleDrop(targetSlide: HeroSlide) {
+    if (!draggedSlide || draggedSlide.id === targetSlide.id) return;
+
+    const newSlides = [...slides];
+    const draggedIndex = newSlides.findIndex(s => s.id === draggedSlide.id);
+    const targetIndex = newSlides.findIndex(s => s.id === targetSlide.id);
+
+    const [removed] = newSlides.splice(draggedIndex, 1);
+    newSlides.splice(targetIndex, 0, removed);
+
+    handleReorder(newSlides);
+    setDraggedSlide(null);
+  }
+
+  function getImageUrl(slide: HeroSlide): string {
+    const { data } = supabase.storage
+      .from(slide.bucket_name)
+      .getPublicUrl(slide.object_path);
+    return data.publicUrl;
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-[hsl(var(--primary))] border-t-transparent" />
+          <p className="text-sm text-[hsl(var(--muted-foreground))]">Loading slides...</p>
         </div>
+      </div>
+    );
+  }
 
-        <form onSubmit={handleSubmit} className="modal__body">
-          {error && (
-            <div className={`alert ${error.startsWith('⚠️') ? 'alert--warning' : 'alert--error'}`}>
-              {error}
+  return (
+    <div className="space-y-6">
+      {/* Action Bar */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Button onClick={() => setIsCreateModalOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add New Slide
+          </Button>
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center rounded-md bg-[hsl(var(--muted))] px-2.5 py-0.5 text-xs font-medium text-[hsl(var(--foreground))]">
+              {slides.length} total
+            </span>
+            <span className="inline-flex items-center rounded-md bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-700 dark:bg-green-500/10 dark:text-green-400">
+              {slides.filter(s => s.is_active).length} active
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Error Alert */}
+      {error && (
+        <div className="rounded-lg border border-[hsl(var(--destructive))] bg-[hsl(var(--destructive))]/10 p-4">
+          <div className="flex items-start gap-3">
+            <svg className="h-5 w-5 flex-shrink-0 text-[hsl(var(--destructive))]" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
+            </svg>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-[hsl(var(--destructive))]">{error}</p>
             </div>
-          )}
+            <button
+              onClick={() => setError(null)}
+              className="flex-shrink-0 text-[hsl(var(--destructive))] hover:text-[hsl(var(--destructive))]/80"
+            >
+              <span className="sr-only">Dismiss</span>
+              <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
 
-          {/* Image Upload */}
-          <div className="form-group">
-            <label className="form-label">
-              Hero Image *
-              <span className="form-hint">
-                Recommended: {RECOMMENDED_WIDTH}×{RECOMMENDED_HEIGHT}px (2880×1050px) • Max 10MB
-              </span>
-            </label>
+      {/* Slides Grid */}
+      {slides.length === 0 ? (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-16">
+            <svg className="h-16 w-16 text-[hsl(var(--muted-foreground))]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <circle cx="8.5" cy="8.5" r="1.5" />
+              <path d="m21 15-5-5L5 21" />
+            </svg>
+            <h3 className="mt-4 text-lg font-semibold text-[hsl(var(--foreground))]">No hero slides yet</h3>
+            <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">
+              Create your first hero slide to get started with the carousel
+            </p>
+            <Button onClick={() => setIsCreateModalOpen(true)} className="mt-6">
+              <Plus className="mr-2 h-4 w-4" />
+              Add First Slide
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {slides.map((slide) => (
+            <Card
+              key={slide.id}
+              className={`group relative overflow-hidden transition-all ${
+                !slide.is_active ? 'opacity-60' : ''
+              } ${draggedSlide?.id === slide.id ? 'ring-2 ring-[hsl(var(--primary))]' : ''}`}
+              draggable
+              onDragStart={() => handleDragStart(slide)}
+              onDragOver={handleDragOver}
+              onDrop={() => handleDrop(slide)}
+            >
+              {/* Drag Handle */}
+              <div className="absolute left-2 top-2 z-10 cursor-grab rounded-md bg-[hsl(var(--background))]/80 p-1.5 opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100">
+                <GripVertical className="h-4 w-4 text-[hsl(var(--muted-foreground))]" />
+              </div>
 
-            <div className="image-uploader">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleImageSelect}
-                className="image-uploader__input"
-              />
+              {/* Position Badge */}
+              <div className="absolute right-2 top-2 z-10 rounded-full bg-[hsl(var(--background))]/90 px-2.5 py-1 text-xs font-semibold text-[hsl(var(--foreground))] backdrop-blur-sm">
+                #{slide.position + 1}
+              </div>
 
-              {imagePreview ? (
-                <div className="image-uploader__preview">
-                  <img src={imagePreview} alt="Preview" />
-                  <div className="image-uploader__overlay">
-                    <button
-                      type="button"
-                      className="btn btn--secondary btn--sm"
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      Change Image
-                    </button>
+              {/* Image Preview */}
+              <div className="relative aspect-[21/9] overflow-hidden">
+                <img
+                  src={getImageUrl(slide)}
+                  alt={slide.alt_text || ''}
+                  className="h-full w-full object-cover"
+                />
+                {!slide.is_active && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                    <span className="rounded-full bg-[hsl(var(--background))] px-3 py-1 text-xs font-medium text-[hsl(var(--muted-foreground))]">
+                      Inactive
+                    </span>
                   </div>
-                  {imageDimensions && (
-                    <div className="image-uploader__dimensions">
-                      {imageDimensions.width} × {imageDimensions.height}px
-                    </div>
+                )}
+              </div>
+
+              {/* Content */}
+              <CardContent className="p-4">
+                {slide.pill_text && (
+                  <span className="mb-2 inline-block rounded-full bg-[hsl(var(--primary))]/10 px-2.5 py-0.5 text-xs font-medium text-[hsl(var(--primary))]">
+                    {slide.pill_text}
+                  </span>
+                )}
+                <h3 className="line-clamp-1 font-semibold text-[hsl(var(--foreground))]">
+                  {slide.headline_line1}
+                </h3>
+                {slide.headline_line2 && (
+                  <h4 className="mt-1 line-clamp-1 text-sm text-[hsl(var(--muted-foreground))]">
+                    {slide.headline_line2}
+                  </h4>
+                )}
+                {slide.subtext && (
+                  <p className="mt-2 line-clamp-2 text-xs text-[hsl(var(--muted-foreground))]">
+                    {slide.subtext}
+                  </p>
+                )}
+
+                {/* Metadata */}
+                <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                  <span className="inline-flex items-center rounded-md bg-[hsl(var(--muted))] px-2 py-0.5 text-xs font-medium text-[hsl(var(--muted-foreground))]">
+                    {slide.text_alignment}
+                  </span>
+                  <span className="inline-flex items-center rounded-md bg-[hsl(var(--muted))] px-2 py-0.5 text-xs font-medium text-[hsl(var(--muted-foreground))]">
+                    {slide.text_color} text
+                  </span>
+                  {slide.width && slide.height && (
+                    <span className="inline-flex items-center rounded-md bg-[hsl(var(--muted))] px-2 py-0.5 text-xs font-medium text-[hsl(var(--muted-foreground))]">
+                      {slide.width}×{slide.height}
+                    </span>
                   )}
                 </div>
-              ) : (
-                <button
-                  type="button"
-                  className="image-uploader__placeholder"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                    <circle cx="8.5" cy="8.5" r="1.5" />
-                    <polyline points="21 15 16 10 5 21" />
-                  </svg>
-                  <span>Click to upload hero image</span>
-                  <span className="image-uploader__hint">PNG, JPG, WebP • 2880×1050px recommended</span>
-                </button>
-              )}
-            </div>
-          </div>
 
-          {/* Alt Text */}
-          <div className="form-group">
-            <label className="form-label" htmlFor="alt_text">
-              Alt Text
-              <span className="form-hint">Accessibility description of the image</span>
-            </label>
-            <input
-              id="alt_text"
-              type="text"
-              className="form-input"
-              value={formData.alt_text}
-              onChange={(e) => setFormData({ ...formData, alt_text: e.target.value })}
-              placeholder="e.g., Western boots on desert sand"
-            />
-          </div>
+                {/* Actions */}
+                <div className="mt-4 flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => handleToggleActive(slide)}
+                    title={slide.is_active ? 'Deactivate' : 'Activate'}
+                  >
+                    {slide.is_active ? (
+                      <Eye className="h-4 w-4" />
+                    ) : (
+                      <EyeOff className="h-4 w-4" />
+                    )}
+                  </Button>
 
-          {/* Text Content Section */}
-          <div className="form-section">
-            <h3 className="form-section__title">Text Overlay</h3>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => {
+                      setSelectedSlide(slide);
+                      setIsEditModalOpen(true);
+                    }}
+                    title="Edit slide"
+                  >
+                    <Edit2 className="h-4 w-4" />
+                  </Button>
 
-            <div className="form-group">
-              <label className="form-label" htmlFor="pill_text">
-                Pill Text (Optional)
-                <span className="form-hint">Small eyebrow text above headline</span>
-              </label>
-              <input
-                id="pill_text"
-                type="text"
-                className="form-input"
-                value={formData.pill_text}
-                onChange={(e) => setFormData({ ...formData, pill_text: e.target.value })}
-                placeholder="e.g., Desert Cowgirl • Western-inspired"
-              />
-            </div>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => {
+                      setSelectedSlide(slide);
+                      setIsDeleteModalOpen(true);
+                    }}
+                    title="Delete slide"
+                    className="text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive))]/10 hover:text-[hsl(var(--destructive))]"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
-            <div className="form-group">
-              <label className="form-label" htmlFor="headline_line1">
-                Headline Line 1 *
-              </label>
-              <input
-                id="headline_line1"
-                type="text"
-                className="form-input"
-                value={formData.headline_line1}
-                onChange={(e) => setFormData({ ...formData, headline_line1: e.target.value })}
-                placeholder="e.g., Wear the desert."
-                required
-              />
-            </div>
+      {/* Modals */}
+      {isCreateModalOpen && (
+        <HeroSlideModal
+          mode="create"
+          onClose={() => setIsCreateModalOpen(false)}
+          onSuccess={() => {
+            setIsCreateModalOpen(false);
+            fetchSlides();
+          }}
+        />
+      )}
 
-            <div className="form-group">
-              <label className="form-label" htmlFor="headline_line2">
-                Headline Line 2 (Optional)
-              </label>
-              <input
-                id="headline_line2"
-                type="text"
-                className="form-input"
-                value={formData.headline_line2}
-                onChange={(e) => setFormData({ ...formData, headline_line2: e.target.value })}
-                placeholder="e.g., Keep it classic."
-              />
-            </div>
+      {isEditModalOpen && selectedSlide && (
+        <HeroSlideModal
+          mode="edit"
+          slide={selectedSlide}
+          onClose={() => {
+            setIsEditModalOpen(false);
+            setSelectedSlide(null);
+          }}
+          onSuccess={() => {
+            setIsEditModalOpen(false);
+            setSelectedSlide(null);
+            fetchSlides();
+          }}
+        />
+      )}
 
-            <div className="form-group">
-              <label className="form-label" htmlFor="subtext">
-                Subtext (Optional)
-              </label>
-              <textarea
-                id="subtext"
-                className="form-textarea"
-                rows={2}
-                value={formData.subtext}
-                onChange={(e) => setFormData({ ...formData, subtext: e.target.value })}
-                placeholder="e.g., Curated Western-inspired pieces for modern living"
-              />
-            </div>
-          </div>
-
-          {/* Text Styling */}
-          <div className="form-row">
-            <div className="form-group">
-              <label className="form-label">Text Alignment</label>
-              <div className="radio-group">
-                {(['left', 'center', 'right'] as const).map((alignment) => (
-                  <label key={alignment} className="radio-label">
-                    <input
-                      type="radio"
-                      name="text_alignment"
-                      value={alignment}
-                      checked={formData.text_alignment === alignment}
-                      onChange={(e) =>
-                        setFormData({ ...formData, text_alignment: e.target.value as any })
-                      }
-                    />
-                    <span className="radio-label__text">{alignment}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Text Color</label>
-              <div className="radio-group">
-                {(['dark', 'light'] as const).map((color) => (
-                  <label key={color} className="radio-label">
-                    <input
-                      type="radio"
-                      name="text_color"
-                      value={color}
-                      checked={formData.text_color === color}
-                      onChange={(e) =>
-                        setFormData({ ...formData, text_color: e.target.value as any })
-                      }
-                    />
-                    <span className="radio-label__text">{color}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Call-to-Action Buttons */}
-          <div className="form-section">
-            <h3 className="form-section__title">Call-to-Action Buttons</h3>
-
-            <div className="form-row">
-              <div className="form-group">
-                <label className="form-label" htmlFor="primary_button_label">
-                  Primary Button Label *
-                </label>
-                <input
-                  id="primary_button_label"
-                  type="text"
-                  className="form-input"
-                  value={formData.primary_button_label}
-                  onChange={(e) =>
-                    setFormData({ ...formData, primary_button_label: e.target.value })
-                  }
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label" htmlFor="primary_button_href">
-                  Primary Button Link *
-                </label>
-                <input
-                  id="primary_button_href"
-                  type="text"
-                  className="form-input"
-                  value={formData.primary_button_href}
-                  onChange={(e) =>
-                    setFormData({ ...formData, primary_button_href: e.target.value })
-                  }
-                  placeholder="/shop"
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="form-row">
-              <div className="form-group">
-                <label className="form-label" htmlFor="secondary_button_label">
-                  Secondary Button Label (Optional)
-                </label>
-                <input
-                  id="secondary_button_label"
-                  type="text"
-                  className="form-input"
-                  value={formData.secondary_button_label}
-                  onChange={(e) =>
-                    setFormData({ ...formData, secondary_button_label: e.target.value })
-                  }
-                  placeholder="New Releases"
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label" htmlFor="secondary_button_href">
-                  Secondary Button Link
-                </label>
-                <input
-                  id="secondary_button_href"
-                  type="text"
-                  className="form-input"
-                  value={formData.secondary_button_href}
-                  onChange={(e) =>
-                    setFormData({ ...formData, secondary_button_href: e.target.value })
-                  }
-                  placeholder="/collections/new-releases"
-                  disabled={!formData.secondary_button_label}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Status */}
-          <div className="form-group">
-            <label className="checkbox-label">
-              <input
-                type="checkbox"
-                checked={formData.is_active}
-                onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-              />
-              <span>Active (visible in carousel)</span>
-            </label>
-          </div>
-
-          {/* Actions */}
-          <div className="modal__footer">
-            <button type="button" className="btn btn--secondary" onClick={onClose}>
-              Cancel
-            </button>
-            <button type="submit" className="btn btn--primary" disabled={uploading}>
-              {uploading ? 'Uploading...' : mode === 'create' ? 'Create Slide' : 'Save Changes'}
-            </button>
-          </div>
-        </form>
-      </div>
+      {isDeleteModalOpen && selectedSlide && (
+        <DeleteConfirmModal
+          title="Delete Hero Slide"
+          message={`Are you sure you want to delete the slide "${selectedSlide.headline_line1}"? This action cannot be undone and will also delete the image from storage.`}
+          onConfirm={handleDelete}
+          onCancel={() => {
+            setIsDeleteModalOpen(false);
+            setSelectedSlide(null);
+          }}
+        />
+      )}
     </div>
   );
 }
