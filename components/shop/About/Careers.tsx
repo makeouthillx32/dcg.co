@@ -2,7 +2,7 @@
 
 import React from "react";
 import "@/app/globals.css";
-import AnchorSection from "@/components/home/_components/AnchorSection";  // ← import
+import AnchorSection from "@/components/shop/_components/AnchorSection";  // ← import
 
 interface CareersPageProps {
   navigateTo: (key: string) => (e?: React.MouseEvent) => void;

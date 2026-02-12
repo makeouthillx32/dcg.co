@@ -2,11 +2,11 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import Header from "@/components/home/Header";
-import SectionPanel from "@/components/home/SectionPanel";
-import BackButton from "@/components/home/_components/BackButton";
-import AnchorSection from "@/components/home/_components/AnchorSection";
-import { pageTree, sectionId } from "@/components/home/_components/pageTree";
+import Header from "@/components/shop/Header";
+import SectionPanel from "@/components/shop/SectionPanel";
+import BackButton from "@/components/shop/_components/BackButton";
+import AnchorSection from "@/components/shop/_components/AnchorSection";
+import { pageTree, sectionId } from "@/components/shop/_components/pageTree";
 import Footer from "@/components/footer"; // Updated import
 import useThemeCookie from "@/lib/useThemeCookie";
 

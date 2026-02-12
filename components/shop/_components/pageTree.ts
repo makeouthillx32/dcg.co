@@ -2,10 +2,10 @@
 // NOTE: Keep SAME export names + structure.
 // We’re stripping this down to only components that exist right now.
 
-import HomePage from "@/components/home/Landing";
-import AboutUsPage from "@/components/home/AboutUs";
-import TermsPage from "@/components/home/TermsPage";
-import PrivacyPolicy from "@/components/home/PrivacyPolicy";
+import HomePage from "@/components/shop/Landing";
+import AboutUsPage from "@/components/shop/AboutUs";
+import TermsPage from "@/components/shop/TermsPage";
+import PrivacyPolicy from "@/components/shop/PrivacyPolicy";
 
 export interface PageConfig {
   Component: React.FC<any>;

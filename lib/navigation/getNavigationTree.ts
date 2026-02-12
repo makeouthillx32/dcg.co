@@ -16,10 +16,10 @@ import type {
 } from "./types";
 
 // Import static page components
-import HomePage from "@/components/home/Landing";
-import AboutUsPage from "@/components/home/AboutUs";
-import TermsPage from "@/components/home/TermsPage";
-import PrivacyPolicy from "@/components/home/PrivacyPolicy";
+import HomePage from "@/components/shop/Landing";
+import AboutUsPage from "@/components/shop/AboutUs";
+import TermsPage from "@/components/shop/TermsPage";
+import PrivacyPolicy from "@/components/shop/PrivacyPolicy";
 
 /**
  * Static pages configuration

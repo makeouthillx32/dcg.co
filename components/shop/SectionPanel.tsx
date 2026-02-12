@@ -1,5 +1,5 @@
 import React, { ReactNode } from 'react';
-import styles from "@/components/home/_components/IntroBar.module.scss"; 
+import styles from "@/components/shop/_components/IntroBar.module.scss"; 
 
 interface SectionPanelProps {
   currentPage: string;

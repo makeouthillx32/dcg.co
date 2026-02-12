@@ -4,7 +4,7 @@
 import React from "react";
 import Image from "next/image";
 import "@/app/globals.css";
-import AnchorSection from "@/components/home/_components/AnchorSection";
+import AnchorSection from "@/components/shop/_components/AnchorSection";
 
 interface ProgramsAndServicesProps {
   /** navigateTo expects a key string and returns a click handler */

@@ -6,8 +6,8 @@ import Link from "next/link";
 import { useTheme } from "@/app/provider";
 import SwitchtoDarkMode from "@/components/SwitchtoDarkMode";
 import useLoginSession from "@/lib/useLoginSession";
-import MobileDrawer from "@/components/home/MobileDrawer";
-import DesktopNav from "@/components/home/DesktopNav";
+import MobileDrawer from "@/components/shop/MobileDrawer";
+import DesktopNav from "@/components/shop/DesktopNav";
 
 const Header: React.FC = () => {
   const session = useLoginSession();
