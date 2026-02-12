@@ -9,7 +9,7 @@ import ChatHeader from './_components/ChatHeader';
 import ChatMessages from './_components/ChatMessages';
 import MessageInput from './_components/MessageInput';
 import ChatRightSidebar from './_components/ChatRightSidebar';
-import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb';
+import Breadcrumb from '@/components/Breadcrumbs/dashboard';
 import LoadingSVG from '@/app/_components/_events/loading-page';
 import { useRealtimeInsert } from '@/hooks/useRealtimeInsert';
 import { useMessages } from '@/hooks/useMessages';

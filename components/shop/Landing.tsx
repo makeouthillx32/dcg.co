@@ -1,9 +1,9 @@
 // components/home/Landing.tsx
 "use client";
 
-import { TopBanner } from "@/components/shop/_components/landing/TopBanner";
-import { useLandingData } from "@/components/shop/_components/landing/useLandingData";
-import { LandingProductCard } from "@/components/shop/_components/landing/ProductCard";
+import { TopBanner } from "@/components/shop/_components/TopBanner";
+import { useLandingData } from "@/components/shop/_components/useLandingData";
+import { LandingProductCard } from "@/components/shop/_components/ProductCard";
 import Link from "next/link";
 import Image from "next/image";
 

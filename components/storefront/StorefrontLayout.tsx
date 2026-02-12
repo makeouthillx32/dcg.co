@@ -1,7 +1,7 @@
 // components/storefront/StorefrontLayout.tsx
 "use client";
 
-import Header from "@/components/shop/Header";
+import Header from "@/components/Layouts/shop/Header";
 import Footer from "@/components/footer";
 import { useState } from "react";
 

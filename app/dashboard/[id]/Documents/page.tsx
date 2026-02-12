@@ -2,7 +2,7 @@
 'use client';
 
 import React, { Suspense } from 'react';
-import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
+import Breadcrumb from "@/components/Breadcrumbs/dashboard";
 import Documents from '@/components/documents';
 import { DocumentsSkeleton } from '@/components/documents/skeleton'; // Fixed: Added 's' to DocumentsSkeleton
 import DocumentsErrorBoundary from '@/components/documents/DocumentsErrorBoundary';

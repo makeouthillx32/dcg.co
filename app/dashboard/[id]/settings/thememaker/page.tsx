@@ -5,7 +5,7 @@
 import React, { useState, useEffect } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { Eye, ArrowLeft } from 'lucide-react';
-import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
+import Breadcrumb from "@/components/Breadcrumbs/dashboard";
 
 // Import components - Fixed to match your actual file names
 import { ThemeHeader } from './_components/Header';

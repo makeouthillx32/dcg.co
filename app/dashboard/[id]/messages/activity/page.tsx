@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
-import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
+import Breadcrumb from "@/components/Breadcrumbs/dashboard";
 import Last4Weeks from "./_components/last_4weeks";
 import Last7d from "./_components/last_7d";
 import Last24h from "./_components/last_24hrs";

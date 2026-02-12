@@ -1,7 +1,7 @@
 "use client";
 
 import React from 'react';
-import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
+import Breadcrumb from "@/components/Breadcrumbs/dashboard";
 
 export const ThemeCreatorSkeleton = () => {
   return (

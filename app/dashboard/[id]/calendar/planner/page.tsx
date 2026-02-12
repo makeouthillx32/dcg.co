@@ -1,4 +1,4 @@
-import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
+import Breadcrumb from "@/components/Breadcrumbs/dashboard";
 import CalendarBox from "@/components/CalenderBox";
 import { Metadata } from "next";
 

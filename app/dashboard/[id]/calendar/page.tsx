@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb';
+import Breadcrumb from '@/components/Breadcrumbs/dashboard';
 import EventModal from './_components/EventModal';
 import CoachHoursModal from './_components/CoachHoursModal';
 import CalendarHeader from './_components/CalendarHeader';

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
+import Breadcrumb from "@/components/Breadcrumbs/dashboard";
 import { PersonalInfoForm } from "./_components/personal-info";
 import { UploadPhotoForm } from "./_components/upload-photo";
 import ManualRoleEditor from "@/components/profile/ManualRoleEditor";
