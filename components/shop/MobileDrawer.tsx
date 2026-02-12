@@ -5,6 +5,7 @@ import { MdExpandMore, MdChevronRight, MdArrowForwardIos } from "react-icons/md"
 import { X } from "lucide-react";
 import Link from "next/link";
 import type { NavNode as UnifiedNavNode } from "@/lib/navigation";
+import "./_components/Mobile.scss";
 
 // Simplified nav node for mobile rendering
 type NavNode = {
