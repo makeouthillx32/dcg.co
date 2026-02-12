@@ -5,7 +5,7 @@ import { cva, VariantProps } from "class-variance-authority";
 import { PanelLeftIcon } from "lucide-react";
 import * as React from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/Layouts/appheader/input";
+import { Input } from "@/components/Layouts/app/input";
 import { Separator } from "@/components/ui/separator";
 import {
 	Sheet,

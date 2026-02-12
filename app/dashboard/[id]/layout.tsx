@@ -5,7 +5,7 @@ import "@/css/satoshi.css";
 import "@/app/globals.css"; // Import the global CSS that contains your CSS variables
 
 import { Sidebar } from "@/components/Layouts/sidebar";
-import { Header } from "@/components/Layouts/header";
+import { Header } from "@/components/Layouts/dashboard";
 import { Providers } from "./providers";
 
 import "flatpickr/dist/flatpickr.min.css";
