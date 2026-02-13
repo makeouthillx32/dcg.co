@@ -95,6 +95,139 @@ function randId() {
   return Math.random().toString(16).slice(2) + Date.now().toString(16);
 }
 
+// Image Editor Component (for inline alt text editing)
+function ImageEditor({
+  img,
+  idx,
+  productId,
+  onUpdated,
+  onDeleted,
+}: {
+  img: ProductImageRow;
+  idx: number;
+  productId: string;
+  onUpdated: () => void;
+  onDeleted: () => void;
+}) {
+  const [editingAlt, setEditingAlt] = useState(false);
+  const [altValue, setAltValue] = useState(img.alt_text || "");
+  const [saving, setSaving] = useState(false);
+
+  const url = supabasePublicUrlFromImage(img);
+
+  const saveAlt = async () => {
+    if (!img.id) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/products/admin/${productId}/images/${img.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ alt_text: altValue.trim() || null }),
+      });
+      const json = await safeReadJson(res);
+      if (!res.ok || !json?.ok) {
+        throw new Error(json?.error?.message ?? "Failed to update alt text");
+      }
+      toast.success("Alt text updated");
+      setEditingAlt(false);
+      onUpdated();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to update alt text");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="flex gap-3 items-start border border-[hsl(var(--border))] rounded-lg p-3 bg-[hsl(var(--card))]">
+      {/* Image Preview */}
+      <div className="relative group flex-shrink-0">
+        <img
+          src={url || "/placeholder.png"}
+          alt={img.alt_text || ""}
+          className="w-20 h-20 object-cover rounded border border-[hsl(var(--border))]"
+        />
+        {img.is_primary && (
+          <Badge variant="secondary" className="absolute -top-2 -left-2 text-xs bg-blue-500 text-white">
+            Primary
+          </Badge>
+        )}
+      </div>
+
+      {/* Alt Text Editor */}
+      <div className="flex-1 space-y-2">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-[hsl(var(--muted-foreground))]">
+            Position: {img.position ?? idx}
+          </span>
+          {img.is_public && <Badge variant="outline" className="text-xs">Public</Badge>}
+        </div>
+
+        {editingAlt ? (
+          <div className="space-y-2">
+            <Input
+              value={altValue}
+              onChange={(e) => setAltValue(e.target.value)}
+              placeholder={`Alt text for image ${idx + 1}`}
+              className="text-sm"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === "Enter") saveAlt();
+                if (e.key === "Escape") {
+                  setEditingAlt(false);
+                  setAltValue(img.alt_text || "");
+                }
+              }}
+            />
+            <div className="flex gap-2">
+              <Button size="sm" onClick={saveAlt} disabled={saving}>
+                {saving ? "Saving..." : "Save"}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  setEditingAlt(false);
+                  setAltValue(img.alt_text || "");
+                }}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div>
+            <p className="text-sm text-[hsl(var(--foreground))] mb-1">
+              {img.alt_text || (
+                <span className="text-[hsl(var(--muted-foreground))] italic">No alt text</span>
+              )}
+            </p>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setEditingAlt(true)}
+              className="h-7 px-2 text-xs"
+            >
+              Edit Alt Text
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* Delete Button */}
+      <Button
+        size="sm"
+        variant="ghost"
+        onClick={onDeleted}
+        className="text-destructive hover:text-destructive flex-shrink-0"
+        title="Delete image"
+      >
+        <X size={16} />
+      </Button>
+    </div>
+  );
+}
+
 export default function ProductModal({
   open,
   onOpenChange,
@@ -473,43 +606,71 @@ export default function ProductModal({
               </div>
             </div>
           ) : activeTab === "media" ? (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
-                />
-                <Input
-                  value={alt}
-                  onChange={(e) => setAlt(e.target.value)}
-                  placeholder="Alt text (optional)"
-                />
-                <Button onClick={onUploadImages} disabled={uploading || files.length === 0}>
-                  {uploading ? "Uploading…" : `Upload ${files.length} image(s)`}
-                </Button>
+            <div className="space-y-6">
+              {/* Upload New Images Section */}
+              <div className="border border-[hsl(var(--border))] rounded-lg p-4 bg-[hsl(var(--muted)/0.3)]">
+                <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                  <ImageIcon size={16} />
+                  Upload New Images
+                </h3>
+                <div className="space-y-3">
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
+                  />
+
+                  {files.length > 0 && (
+                    <div className="space-y-2">
+                      <Input
+                        value={alt}
+                        onChange={(e) => setAlt(e.target.value)}
+                        placeholder="Alt text for all new images (optional)"
+                      />
+                      <p className="text-xs text-[hsl(var(--muted-foreground))]">
+                        This alt text will be applied to all {files.length} selected image(s). You can
+                        edit individual alt text after uploading.
+                      </p>
+                    </div>
+                  )}
+
+                  <Button onClick={onUploadImages} disabled={uploading || files.length === 0}>
+                    {uploading ? "Uploading…" : `Upload ${files.length} image(s)`}
+                  </Button>
+                </div>
               </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                {(detail.product_images ?? []).map((img, idx) => {
-                  const url = supabasePublicUrlFromImage(img);
-                  return (
-                    <div key={img.id || idx} className="relative group">
-                      <img
-                        src={url || "/placeholder.png"}
-                        alt={img.alt_text || ""}
-                        className="w-full aspect-square object-cover rounded-md"
+              {/* Existing Images Section */}
+              <div>
+                <h3 className="text-sm font-semibold mb-3">
+                  Existing Images ({(detail.product_images ?? []).length})
+                </h3>
+
+                {(detail.product_images ?? []).length === 0 ? (
+                  <div className="text-center py-8 border border-dashed border-[hsl(var(--border))] rounded-lg">
+                    <ImageIcon size={32} className="mx-auto mb-2 text-[hsl(var(--muted-foreground))]" />
+                    <p className="text-sm text-[hsl(var(--muted-foreground))]">
+                      No images yet. Upload some above to get started.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {(detail.product_images ?? []).map((img, idx) => (
+                      <ImageEditor
+                        key={img.id || idx}
+                        img={img}
+                        idx={idx}
+                        productId={detail.id}
+                        onUpdated={() => {
+                          load();
+                          onChanged();
+                        }}
+                        onDeleted={() => img.id && onDeleteImage(img.id)}
                       />
-                      <button
-                        onClick={() => img.id && onDeleteImage(img.id)}
-                        className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <X size={14} />
-                      </button>
-                    </div>
-                  );
-                })}
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           ) : activeTab === "tags" ? (
@@ -550,10 +711,7 @@ export default function ProductModal({
               />
 
               <div className="border-t border-[hsl(var(--border))] pt-6">
-                <ProductInventoryInline
-                  variants={detail.product_variants || []}
-                  onChanged={load}
-                />
+                <ProductInventoryInline variants={detail.product_variants || []} onChanged={load} />
               </div>
 
               <div className="border-t border-[hsl(var(--border))] pt-6">

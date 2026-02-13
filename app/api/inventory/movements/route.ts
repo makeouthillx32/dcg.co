@@ -9,7 +9,7 @@ function jsonError(status: number, code: string, message: string, details?: any)
 }
 
 // TODO: Replace with your real role gating (admin/catalog manager)
-async function requireAdmin(supabase: ReturnType<typeof createServerClient>) {
+async function requireAdmin(supabase: Awaited<ReturnType<typeof createServerClient>>) {
   const { data } = await supabase.auth.getUser();
   if (!data.user) return { ok: false };
   return { ok: true };
@@ -32,10 +32,11 @@ async function requireAdmin(supabase: ReturnType<typeof createServerClient>) {
  *
  * Notes:
  * - Keep quantity positive. movement_type determines direction.
- * - If your schema uses signed quantities instead, tell me and I’ll adjust.
+ * - If your schema uses signed quantities instead, tell me and I'll adjust.
  */
 export async function POST(req: NextRequest) {
-  const supabase = createServerClient();
+  // ✅ FIX: Await the createServerClient call
+  const supabase = await createServerClient();
 
   const gate = await requireAdmin(supabase);
   if (!gate.ok) {

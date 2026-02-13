@@ -14,6 +14,10 @@ import {
   Image as ImageIcon,
   ChevronDown,
   ChevronUp,
+  Palette,
+  Ruler,
+  Box,
+  MapPin,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import type { ProductVariant, UpdateVariantInput } from "@/types/product-variants";
@@ -142,8 +146,8 @@ export default function VariantCard({
               )}
             </div>
 
-            {/* Quick Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+            {/* Quick Stats Row 1: Basic Info */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm mb-2">
               {variant.sku && (
                 <div className="flex items-center gap-1.5 text-[hsl(var(--muted-foreground))]">
                   <Hash size={14} />
@@ -172,6 +176,49 @@ export default function VariantCard({
                 </Badge>
               </div>
             </div>
+
+            {/* Quick Stats Row 2: Options Preview */}
+            {variant.options && Object.keys(variant.options).length > 0 && (
+              <div className="flex flex-wrap gap-2 text-xs">
+                {variant.options.size && (
+                  <div className="flex items-center gap-1 px-2 py-0.5 rounded bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]">
+                    <Ruler size={12} />
+                    <span>{variant.options.size}</span>
+                  </div>
+                )}
+                
+                {variant.options.color && (
+                  <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]">
+                    <Palette size={12} />
+                    <span>
+                      {typeof variant.options.color === 'string' 
+                        ? variant.options.color 
+                        : variant.options.color.name}
+                    </span>
+                    {typeof variant.options.color === 'object' && variant.options.color.hex && (
+                      <div
+                        className="w-3 h-3 rounded-full border border-[hsl(var(--border))]"
+                        style={{ backgroundColor: variant.options.color.hex }}
+                      />
+                    )}
+                  </div>
+                )}
+
+                {variant.options.material && (
+                  <div className="flex items-center gap-1 px-2 py-0.5 rounded bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]">
+                    <Box size={12} />
+                    <span>{variant.options.material}</span>
+                  </div>
+                )}
+
+                {variant.options.made_in && (
+                  <div className="flex items-center gap-1 px-2 py-0.5 rounded bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]">
+                    <MapPin size={12} />
+                    <span>{variant.options.made_in}</span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Actions */}
@@ -210,6 +257,95 @@ export default function VariantCard({
       {/* Expanded Details */}
       {expanded && (
         <div className="border-t border-[hsl(var(--border))] p-4 bg-[hsl(var(--muted)/0.3)] space-y-4">
+          {/* Variant Options - DETAILED VIEW */}
+          {variant.options && Object.keys(variant.options).length > 0 && (
+            <div>
+              <h5 className="text-xs font-medium text-[hsl(var(--muted-foreground))] mb-2">
+                Variant Options
+              </h5>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                {/* Size */}
+                {variant.options.size && (
+                  <div className="flex items-start gap-2">
+                    <Ruler size={16} className="text-[hsl(var(--muted-foreground))] mt-0.5" />
+                    <div>
+                      <div className="text-[hsl(var(--muted-foreground))] text-xs">Size</div>
+                      <div className="font-medium">{variant.options.size}</div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Color */}
+                {variant.options.color && (
+                  <div className="flex items-start gap-2">
+                    <Palette size={16} className="text-[hsl(var(--muted-foreground))] mt-0.5" />
+                    <div>
+                      <div className="text-[hsl(var(--muted-foreground))] text-xs">Color</div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">
+                          {typeof variant.options.color === 'string' 
+                            ? variant.options.color 
+                            : variant.options.color.name}
+                        </span>
+                        {typeof variant.options.color === 'object' && variant.options.color.hex && (
+                          <div className="flex items-center gap-1">
+                            <div
+                              className="w-5 h-5 rounded border-2 border-[hsl(var(--border))] shadow-sm"
+                              style={{ backgroundColor: variant.options.color.hex }}
+                              title={variant.options.color.hex}
+                            />
+                            <span className="text-xs text-[hsl(var(--muted-foreground))] font-mono">
+                              {variant.options.color.hex}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Material */}
+                {variant.options.material && (
+                  <div className="flex items-start gap-2">
+                    <Box size={16} className="text-[hsl(var(--muted-foreground))] mt-0.5" />
+                    <div>
+                      <div className="text-[hsl(var(--muted-foreground))] text-xs">Material</div>
+                      <div className="font-medium">{variant.options.material}</div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Made In */}
+                {variant.options.made_in && (
+                  <div className="flex items-start gap-2">
+                    <MapPin size={16} className="text-[hsl(var(--muted-foreground))] mt-0.5" />
+                    <div>
+                      <div className="text-[hsl(var(--muted-foreground))] text-xs">Made In</div>
+                      <div className="font-medium">{variant.options.made_in}</div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Custom Options */}
+                {Object.entries(variant.options)
+                  .filter(([key]) => !['size', 'color', 'material', 'made_in', 'colors'].includes(key))
+                  .map(([key, value]) => (
+                    <div key={key} className="flex items-start gap-2">
+                      <Hash size={16} className="text-[hsl(var(--muted-foreground))] mt-0.5" />
+                      <div>
+                        <div className="text-[hsl(var(--muted-foreground))] text-xs capitalize">
+                          {key.replace(/_/g, ' ')}
+                        </div>
+                        <div className="font-medium">
+                          {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+
           {/* Pricing Details */}
           {variant.compare_at_price_cents && (
             <div>
