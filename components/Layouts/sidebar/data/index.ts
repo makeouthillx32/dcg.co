@@ -30,6 +30,25 @@ export const NAV_DATA = [
         icon: Icons.MessageIcon,
         items: [],
       },
+
+      // ✅ NEW: Home dropdown (Pages + Images)
+      {
+        title: "Home",
+        icon: Icons.HomeIcon,
+        items: [
+          {
+            title: "Pages",
+            url: "/settings/static-pages",
+            icon: Icons.Table,
+          },
+          {
+            title: "Images",
+            url: "/settings/hero-carousel",
+            icon: Icons.FourCircle,
+          },
+        ],
+      },
+
       {
         title: "Admin",
         icon: Icons.SettingsIcon,
