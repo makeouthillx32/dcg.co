@@ -3,7 +3,7 @@
 
 import React, { useEffect } from "react";
 import Header from "@/components/Layouts/shop/Header";
-import Footer from "@/components/footer";
+import Footer from "@/components/Layouts/footer";
 import useThemeCookie from "@/lib/useThemeCookie";
 
 import Landing from "@/components/shop/Landing";

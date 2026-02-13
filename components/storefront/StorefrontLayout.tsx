@@ -2,7 +2,7 @@
 "use client";
 
 import Header from "@/components/Layouts/shop/Header";
-import Footer from "@/components/footer";
+import Footer from "@/components/Layouts/footer";
 import { useState } from "react";
 
 export default function StorefrontLayout({ children }: { children: React.ReactNode }) {

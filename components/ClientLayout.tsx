@@ -5,7 +5,7 @@
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import Nav from "@/components/nav";
-import Footer from "@/components/footer";
+import Footer from "@/components/Layouts/footer";
 import AccessibilityOverlay from "@/components/theme/accessibility";
 import { CookieConsent } from "@/components/CookieConsent";
 import analytics from "@/lib/analytics";

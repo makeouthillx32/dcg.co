@@ -1,7 +1,7 @@
 // app/layout.tsx - UPDATED BRANDING FOR DESERT COWGIRL
 import { Providers } from "./provider";
 import Nav from "@/components/nav";
-import Footer from "@/components/footer";
+import Footer from "@/components/Layouts/footer";
 import AccessibilityOverlay from "@/components/theme/accessibility";
 import "./globals.css";
 import type { Metadata } from "next";
