@@ -34,6 +34,19 @@ export async function POST(req: NextRequest, { params }: Params) {
     return jsonError(400, "MISSING_FIELDS", "bucket_name and object_path are required");
   }
 
+  // ✅ Get the next available position for this product
+  const { data: existingImages } = await supabase
+    .from("product_images")
+    .select("position")
+    .eq("product_id", id)
+    .order("position", { ascending: false })
+    .limit(1);
+
+  // Calculate next position (max + 1, or 0 if no images exist)
+  const nextPosition = existingImages && existingImages.length > 0 
+    ? (existingImages[0].position ?? 0) + 1 
+    : 0;
+
   // Insert into product_images table
   const { data, error } = await supabase
     .from("product_images")
@@ -44,8 +57,8 @@ export async function POST(req: NextRequest, { params }: Params) {
       alt_text: alt_text ?? null,
       is_public: is_public ?? true,
       is_primary: is_primary ?? false,
-      sort_order: sort_order ?? 0,
-      position: sort_order ?? 0, // if you use position instead
+      sort_order: sort_order ?? nextPosition,
+      position: nextPosition, // ✅ Use calculated position
     })
     .select("*")
     .single();

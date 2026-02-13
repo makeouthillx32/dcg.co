@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/utils/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-type Params = { params: { id: string } };
+type Params = { params: Promise<{ id: string }> };
 
 function jsonError(status: number, code: string, message: string, details?: any) {
   return NextResponse.json({ ok: false, error: { code, message, details } }, { status });
@@ -38,7 +38,7 @@ export async function POST(req: NextRequest, { params }: Params) {
   const gate = await requireAdmin(supabase);
   if (!gate.ok) return jsonError(gate.status, "UNAUTHORIZED", gate.message);
 
-  const productId = params.id;
+  const { id: productId } = await params;
   if (!productId) return jsonError(400, "INVALID_ID", "Missing product id");
 
   let body: any = null;

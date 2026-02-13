@@ -37,8 +37,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const gate = await requireAdmin(supabase);
   if (!gate.ok) return jsonError(gate.status, "UNAUTHORIZED", gate.message);
 
-  const productId = params.id;
-  const imageId = params.imageId;
+  const { id: productId, imageId } = await params;
 
   if (!productId) return jsonError(400, "INVALID_ID", "Missing product id");
   if (!imageId) return jsonError(400, "INVALID_IMAGE_ID", "Missing image id");
@@ -106,8 +105,7 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   const gate = await requireAdmin(supabase);
   if (!gate.ok) return jsonError(gate.status, "UNAUTHORIZED", gate.message);
 
-  const productId = params.id;
-  const imageId = params.imageId;
+  const { id: productId, imageId } = await params;
 
   if (!productId) return jsonError(400, "INVALID_ID", "Missing product id");
   if (!imageId) return jsonError(400, "INVALID_IMAGE_ID", "Missing image id");

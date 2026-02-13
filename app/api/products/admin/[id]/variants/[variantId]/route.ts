@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/utils/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-type Params = { params: { id: string; variantId: string } };
+type Params = { params: Promise<{ id: string; variantId: string }> };
 
 function jsonError(status: number, code: string, message: string, details?: any) {
   return NextResponse.json({ ok: false, error: { code, message, details } }, { status });
@@ -21,8 +21,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const gate = await requireAdmin(supabase);
   if (!gate.ok) return jsonError(gate.status, "UNAUTHORIZED", gate.message);
 
-  const productId = params.id;
-  const variantId = params.variantId;
+  const { id: productId, variantId } = await params;
 
   if (!productId) return jsonError(400, "INVALID_ID", "Missing product id");
   if (!variantId) return jsonError(400, "INVALID_VARIANT_ID", "Missing variant id");
@@ -202,8 +201,7 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   const gate = await requireAdmin(supabase);
   if (!gate.ok) return jsonError(gate.status, "UNAUTHORIZED", gate.message);
 
-  const productId = params.id;
-  const variantId = params.variantId;
+  const { id: productId, variantId } = await params;
 
   if (!productId) return jsonError(400, "INVALID_ID", "Missing product id");
   if (!variantId) return jsonError(400, "INVALID_VARIANT_ID", "Missing variant id");
