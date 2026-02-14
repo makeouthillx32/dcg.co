@@ -96,23 +96,51 @@ export default function CreateProductModal({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label className="text-sm font-semibold">Price (USD)</label>
+            <Input value={state.price} onChange={(e) => actions.setPrice(e.target.value)} />
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
-              <label className="text-sm font-semibold">Price (USD)</label>
-              <Input value={state.price} onChange={(e) => actions.setPrice(e.target.value)} />
+              <label className="text-sm font-semibold">Base SKU (Optional)</label>
+              <div className="flex gap-2">
+                <Input 
+                  value={state.baseSku} 
+                  onChange={(e) => actions.setBaseSku(e.target.value)}
+                  placeholder="e.g., LC2542552-P1720"
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={actions.autoBaseSku}
+                >
+                  Auto
+                </Button>
+              </div>
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-semibold">Base SKU (Optional)</label>
+              <label className="text-sm font-semibold">Material (Optional)</label>
               <Input 
-                value={state.baseSku} 
-                onChange={(e) => actions.setBaseSku(e.target.value)}
-                placeholder="e.g., LC2542552-P1720"
+                value={state.material} 
+                onChange={(e) => actions.setMaterial(e.target.value)}
+                placeholder="e.g., 95%Polyester+5%Elastane"
               />
-              <p className="text-xs text-muted-foreground">
-                Variants will use: BASE-S, BASE-M, BASE-L, etc.
-              </p>
             </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-semibold">Made In (Optional)</label>
+              <Input 
+                value={state.madeIn} 
+                onChange={(e) => actions.setMadeIn(e.target.value)}
+                placeholder="e.g., USA, China"
+              />
+            </div>
+          </div>
+
+          <div className="text-xs text-muted-foreground -mt-2">
+            Variants will use Base SKU + size (e.g., LC2542552-P1720-S, -M, -L)
           </div>
 
           <div className="space-y-2">

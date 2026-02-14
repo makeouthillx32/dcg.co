@@ -26,6 +26,8 @@ export function useCreateProduct(onOpenChange: (v: boolean) => void, onCreated: 
   const [baseSku, setBaseSku] = useState(""); 
   const [price, setPrice] = useState("0.00");
   const [description, setDescription] = useState("");
+  const [material, setMaterial] = useState(""); // ✅ NEW: Product-level
+  const [madeIn, setMadeIn] = useState(""); // ✅ NEW: Product-level
   const [images, setImages] = useState<ImageWithAlt[]>([]);
   const [availableSizes, setAvailableSizes] = useState<SizeOption[]>([]);
   const [availableColors, setAvailableColors] = useState<ColorOption[]>([]);
@@ -40,6 +42,26 @@ export function useCreateProduct(onOpenChange: (v: boolean) => void, onCreated: 
 
   const cents = useMemo(() => moneyToCents(price), [price]);
   const autoSlug = () => setSlug(slugify(title));
+  const autoBaseSku = () => {
+  const words = title
+    .replace(/[’']/g, "")
+    .toUpperCase()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  const prefix = words.includes("SWEATSHIRT") || words.includes("CREWNECK")
+    ? "WSP"
+    : "PRD";
+
+  const shortWords = words
+    .filter(w => !["THE","A","AN","AND","OF","WITH","COUNTRY","WESTERN","GRAPHIC"].includes(w))
+    .slice(0, 2);
+
+  const code = shortWords.map(w => w.substring(0, 3)).join("-");
+
+  setBaseSku(`${prefix}-${code}`);
+};
+
 
   // Reusable ID generator that works in all browser contexts
   const generateId = () => Math.random().toString(36).substring(7);
@@ -51,6 +73,8 @@ export function useCreateProduct(onOpenChange: (v: boolean) => void, onCreated: 
     setBaseSku("");
     setPrice("0.00");
     setDescription("");
+    setMaterial("");
+    setMadeIn("");
     setImages([]);
     setAvailableSizes([]);
     setAvailableColors([]);
@@ -162,6 +186,8 @@ export function useCreateProduct(onOpenChange: (v: boolean) => void, onCreated: 
 
   const buildVariantOptions = (variant: VariantInput) => {
     const options: Record<string, any> = {};
+    
+    // ✅ CHANGED: Only include size and color in variant options
     if (variant.selectedSizes.length > 0) {
       const vals = variant.selectedSizes.map(id => availableSizes.find(s => s.id === id)?.value).filter(Boolean);
       options.size = vals.length === 1 ? vals[0] : vals.join(", ");
@@ -171,14 +197,9 @@ export function useCreateProduct(onOpenChange: (v: boolean) => void, onCreated: 
       if (objs.length === 1) options.color = { name: objs[0]!.name, hex: objs[0]!.hex };
       else options.colors = objs.map(c => ({ name: c!.name, hex: c!.hex }));
     }
-    if (variant.selectedMaterials.length > 0) {
-      const vals = variant.selectedMaterials.map(id => availableMaterials.find(m => m.id === id)?.value).filter(Boolean);
-      options.material = vals.length === 1 ? vals[0] : vals.join(", ");
-    }
-    if (variant.selectedMadeIn.length > 0) {
-      const vals = variant.selectedMadeIn.map(id => availableMadeIn.find(m => m.id === id)?.value).filter(Boolean);
-      options.made_in = vals.length === 1 ? vals[0] : vals.join(", ");
-    }
+    
+    // ❌ REMOVED: material and made_in (now product-level)
+    
     Object.entries(variant.customOptions).forEach(([k, v]) => {
       const val = typeof v === "string" ? v.trim() : "";
       if (val) options[k] = val;
@@ -204,6 +225,8 @@ export function useCreateProduct(onOpenChange: (v: boolean) => void, onCreated: 
           slug: finalSlug, 
           base_sku: baseSku.trim() || null,
           description: description.trim() || null, 
+          material: material.trim() || null, // ✅ NEW: Save to products table
+          made_in: madeIn.trim() || null, // ✅ NEW: Save to products table
           price_cents: cents, 
           status: "draft" 
         }),
@@ -236,7 +259,7 @@ export function useCreateProduct(onOpenChange: (v: boolean) => void, onCreated: 
             body: JSON.stringify({
               title: variant.title.trim() || "Default",
               sku: finalVariantSku,
-              options: buildVariantOptions(variant),
+              options: buildVariantOptions(variant), // ✅ Only size & color now
               weight_grams: weight,
               price_cents: override ?? cents,
               track_inventory: stock !== null && stock > 0,
@@ -303,19 +326,19 @@ export function useCreateProduct(onOpenChange: (v: boolean) => void, onCreated: 
 
   return {
     state: {
-      title, slug, baseSku, price, description, images, availableSizes, availableColors,
+      title, slug, baseSku, price, description, material, madeIn, images, availableSizes, availableColors,
       availableMaterials, availableMadeIn, variants, availableCategories,
       selectedCategoryIds, availableCollections, selectedCollectionIds, creating
     },
     actions: {
-      setTitle, setSlug, setBaseSku, setPrice, setDescription, autoSlug,
+      setTitle, setSlug, setBaseSku, setPrice, setDescription, setMaterial, setMadeIn, autoSlug, autoBaseSku,
       addSize, updateSize, removeSize,
       addColor, updateColor, removeColor,
       addMaterial, updateMaterial, removeMaterial,
       addMadeIn, updateMadeIn, removeMadeIn,
       handleFilesSelected, updateImageAlt, removeImage, setPrimaryImage,
       addVariant, updateVariant, removeVariant,
-      setVariants,  // ✅ NEW: Allow bulk setting of variants
+      setVariants,
       setSelectedCategoryIds, setSelectedCollectionIds,
       setAvailableCategories, setAvailableCollections,
       create, reset
