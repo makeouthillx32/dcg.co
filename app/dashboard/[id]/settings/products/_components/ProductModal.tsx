@@ -14,7 +14,7 @@ import { CategoriesTab } from "./manage/categories-tab";
 import { CollectionsTab } from "./manage/collections-tab";
 import { TagsTab } from "./manage/tags-tab";
 import { AdvancedTab } from "./manage/advanced-tab";
-import type { TabType } from "./manage/types";
+import type { TabType } from "./types";
 
 export default function ProductModal({
   open,

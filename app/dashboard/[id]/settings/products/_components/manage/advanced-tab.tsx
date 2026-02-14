@@ -3,7 +3,7 @@ import { Trash2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "react-hot-toast";
-import { safeReadJson } from "./utils";
+import { safeReadJson } from "../utils";
 
 interface AdvancedTabProps {
   productId: string;

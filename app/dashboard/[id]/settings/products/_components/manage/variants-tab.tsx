@@ -1,5 +1,5 @@
 import ProductVariantsInline from "../ProductVariantsInline";
-import type { ProductRow } from "./types";
+import type { ProductRow } from "../types";
 
 interface VariantsTabProps {
   productId: string;

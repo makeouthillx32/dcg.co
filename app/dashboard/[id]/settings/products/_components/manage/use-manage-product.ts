@@ -4,8 +4,8 @@ import { useState, useEffect } from "react";
 import { toast } from "react-hot-toast";
 import { createBrowserClient } from "@/utils/supabase/client";
 import { PRODUCT_IMAGE_BUCKET } from "@/lib/images";
-import { safeReadJson, moneyToCents, slugify, fileExt, randId } from "./utils";
-import type { ProductRow } from "./types";
+import { safeReadJson, moneyToCents, slugify, fileExt, randId } from "../utils";
+import type { ProductRow } from "../types";
 
 export function useManageProduct(
   productId: string | null,

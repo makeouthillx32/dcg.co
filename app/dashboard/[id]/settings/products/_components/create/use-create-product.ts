@@ -8,7 +8,7 @@ import {
   moneyToCents, 
   safeExtFromFile, 
   buildObjectPath 
-} from "./utils";
+} from "../utils";
 import { 
   CategoryNode, 
   CollectionRow, 
@@ -18,7 +18,7 @@ import {
   MaterialOption, 
   MadeInOption, 
   VariantInput 
-} from "./types";
+} from "../types";
 
 export function useCreateProduct(onOpenChange: (v: boolean) => void, onCreated: () => void) {
   const [title, setTitle] = useState("");

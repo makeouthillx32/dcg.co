@@ -7,8 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { supabasePublicUrlFromImage } from "@/lib/images";
-import { safeReadJson } from "./utils";
-import type { ProductImageRow } from "./types";
+import { safeReadJson } from "../utils";
+import type { ProductImageRow } from "../types";
 
 interface ImageEditorProps {
   img: ProductImageRow;

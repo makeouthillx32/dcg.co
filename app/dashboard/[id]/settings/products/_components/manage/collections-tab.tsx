@@ -1,5 +1,5 @@
 import ProductCollectionsInline from "../ProductCollectionsInline";
-import type { ProductRow } from "./types";
+import type { ProductRow } from "../types";
 
 interface CollectionsTabProps {
   productId: string;

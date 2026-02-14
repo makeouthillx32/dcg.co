@@ -2,7 +2,7 @@ import { Image as ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ImageEditor } from "./image-editor";
-import type { ProductRow } from "./types";
+import type { ProductRow } from "../types";
 
 interface MediaTabProps {
   detail: ProductRow;

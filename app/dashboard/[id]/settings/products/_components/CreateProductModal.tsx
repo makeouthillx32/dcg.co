@@ -11,7 +11,7 @@ import { useCreateProduct } from "./create/use-create-product";
 import { CollapsibleSection } from "./create/collapsible-section";
 import { ImageSection } from "./create/image-section";
 import { VariantSection } from "./create/variant-section";
-import { safeReadJson } from "./create/utils";
+import { safeReadJson } from "./utils";
 
 export default function CreateProductModal({
   open,

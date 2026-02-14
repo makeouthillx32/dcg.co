@@ -1,5 +1,5 @@
 import ProductInventoryInline from "../ProductInventoryInline";
-import type { ProductRow } from "./types";
+import type { ProductRow } from "../types";
 
 interface InventoryTabProps {
   detail: ProductRow;

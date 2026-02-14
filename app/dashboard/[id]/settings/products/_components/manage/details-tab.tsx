@@ -1,8 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { centsToMoney } from "./utils";
-import type { ProductRow } from "./types";
+import { centsToMoney } from "../utils";
+import type { ProductRow } from "../types";
 
 interface DetailsTabProps {
   detail: ProductRow;

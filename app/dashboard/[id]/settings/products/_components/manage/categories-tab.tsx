@@ -1,5 +1,5 @@
 import ProductCategoriesInline from "../ProductCategoriesInline";
-import type { ProductRow } from "./types";
+import type { ProductRow } from "../types";
 
 interface CategoriesTabProps {
   productId: string;
