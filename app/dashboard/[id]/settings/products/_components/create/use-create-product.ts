@@ -23,11 +23,11 @@ import {
 export function useCreateProduct(onOpenChange: (v: boolean) => void, onCreated: () => void) {
   const [title, setTitle] = useState("");
   const [slug, setSlug] = useState("");
-  const [baseSku, setBaseSku] = useState(""); 
+  const [baseSku, setBaseSku] = useState(""); // ✅ UI-only, not saved to DB
   const [price, setPrice] = useState("0.00");
   const [description, setDescription] = useState("");
-  const [material, setMaterial] = useState(""); // ✅ NEW: Product-level
-  const [madeIn, setMadeIn] = useState(""); // ✅ NEW: Product-level
+  const [material, setMaterial] = useState(""); // ✅ Product-level
+  const [madeIn, setMadeIn] = useState(""); // ✅ Product-level
   const [images, setImages] = useState<ImageWithAlt[]>([]);
   const [availableSizes, setAvailableSizes] = useState<SizeOption[]>([]);
   const [availableColors, setAvailableColors] = useState<ColorOption[]>([]);
@@ -44,7 +44,7 @@ export function useCreateProduct(onOpenChange: (v: boolean) => void, onCreated: 
   const autoSlug = () => setSlug(slugify(title));
   const autoBaseSku = () => {
   const words = title
-    .replace(/[’']/g, "")
+    .replace(/['']/g, "")
     .toUpperCase()
     .split(/\s+/)
     .filter(Boolean);
@@ -89,15 +89,28 @@ export function useCreateProduct(onOpenChange: (v: boolean) => void, onCreated: 
     const base = baseSku.trim();
     if (!base) return variant.sku;
 
-    const sizeId = variant.selectedSizes?.[0];
-    const sizeVal = sizeId ? availableSizes.find(s => s.id === sizeId)?.value : null;
+    const parts = [base];
 
-    if (sizeVal) {
-      const cleanSize = sizeVal.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
-      return `${base}-${cleanSize}`;
+    // Add color if present
+    const colorId = variant.selectedColors?.[0];
+    const colorObj = colorId ? availableColors.find(c => c.id === colorId) : null;
+    if (colorObj?.name) {
+      const cleanColor = colorObj.name
+        .replace(/[^a-zA-Z0-9]/g, "")
+        .toUpperCase()
+        .substring(0, 3); // First 3 chars of color
+      parts.push(cleanColor);
     }
 
-    return base;
+    // Add size if present
+    const sizeId = variant.selectedSizes?.[0];
+    const sizeVal = sizeId ? availableSizes.find(s => s.id === sizeId)?.value : null;
+    if (sizeVal) {
+      const cleanSize = sizeVal.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+      parts.push(cleanSize);
+    }
+
+    return parts.length > 1 ? parts.join("-") : base;
   };
 
   const addSize = () => setAvailableSizes([...availableSizes, { id: generateId(), value: "" }]);
@@ -187,23 +200,33 @@ export function useCreateProduct(onOpenChange: (v: boolean) => void, onCreated: 
   const buildVariantOptions = (variant: VariantInput) => {
     const options: Record<string, any> = {};
     
-    // ✅ CHANGED: Only include size and color in variant options
+    // Size from variant selections
     if (variant.selectedSizes.length > 0) {
       const vals = variant.selectedSizes.map(id => availableSizes.find(s => s.id === id)?.value).filter(Boolean);
       options.size = vals.length === 1 ? vals[0] : vals.join(", ");
     }
+    
+    // Color from variant selections
     if (variant.selectedColors.length > 0) {
       const objs = variant.selectedColors.map(id => availableColors.find(c => c.id === id)).filter(Boolean);
       if (objs.length === 1) options.color = { name: objs[0]!.name, hex: objs[0]!.hex };
       else options.colors = objs.map(c => ({ name: c!.name, hex: c!.hex }));
     }
     
-    // ❌ REMOVED: material and made_in (now product-level)
+    // ✅ Add product-level material and made_in to variant options
+    if (material.trim()) {
+      options.material = material.trim();
+    }
+    if (madeIn.trim()) {
+      options.made_in = madeIn.trim();
+    }
     
+    // Custom options
     Object.entries(variant.customOptions).forEach(([k, v]) => {
       const val = typeof v === "string" ? v.trim() : "";
       if (val) options[k] = val;
     });
+    
     return options;
   };
 
@@ -212,6 +235,31 @@ export function useCreateProduct(onOpenChange: (v: boolean) => void, onCreated: 
     const finalSlug = (slug.trim() || slugify(title)).trim();
     if (!finalSlug) return toast.error("Slug is required");
     if (cents === null || cents < 0) return toast.error("Price must be valid");
+
+    // ✅ PRE-FLIGHT VALIDATION: Check for duplicate SKUs BEFORE creating product
+    if (variants.length > 0) {
+      const generatedSkus = new Set<string>();
+      
+      for (const variant of variants) {
+        let finalSku: string;
+        
+        if (variant.sku.trim()) {
+          finalSku = variant.sku.trim();
+        } else {
+          finalSku = generateVariantSku(variant);
+        }
+        
+        if (!finalSku || finalSku === baseSku.trim()) {
+          return toast.error(`Variant "${variant.title}" has invalid SKU. Each variant needs a unique size selected.`);
+        }
+        
+        if (generatedSkus.has(finalSku)) {
+          return toast.error(`Duplicate SKU detected: "${finalSku}". Check that each variant has a unique size selected.`);
+        }
+        
+        generatedSkus.add(finalSku);
+      }
+    }
 
     setCreating(true);
     let productId: string | null = null;
@@ -223,10 +271,9 @@ export function useCreateProduct(onOpenChange: (v: boolean) => void, onCreated: 
         body: JSON.stringify({ 
           title: title.trim(), 
           slug: finalSlug, 
-          base_sku: baseSku.trim() || null,
           description: description.trim() || null, 
-          material: material.trim() || null, // ✅ NEW: Save to products table
-          made_in: madeIn.trim() || null, // ✅ NEW: Save to products table
+          material: material.trim() || null, // ✅ Save to DB
+          made_in: madeIn.trim() || null, // ✅ Save to DB
           price_cents: cents, 
           status: "draft" 
         }),
@@ -243,7 +290,7 @@ export function useCreateProduct(onOpenChange: (v: boolean) => void, onCreated: 
           const override = variant.price_override.trim() === "" ? null : moneyToCents(variant.price_override);
           const stock = variant.initial_stock.trim() === "" ? null : Number(variant.initial_stock);
 
-          // ✅ FIXED: Generate SKU properly
+          // ✅ Generate SKU from baseSku + size (UI-only, not saved to products table)
           let finalVariantSku: string | null = null;
           if (variant.sku.trim()) {
             // User provided custom SKU
@@ -259,7 +306,7 @@ export function useCreateProduct(onOpenChange: (v: boolean) => void, onCreated: 
             body: JSON.stringify({
               title: variant.title.trim() || "Default",
               sku: finalVariantSku,
-              options: buildVariantOptions(variant), // ✅ Only size & color now
+              options: buildVariantOptions(variant),
               weight_grams: weight,
               price_cents: override ?? cents,
               track_inventory: stock !== null && stock > 0,

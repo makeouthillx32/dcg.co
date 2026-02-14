@@ -164,8 +164,6 @@ export default function CreateProductModal({
               baseSku={state.baseSku}
               availableSizes={state.availableSizes}
               availableColors={state.availableColors}
-              availableMaterials={state.availableMaterials}
-              availableMadeIn={state.availableMadeIn}
               actions={actions as any} 
             />
           </CollapsibleSection>
