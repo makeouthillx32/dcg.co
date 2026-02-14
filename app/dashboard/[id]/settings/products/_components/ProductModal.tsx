@@ -1,7 +1,17 @@
 "use client";
 
-import React, { useState } from "react";
-import { X, Image as ImageIcon, Tag as TagIcon, Settings2, AlertTriangle, Package, Box, FolderTree, Grid3x3 } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import {
+  X,
+  Image as ImageIcon,
+  Tag as TagIcon,
+  Settings2,
+  AlertTriangle,
+  Package,
+  Box,
+  FolderTree,
+  Grid3x3,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
@@ -32,16 +42,56 @@ export default function ProductModal({
   const [activeTab, setActiveTab] = useState<TabType>("details");
   const { state, actions } = useManageProduct(productId, open, onChanged);
 
+  // ✅ Prevent stale tab when switching products / reopening
+  useEffect(() => {
+    if (!open) setActiveTab("details");
+  }, [open, productId]);
+
+  const tabBtn = (key: TabType, icon: React.ReactNode, label: string) => {
+    const active =
+      activeTab === key
+        ? "text-[hsl(var(--sidebar-primary))] border-b-2 border-[hsl(var(--sidebar-primary))]"
+        : "text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] transition-colors";
+
+    return (
+      <button
+        type="button"
+        className={`px-4 py-2 font-medium text-sm whitespace-nowrap ${active}`}
+        onClick={() => setActiveTab(key)}
+        disabled={!productId}
+      >
+        <span className="inline-flex items-center gap-2">
+          {icon} {label}
+        </span>
+      </button>
+    );
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl p-0 overflow-hidden">
-        <div className="border-b border-[hsl(var(--border))] bg-[hsl(var(--background))]">
+      {/* ✅ Make the modal fit the *actual* mobile viewport + only body scrolls */}
+      <DialogContent
+        className="
+          max-w-4xl p-0
+          w-[calc(100vw-1.5rem)] sm:w-full
+          max-h-[calc(100dvh-1.5rem)]
+          overflow-hidden
+          flex flex-col
+        "
+      >
+        {/* Header + Tabs (fixed) */}
+        <div className="border-b border-[hsl(var(--border))] bg-[hsl(var(--background))] shrink-0">
           <DialogHeader className="px-5 py-4">
             <DialogTitle className="flex items-center justify-between gap-3">
               <span className="truncate">{title}</span>
+
               <div className="flex items-center gap-2">
-                {state.detail?.status && <Badge variant="secondary">{state.detail.status}</Badge>}
+                {state.detail?.status && (
+                  <Badge variant="secondary">{state.detail.status}</Badge>
+                )}
+
                 <button
+                  type="button"
                   onClick={() => onOpenChange(false)}
                   className="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] transition-colors"
                   aria-label="Close"
@@ -53,127 +103,29 @@ export default function ProductModal({
           </DialogHeader>
 
           <div className="flex border-t border-[hsl(var(--border))] overflow-x-auto">
-            <button
-              className={`px-4 py-2 font-medium text-sm whitespace-nowrap ${
-                activeTab === "details"
-                  ? "text-[hsl(var(--sidebar-primary))] border-b-2 border-[hsl(var(--sidebar-primary))]"
-                  : "text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] transition-colors"
-              }`}
-              onClick={() => setActiveTab("details")}
-              disabled={!productId}
-            >
-              <span className="inline-flex items-center gap-2">
-                <Settings2 size={16} /> Details
-              </span>
-            </button>
-
-            <button
-              className={`px-4 py-2 font-medium text-sm whitespace-nowrap ${
-                activeTab === "media"
-                  ? "text-[hsl(var(--sidebar-primary))] border-b-2 border-[hsl(var(--sidebar-primary))]"
-                  : "text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] transition-colors"
-              }`}
-              onClick={() => setActiveTab("media")}
-              disabled={!productId}
-            >
-              <span className="inline-flex items-center gap-2">
-                <ImageIcon size={16} /> Photos
-              </span>
-            </button>
-
-            <button
-              className={`px-4 py-2 font-medium text-sm whitespace-nowrap ${
-                activeTab === "variants"
-                  ? "text-[hsl(var(--sidebar-primary))] border-b-2 border-[hsl(var(--sidebar-primary))]"
-                  : "text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] transition-colors"
-              }`}
-              onClick={() => setActiveTab("variants")}
-              disabled={!productId}
-            >
-              <span className="inline-flex items-center gap-2">
-                <Package size={16} /> Variants
-              </span>
-            </button>
-
-            <button
-              className={`px-4 py-2 font-medium text-sm whitespace-nowrap ${
-                activeTab === "inventory"
-                  ? "text-[hsl(var(--sidebar-primary))] border-b-2 border-[hsl(var(--sidebar-primary))]"
-                  : "text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] transition-colors"
-              }`}
-              onClick={() => setActiveTab("inventory")}
-              disabled={!productId}
-            >
-              <span className="inline-flex items-center gap-2">
-                <Box size={16} /> Inventory
-              </span>
-            </button>
-
-            <button
-              className={`px-4 py-2 font-medium text-sm whitespace-nowrap ${
-                activeTab === "categories"
-                  ? "text-[hsl(var(--sidebar-primary))] border-b-2 border-[hsl(var(--sidebar-primary))]"
-                  : "text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] transition-colors"
-              }`}
-              onClick={() => setActiveTab("categories")}
-              disabled={!productId}
-            >
-              <span className="inline-flex items-center gap-2">
-                <FolderTree size={16} /> Categories
-              </span>
-            </button>
-
-            <button
-              className={`px-4 py-2 font-medium text-sm whitespace-nowrap ${
-                activeTab === "collections"
-                  ? "text-[hsl(var(--sidebar-primary))] border-b-2 border-[hsl(var(--sidebar-primary))]"
-                  : "text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] transition-colors"
-              }`}
-              onClick={() => setActiveTab("collections")}
-              disabled={!productId}
-            >
-              <span className="inline-flex items-center gap-2">
-                <Grid3x3 size={16} /> Collections
-              </span>
-            </button>
-
-            <button
-              className={`px-4 py-2 font-medium text-sm whitespace-nowrap ${
-                activeTab === "tags"
-                  ? "text-[hsl(var(--sidebar-primary))] border-b-2 border-[hsl(var(--sidebar-primary))]"
-                  : "text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] transition-colors"
-              }`}
-              onClick={() => setActiveTab("tags")}
-              disabled={!productId}
-            >
-              <span className="inline-flex items-center gap-2">
-                <TagIcon size={16} /> Tags
-              </span>
-            </button>
-
-            <button
-              className={`px-4 py-2 font-medium text-sm whitespace-nowrap ${
-                activeTab === "advanced"
-                  ? "text-[hsl(var(--sidebar-primary))] border-b-2 border-[hsl(var(--sidebar-primary))]"
-                  : "text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] transition-colors"
-              }`}
-              onClick={() => setActiveTab("advanced")}
-              disabled={!productId}
-            >
-              <span className="inline-flex items-center gap-2">
-                <AlertTriangle size={16} /> Advanced
-              </span>
-            </button>
+            {tabBtn("details", <Settings2 size={16} />, "Details")}
+            {tabBtn("media", <ImageIcon size={16} />, "Photos")}
+            {tabBtn("variants", <Package size={16} />, "Variants")}
+            {tabBtn("inventory", <Box size={16} />, "Inventory")}
+            {tabBtn("categories", <FolderTree size={16} />, "Categories")}
+            {tabBtn("collections", <Grid3x3 size={16} />, "Collections")}
+            {tabBtn("tags", <TagIcon size={16} />, "Tags")}
+            {tabBtn("advanced", <AlertTriangle size={16} />, "Advanced")}
           </div>
         </div>
 
-        <div className="max-h-[75vh] overflow-auto p-5">
+        {/* ✅ Scrollable Body (fills remaining space) */}
+        <div className="flex-1 overflow-y-auto p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]">
           {!productId ? (
-            <div className="text-sm text-[hsl(var(--muted-foreground))]">Select a product to manage.</div>
+            <div className="text-sm text-[hsl(var(--muted-foreground))]">
+              Select a product to manage.
+            </div>
           ) : state.loading ? (
             <div className="text-sm text-[hsl(var(--muted-foreground))]">Loading…</div>
           ) : !state.detail ? (
-            <div className="text-sm text-[hsl(var(--muted-foreground))]">Couldn't load product.</div>
+            <div className="text-sm text-[hsl(var(--muted-foreground))]">
+              Couldn't load product.
+            </div>
           ) : activeTab === "details" ? (
             <DetailsTab
               detail={state.detail}
@@ -215,16 +167,9 @@ export default function ProductModal({
               }}
             />
           ) : activeTab === "variants" ? (
-            <VariantsTab
-              productId={productId}
-              detail={state.detail}
-              load={actions.load}
-            />
+            <VariantsTab productId={productId} detail={state.detail} load={actions.load} />
           ) : activeTab === "inventory" ? (
-            <InventoryTab
-              detail={state.detail}
-              load={actions.load}
-            />
+            <InventoryTab detail={state.detail} load={actions.load} />
           ) : activeTab === "categories" ? (
             <CategoriesTab
               productId={productId}
