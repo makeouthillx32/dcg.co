@@ -1,10 +1,10 @@
-// app/dashboard/[id]/settings/products/_components/ProductVariantsInline.tsx
 "use client";
 
 import { useState } from "react";
 import { Package, Plus, Edit2, Trash2, Save, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "react-hot-toast";
 
 interface Variant {
@@ -16,6 +16,12 @@ interface Variant {
   weight_grams: number | null;
   position: number;
   is_active: boolean;
+  options?: {
+    size?: string;
+    color?: { name: string; hex: string };
+    material?: string;
+    made_in?: string;
+  };
   inventory_qty?: number;
   track_inventory?: boolean;
 }
@@ -87,7 +93,7 @@ export default function ProductVariantsInline({
         if (!isNaN(cents)) body.price_cents = cents;
       }
       if (formWeight.trim()) {
-        const grams = parseInt(formWeight, 10);
+        const grams = parseFloat(formWeight);
         if (!isNaN(grams)) body.weight_grams = grams;
       }
 
@@ -119,7 +125,7 @@ export default function ProductVariantsInline({
         if (!isNaN(cents)) body.price_cents = cents;
       }
       if (formWeight.trim()) {
-        const grams = parseInt(formWeight, 10);
+        const grams = parseFloat(formWeight);
         if (!isNaN(grams)) body.weight_grams = grams;
       }
 
@@ -176,6 +182,7 @@ export default function ProductVariantsInline({
       <div className="space-y-2">
         {variants.map((v) => {
           const isEditing = editingId === v.id;
+          const opts = v.options || {};
 
           return (
             <div
@@ -183,82 +190,131 @@ export default function ProductVariantsInline({
               className="border border-[hsl(var(--border))] rounded-lg p-3"
             >
               {isEditing ? (
-                <div className="space-y-2">
-                  <Input
-                    placeholder="Title"
-                    value={formTitle}
-                    onChange={(e) => setFormTitle(e.target.value)}
-                  />
-                  <Input
-                    placeholder="SKU"
-                    value={formSku}
-                    onChange={(e) => setFormSku(e.target.value)}
-                  />
-                  <Input
-                    type="number"
-                    step="0.01"
-                    placeholder="Price (USD)"
-                    value={formPrice}
-                    onChange={(e) => setFormPrice(e.target.value)}
-                  />
-                  <Input
-                    type="number"
-                    placeholder="Weight (grams)"
-                    value={formWeight}
-                    onChange={(e) => setFormWeight(e.target.value)}
-                  />
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input
+                      value={formTitle}
+                      onChange={(e) => setFormTitle(e.target.value)}
+                      placeholder="Title"
+                    />
+                    <Input
+                      value={formSku}
+                      onChange={(e) => setFormSku(e.target.value)}
+                      placeholder="SKU"
+                    />
+                    <Input
+                      value={formPrice}
+                      onChange={(e) => setFormPrice(e.target.value)}
+                      placeholder="Price (USD)"
+                    />
+                    <Input
+                      value={formWeight}
+                      onChange={(e) => setFormWeight(e.target.value)}
+                      placeholder="Weight (grams)"
+                    />
+                  </div>
+
+                  {/* Show variant options (read-only) */}
+                  {(opts.size || opts.color || opts.material || opts.made_in) && (
+                    <div className="space-y-2 pt-2 border-t">
+                      <label className="text-xs font-semibold text-muted-foreground">
+                        Variant Options (Read-Only)
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        {opts.size && (
+                          <Badge variant="outline" className="cursor-default">
+                            Size: {opts.size}
+                          </Badge>
+                        )}
+                        {opts.color && (
+                          <Badge variant="outline" className="cursor-default flex items-center gap-1.5">
+                            <div 
+                              className="w-3 h-3 rounded-full border" 
+                              style={{ backgroundColor: opts.color.hex }}
+                            />
+                            {opts.color.name}
+                          </Badge>
+                        )}
+                        {opts.material && (
+                          <Badge variant="outline" className="cursor-default">
+                            {opts.material}
+                          </Badge>
+                        )}
+                        {opts.made_in && (
+                          <Badge variant="outline" className="cursor-default">
+                            Made in {opts.made_in}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      onClick={() => handleUpdate(v.id)}
-                      disabled={saving}
-                    >
+                    <Button size="sm" onClick={() => handleUpdate(v.id)} disabled={saving}>
                       <Save size={14} className="mr-1" />
-                      Save
+                      {saving ? "Saving..." : "Save"}
                     </Button>
                     <Button size="sm" variant="outline" onClick={cancel}>
+                      <X size={14} className="mr-1" />
                       Cancel
                     </Button>
                   </div>
                 </div>
               ) : (
-                <div className="flex items-start justify-between">
-                  <div className="space-y-1">
-                    <div className="font-medium">{v.title}</div>
-                    <div className="text-sm text-[hsl(var(--muted-foreground))]">
-                      {v.sku ? `SKU: ${v.sku}` : "No SKU"}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 space-y-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h4 className="text-sm font-semibold">{v.title}</h4>
+                      {v.sku && (
+                        <Badge variant="secondary" className="text-xs font-mono">
+                          {v.sku}
+                        </Badge>
+                      )}
                     </div>
-                    <div className="text-sm">
-                      Price: {centsToMoney(v.price_cents)}
-                      {v.compare_at_price_cents && (
-                        <span className="ml-2 line-through text-[hsl(var(--muted-foreground))]">
-                          {centsToMoney(v.compare_at_price_cents)}
+
+                    {/* Rich variant data display */}
+                    <div className="flex flex-wrap gap-2 items-center">
+                      {opts.size && (
+                        <Badge variant="outline" className="text-xs">
+                          {opts.size}
+                        </Badge>
+                      )}
+                      {opts.color && (
+                        <Badge variant="outline" className="text-xs flex items-center gap-1.5">
+                          <div 
+                            className="w-3 h-3 rounded-full border" 
+                            style={{ backgroundColor: opts.color.hex }}
+                          />
+                          {opts.color.name}
+                        </Badge>
+                      )}
+                      {opts.material && (
+                        <span className="text-xs text-muted-foreground">
+                          {opts.material}
+                        </span>
+                      )}
+                      {opts.made_in && (
+                        <span className="text-xs text-muted-foreground">
+                          Made in {opts.made_in}
                         </span>
                       )}
                     </div>
-                    {v.weight_grams && (
-                      <div className="text-sm text-[hsl(var(--muted-foreground))]">
-                        Weight: {v.weight_grams}g
-                      </div>
-                    )}
-                    {typeof v.inventory_qty === "number" && (
-                      <div className="text-sm text-[hsl(var(--muted-foreground))]">
-                        Stock: {v.inventory_qty} units
-                      </div>
-                    )}
+
+                    <div className="flex gap-4 text-xs text-muted-foreground">
+                      <span>Price: {centsToMoney(v.price_cents)}</span>
+                      {v.weight_grams && <span>Weight: {v.weight_grams}g</span>}
+                    </div>
                   </div>
+
                   <div className="flex gap-1">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => startEdit(v)}
-                    >
+                    <Button size="sm" variant="ghost" onClick={() => startEdit(v)}>
                       <Edit2 size={14} />
                     </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
+                    <Button 
+                      size="sm" 
+                      variant="ghost" 
                       onClick={() => handleDelete(v.id)}
+                      className="text-destructive hover:text-destructive"
                     >
                       <Trash2 size={14} />
                     </Button>
@@ -270,48 +326,43 @@ export default function ProductVariantsInline({
         })}
 
         {adding && (
-          <div className="border border-[hsl(var(--border))] rounded-lg p-3 space-y-2">
-            <Input
-              placeholder="Title (e.g., Default, Size 7)"
-              value={formTitle}
-              onChange={(e) => setFormTitle(e.target.value)}
-            />
-            <Input
-              placeholder="SKU (optional)"
-              value={formSku}
-              onChange={(e) => setFormSku(e.target.value)}
-            />
-            <Input
-              type="number"
-              step="0.01"
-              placeholder="Price Override (optional)"
-              value={formPrice}
-              onChange={(e) => setFormPrice(e.target.value)}
-            />
-            <Input
-              type="number"
-              placeholder="Weight in grams (optional)"
-              value={formWeight}
-              onChange={(e) => setFormWeight(e.target.value)}
-            />
+          <div className="border-2 border-dashed border-[hsl(var(--border))] rounded-lg p-3 space-y-3">
+            <h4 className="text-sm font-semibold">Add New Variant</h4>
+            <div className="grid grid-cols-2 gap-2">
+              <Input
+                value={formTitle}
+                onChange={(e) => setFormTitle(e.target.value)}
+                placeholder="Title (e.g., Blue / Large)"
+              />
+              <Input
+                value={formSku}
+                onChange={(e) => setFormSku(e.target.value)}
+                placeholder="SKU (optional)"
+              />
+              <Input
+                value={formPrice}
+                onChange={(e) => setFormPrice(e.target.value)}
+                placeholder="Price (USD)"
+              />
+              <Input
+                value={formWeight}
+                onChange={(e) => setFormWeight(e.target.value)}
+                placeholder="Weight (grams)"
+              />
+            </div>
             <div className="flex gap-2">
               <Button size="sm" onClick={handleAdd} disabled={saving}>
-                <Plus size={14} className="mr-1" />
-                Add
+                <Save size={14} className="mr-1" />
+                {saving ? "Adding..." : "Add Variant"}
               </Button>
               <Button size="sm" variant="outline" onClick={cancel}>
+                <X size={14} className="mr-1" />
                 Cancel
               </Button>
             </div>
           </div>
         )}
       </div>
-
-      {variants.length === 0 && !adding && (
-        <div className="text-center py-8 text-sm text-[hsl(var(--muted-foreground))]">
-          No variants yet. Click "Add Variant" to create one.
-        </div>
-      )}
     </div>
   );
 }
