@@ -8,7 +8,6 @@ function jsonError(status: number, code: string, message: string, details?: any)
   );
 }
 
-// TODO: Replace with your real role gating (admin/catalog manager)
 async function requireAdmin(supabase: Awaited<ReturnType<typeof createServerClient>>) {
   const { data } = await supabase.auth.getUser();
   if (!data.user) return { ok: false };
@@ -18,21 +17,24 @@ async function requireAdmin(supabase: Awaited<ReturnType<typeof createServerClie
 /**
  * POST /api/inventory/movements
  *
- * Insert an inventory movement row. The database trigger should apply the movement
- * to the variant's stock fields (stock_on_hand, etc.).
+ * Insert an inventory movement row using the ACTUAL schema:
+ * - delta_qty (signed integer, not just "quantity")
+ * - reason (not "movement_type")
  *
  * Body:
  * {
  *   "variant_id": "uuid",               // required
- *   "movement_type": "restock" | "sale" | "adjustment" | "damage" | "return",
- *   "quantity": 5,                      // required (positive integer)
+ *   "delta_qty": 5,                     // required (positive = add, negative = remove)
+ *   "reason": "initial" | "restock" | "sale" | "refund" | "adjustment" | "damage" | "return" | "transfer",
  *   "note": "optional text",            // optional
- *   "reference": "order_123"            // optional (order id / external ref)
+ *   "reference_type": "orders",         // optional (e.g., "orders", "purchase_orders", "manual")
+ *   "reference_id": "uuid"              // optional (order id / external ref)
  * }
  *
  * Notes:
- * - Keep quantity positive. movement_type determines direction.
- * - If your schema uses signed quantities instead, tell me and I'll adjust.
+ * - delta_qty is SIGNED: positive = add stock, negative = remove stock
+ * - reason must match DB constraint
+ * - The database trigger should apply the movement to inventory.quantity
  */
 export async function POST(req: NextRequest) {
   // ✅ FIX: Await the createServerClient call
@@ -51,44 +53,60 @@ export async function POST(req: NextRequest) {
   }
 
   const variant_id = body?.variant_id;
-  const movement_type = body?.movement_type;
-  const quantity = body?.quantity;
+  const delta_qty = body?.delta_qty;
+  const reason = body?.reason;
   const note = body?.note ?? null;
-  const reference = body?.reference ?? null;
+  const reference_type = body?.reference_type ?? null;
+  const reference_id = body?.reference_id ?? null;
 
   if (!variant_id || typeof variant_id !== "string") {
     return jsonError(400, "INVALID_VARIANT_ID", "variant_id is required");
   }
 
-  if (
-    !movement_type ||
-    typeof movement_type !== "string" ||
-    !["restock", "sale", "adjustment", "damage", "return"].includes(movement_type)
-  ) {
+  // ✅ FIX: Use "reason" not "movement_type"
+  const validReasons = [
+    "initial",
+    "restock", 
+    "sale", 
+    "refund", 
+    "adjustment", 
+    "damage", 
+    "return", 
+    "transfer"
+  ];
+
+  if (!reason || typeof reason !== "string" || !validReasons.includes(reason)) {
     return jsonError(
       400,
-      "INVALID_MOVEMENT_TYPE",
-      "movement_type must be restock|sale|adjustment|damage|return"
+      "INVALID_REASON",
+      `reason must be one of: ${validReasons.join(", ")}`
     );
   }
 
+  // ✅ FIX: Use "delta_qty" (signed) not "quantity" (unsigned)
   if (
-    typeof quantity !== "number" ||
-    !Number.isFinite(quantity) ||
-    quantity <= 0 ||
-    !Number.isInteger(quantity)
+    typeof delta_qty !== "number" ||
+    !Number.isFinite(delta_qty) ||
+    !Number.isInteger(delta_qty) ||
+    delta_qty === 0  // DB constraint: delta_qty <> 0
   ) {
-    return jsonError(400, "INVALID_QUANTITY", "quantity must be a positive integer");
+    return jsonError(
+      400, 
+      "INVALID_DELTA_QTY", 
+      "delta_qty must be a non-zero integer (positive = add, negative = remove)"
+    );
   }
 
+  // ✅ FIX: Insert using actual column names
   const { data, error } = await supabase
     .from("inventory_movements")
     .insert({
       variant_id,
-      movement_type,
-      quantity,
+      delta_qty,           // ✅ Correct column name
+      reason,              // ✅ Correct column name
       note,
-      reference,
+      reference_type,      // ✅ Correct column name
+      reference_id,        // ✅ Correct column name
     })
     .select()
     .single();
@@ -97,9 +115,18 @@ export async function POST(req: NextRequest) {
     return jsonError(500, "MOVEMENT_CREATE_FAILED", error.message);
   }
 
-  /**
-   * Optional: return updated variant snapshot too (handy for admin UI)
-   * If you want that, say "include variant", and I'll add it.
-   */
-  return NextResponse.json({ ok: true, data });
+  // Optional: Return updated inventory snapshot
+  const { data: inventory } = await supabase
+    .from("inventory")
+    .select("*")
+    .eq("variant_id", variant_id)
+    .single();
+
+  return NextResponse.json({ 
+    ok: true, 
+    data: {
+      movement: data,
+      inventory
+    }
+  });
 }

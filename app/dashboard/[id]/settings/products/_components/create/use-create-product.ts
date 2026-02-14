@@ -193,6 +193,8 @@ export function useCreateProduct(onOpenChange: (v: boolean) => void, onCreated: 
     if (cents === null || cents < 0) return toast.error("Price must be valid");
 
     setCreating(true);
+    let productId: string | null = null;
+
     try {
       const res = await fetch("/api/products/admin", {
         method: "POST",
@@ -209,38 +211,51 @@ export function useCreateProduct(onOpenChange: (v: boolean) => void, onCreated: 
 
       const json = await safeReadJson(res);
       if (!res.ok || !json?.ok) throw new Error(json?.error?.message ?? "Failed to create product");
-      const productId = json.data?.id;
+      productId = json.data?.id;
 
-      for (const variant of variants) {
-        const weight = variant.weight_grams.trim() === "" ? null : Number(variant.weight_grams);
-        const override = variant.price_override.trim() === "" ? null : moneyToCents(variant.price_override);
-        const finalVariantSku = (variant.sku.trim() || generateVariantSku(variant)) || null;
+      // ✅ Create variants (if any) - with transaction rollback on failure
+      try {
+        for (const variant of variants) {
+          const weight = variant.weight_grams.trim() === "" ? null : Number(variant.weight_grams);
+          const override = variant.price_override.trim() === "" ? null : moneyToCents(variant.price_override);
+          const stock = variant.initial_stock.trim() === "" ? null : Number(variant.initial_stock);
 
-        const vRes = await fetch(`/api/products/admin/${productId}/variants`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            title: variant.title.trim() || "Default",
-            sku: finalVariantSku,
-            options: buildVariantOptions(variant),
-            weight_grams: weight,
-            price_cents: override,
-          }),
-        });
+          // ✅ FIXED: Generate SKU properly
+          let finalVariantSku: string | null = null;
+          if (variant.sku.trim()) {
+            // User provided custom SKU
+            finalVariantSku = variant.sku.trim();
+          } else {
+            // Auto-generate from base SKU + size
+            finalVariantSku = generateVariantSku(variant);
+          }
 
-        const vJson = await safeReadJson(vRes);
-        if (vRes.ok && vJson?.ok && variant.initial_stock.trim()) {
-          await fetch("/api/inventory/movements", {
+          const vRes = await fetch(`/api/products/admin/${productId}/variants`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              variant_id: vJson.data.id,
-              delta_qty: Number(variant.initial_stock),
-              reason: "initial",
-              note: `Initial stock for ${variant.title || finalVariantSku}`,
+              title: variant.title.trim() || "Default",
+              sku: finalVariantSku,
+              options: buildVariantOptions(variant),
+              weight_grams: weight,
+              price_cents: override ?? cents,
+              track_inventory: stock !== null && stock > 0,
+              quantity: stock ?? 0,
             }),
           });
+
+          const vJson = await safeReadJson(vRes);
+          if (!vRes.ok || !vJson?.ok) {
+            console.error("Variant creation failed:", vJson);
+            throw new Error(vJson?.error?.message ?? `Failed to create variant: ${variant.title || finalVariantSku}`);
+          }
         }
+      } catch (variantError: any) {
+        // ✅ ROLLBACK: Delete the product if variant creation fails
+        if (productId) {
+          await fetch(`/api/products/admin/${productId}`, { method: "DELETE" });
+        }
+        throw new Error(`Product creation rolled back - ${variantError.message}`);
       }
 
       await Promise.all([
@@ -300,6 +315,7 @@ export function useCreateProduct(onOpenChange: (v: boolean) => void, onCreated: 
       addMadeIn, updateMadeIn, removeMadeIn,
       handleFilesSelected, updateImageAlt, removeImage, setPrimaryImage,
       addVariant, updateVariant, removeVariant,
+      setVariants,  // ✅ NEW: Allow bulk setting of variants
       setSelectedCategoryIds, setSelectedCollectionIds,
       setAvailableCategories, setAvailableCollections,
       create, reset

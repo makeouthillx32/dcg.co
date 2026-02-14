@@ -96,9 +96,23 @@ export default function CreateProductModal({
             </div>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-semibold">Price (USD)</label>
-            <Input value={state.price} onChange={(e) => actions.setPrice(e.target.value)} />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="text-sm font-semibold">Price (USD)</label>
+              <Input value={state.price} onChange={(e) => actions.setPrice(e.target.value)} />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-semibold">Base SKU (Optional)</label>
+              <Input 
+                value={state.baseSku} 
+                onChange={(e) => actions.setBaseSku(e.target.value)}
+                placeholder="e.g., LC2542552-P1720"
+              />
+              <p className="text-xs text-muted-foreground">
+                Variants will use: BASE-S, BASE-M, BASE-L, etc.
+              </p>
+            </div>
           </div>
 
           <div className="space-y-2">
@@ -116,9 +130,10 @@ export default function CreateProductModal({
             />
           </CollapsibleSection>
 
-          <CollapsibleSection title="Variants" description="Sizes, colors, materials, and stock" open={secVariantsOpen} onToggle={() => setSecVariantsOpen(!secVariantsOpen)}>
+          <CollapsibleSection title="Variants" description="Sizes, colors, materials, made in, and base SKU" open={secVariantsOpen} onToggle={() => setSecVariantsOpen(!secVariantsOpen)}>
             <VariantSection 
               variants={state.variants}
+              baseSku={state.baseSku}
               availableSizes={state.availableSizes}
               availableColors={state.availableColors}
               availableMaterials={state.availableMaterials}

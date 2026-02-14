@@ -24,7 +24,14 @@ async function requireAdmin(supabase: SupabaseClient) {
  *   "sku": "SKU-123",                   // optional
  *   "price_cents": 1999,                // optional (defaults to product price_cents)
  *   "compare_at_price_cents": 2499,     // optional
+ *   "weight_grams": 310,                // optional
  *   "position": 0,                      // optional (defaults to append)
+ *   "options": {                        // ✅ NEW! Store variant attributes
+ *     "size": "S",
+ *     "color": {"name": "Brown", "hex": "#8B4513"},
+ *     "material": "Cotton Blend",
+ *     "made_in": "USA"
+ *   },
  *
  *   // inventory (aligned to Supabase schema)
  *   "track_inventory": true,            // optional (or legacy: inventory_enabled)
@@ -56,6 +63,18 @@ export async function POST(req: NextRequest, { params }: Params) {
   const sku = body?.sku ?? null;
   if (sku !== null && typeof sku !== "string") {
     return jsonError(400, "INVALID_SKU", "sku must be a string or null");
+  }
+
+  // ✅ NEW: Extract options field (size, color, material, made_in, etc.)
+  const options = body?.options ?? {};
+  if (typeof options !== "object" || Array.isArray(options)) {
+    return jsonError(400, "INVALID_OPTIONS", "options must be an object");
+  }
+
+  // ✅ NEW: Extract weight_grams
+  const weight_grams = body?.weight_grams ?? null;
+  if (weight_grams !== null && (typeof weight_grams !== "number" || weight_grams < 0)) {
+    return jsonError(400, "INVALID_WEIGHT", "weight_grams must be a number >= 0 or null");
   }
 
   // position: append by default
@@ -131,13 +150,15 @@ export async function POST(req: NextRequest, { params }: Params) {
     return jsonError(400, "INVALID_QUANTITY", "quantity/stock_on_hand must be a number >= 0");
   }
 
-  // 1) Create variant row using REAL columns
+  // 1) Create variant row with ALL fields including options
   const { data: variant, error: vErr } = await supabase
     .from("product_variants")
     .insert({
       product_id: productId,
       title,
       sku,
+      options,              // ✅ ADDED: Store size, color, material, made_in
+      weight_grams,         // ✅ ADDED: Store weight
       price_cents,
       compare_at_price_cents,
       position,
