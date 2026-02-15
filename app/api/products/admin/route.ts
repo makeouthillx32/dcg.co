@@ -116,7 +116,7 @@ export async function GET(req: NextRequest) {
  * POST /api/products/admin
  * Create product (draft)
  *
- * Body: { slug, title, description?, price_cents }
+ * Body: { slug, title, description?, material?, made_in?, price_cents }
  */
 export async function POST(req: NextRequest) {
   const supabase = await createServerClient();
@@ -131,7 +131,8 @@ export async function POST(req: NextRequest) {
     return jsonError(400, "INVALID_JSON", "Body must be valid JSON");
   }
 
-  const { slug, title, description = null, price_cents } = body ?? {};
+  // ✅ Extract material and made_in from body
+  const { slug, title, description = null, material = null, made_in = null, price_cents } = body ?? {};
 
   if (!slug || typeof slug !== "string") {
     return jsonError(400, "INVALID_SLUG", "slug is required");
@@ -143,12 +144,15 @@ export async function POST(req: NextRequest) {
     return jsonError(400, "INVALID_PRICE", "price_cents must be a number >= 0");
   }
 
+  // ✅ Insert with material and made_in
   const { data, error } = await supabase
     .from("products")
     .insert({
       slug,
       title,
       description,
+      material,       // ✅ NEW
+      made_in,        // ✅ NEW
       price_cents,
       status: "draft",
     })
@@ -158,6 +162,8 @@ export async function POST(req: NextRequest) {
       slug,
       title,
       description,
+      material,
+      made_in,
       price_cents,
       compare_at_price_cents,
       currency,

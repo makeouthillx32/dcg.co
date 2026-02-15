@@ -3,7 +3,6 @@ import { Trash2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "react-hot-toast";
-import { safeReadJson } from "../utils";
 
 interface AdvancedTabProps {
   productId: string;
@@ -31,11 +30,18 @@ export function AdvancedTab({
 
     setDeleting(true);
     try {
-      const res = await fetch(`/api/products/admin/${productId}`, {
-        method: "DELETE",
+      // Use Supabase direct deletion - cascading deletes will handle related records
+      const response = await fetch('/api/supabase/delete-product', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productId }),
       });
-      const json = await safeReadJson(res);
-      if (!res.ok || !json?.ok) throw new Error(json?.error?.message ?? "Failed to delete");
+
+      const result = await response.json();
+      
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Failed to delete product');
+      }
 
       toast.success("Product permanently deleted");
       onDeleted();
