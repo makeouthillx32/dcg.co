@@ -20,6 +20,19 @@ import {
   VariantInput 
 } from "../types";
 
+// ✅ Add OptionGroup type
+interface OptionGroup {
+  id: string;
+  name: string;
+  type: "size" | "color" | "custom";
+  options: Array<{
+    id: string;
+    value: string;
+    hex?: string;
+    weight?: string;
+  }>;
+}
+
 export function useCreateProduct(onOpenChange: (v: boolean) => void, onCreated: () => void) {
   const [title, setTitle] = useState("");
   const [slug, setSlug] = useState("");
@@ -39,6 +52,7 @@ export function useCreateProduct(onOpenChange: (v: boolean) => void, onCreated: 
   const [availableCollections, setAvailableCollections] = useState<CollectionRow[]>([]);
   const [selectedCollectionIds, setSelectedCollectionIds] = useState<string[]>([]);
   const [creating, setCreating] = useState(false);
+  const [customGroups, setCustomGroups] = useState<OptionGroup[]>([]); // ✅ Add custom groups state
 
   const cents = useMemo(() => moneyToCents(price), [price]);
   const autoSlug = () => setSlug(slugify(title));
@@ -83,9 +97,10 @@ export function useCreateProduct(onOpenChange: (v: boolean) => void, onCreated: 
     setVariants([]);
     setSelectedCategoryIds([]);
     setSelectedCollectionIds([]);
+    setCustomGroups([]); // ✅ Reset custom groups
   };
 
-  const generateVariantSku = (variant: VariantInput) => {
+  const generateVariantSku = (variant: VariantInput, customGroups?: Array<{ id: string; name: string; options: Array<{ id: string; value: string }> }>) => {
     const base = baseSku.trim();
     if (!base) return variant.sku;
 
@@ -110,6 +125,29 @@ export function useCreateProduct(onOpenChange: (v: boolean) => void, onCreated: 
       if (cleanColor) parts.push(cleanColor);
     }
 
+    // ✅ Add custom option groups (e.g., Style: TEE, CREW)
+    if (customGroups) {
+      customGroups.forEach(group => {
+        const selectionKey = `group_${group.id}_selection`;
+        const selectedIds = (variant.customOptions[selectionKey] as string[]) || [];
+        
+        if (selectedIds.length > 0) {
+          const selectedValues = selectedIds
+            .map(id => group.options.find(opt => opt.id === id)?.value)
+            .filter(Boolean);
+          
+          if (selectedValues.length > 0) {
+            // Use first 3-4 chars of each selected value
+            const identifier = selectedValues
+              .map(val => val.replace(/[^a-zA-Z0-9]/g, "").substring(0, 4).toUpperCase())
+              .join("");
+            
+            if (identifier) parts.push(identifier);
+          }
+        }
+      });
+    }
+
     // Add size if present
     const sizeId = variant.selectedSizes?.[0];
     const sizeVal = sizeId ? availableSizes.find(s => s.id === sizeId)?.value : null;
@@ -118,7 +156,7 @@ export function useCreateProduct(onOpenChange: (v: boolean) => void, onCreated: 
       parts.push(cleanSize);
     }
 
-    // ✅ Fallback: If no color or size added a differentiator, use variant title
+    // ✅ Fallback: If no differentiators added, use variant title
     if (parts.length === 1 && variant.title.trim()) {
       const titleIdentifier = variant.title
         .trim()
@@ -290,7 +328,7 @@ export function useCreateProduct(onOpenChange: (v: boolean) => void, onCreated: 
         if (variant.sku.trim()) {
           finalSku = variant.sku.trim();
         } else {
-          finalSku = generateVariantSku(variant);
+          finalSku = generateVariantSku(variant, customGroups);
         }
         
         if (!finalSku || finalSku === baseSku.trim()) {
@@ -348,7 +386,7 @@ export function useCreateProduct(onOpenChange: (v: boolean) => void, onCreated: 
             if (variant.sku.trim()) {
               finalVariantSku = variant.sku.trim();
             } else {
-              finalVariantSku = generateVariantSku(variant);
+              finalVariantSku = generateVariantSku(variant, customGroups);
             }
 
             const vRes = await fetch(`/api/products/admin/${productId}/variants`, {
@@ -452,7 +490,7 @@ export function useCreateProduct(onOpenChange: (v: boolean) => void, onCreated: 
     state: {
       title, slug, baseSku, price, description, material, madeIn, images, availableSizes, availableColors,
       availableMaterials, availableMadeIn, variants, availableCategories,
-      selectedCategoryIds, availableCollections, selectedCollectionIds, creating
+      selectedCategoryIds, availableCollections, selectedCollectionIds, creating, customGroups
     },
     actions: {
       setTitle, setSlug, setBaseSku, setPrice, setDescription, setMaterial, setMadeIn, autoSlug, autoBaseSku,
@@ -465,6 +503,7 @@ export function useCreateProduct(onOpenChange: (v: boolean) => void, onCreated: 
       setVariants,
       setSelectedCategoryIds, setSelectedCollectionIds,
       setAvailableCategories, setAvailableCollections,
+      setCustomGroups, // ✅ Export setCustomGroups
       create, reset
     }
   };
