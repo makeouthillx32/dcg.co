@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState } from "react";
 import {
-  X,
   Image as ImageIcon,
   Tag as TagIcon,
   Settings2,
@@ -85,20 +84,9 @@ export default function ProductModal({
             <DialogTitle className="flex items-center justify-between gap-3">
               <span className="truncate">{title}</span>
 
-              <div className="flex items-center gap-2">
-                {state.detail?.status && (
-                  <Badge variant="secondary">{state.detail.status}</Badge>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => onOpenChange(false)}
-                  className="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] transition-colors"
-                  aria-label="Close"
-                >
-                  <X size={18} />
-                </button>
-              </div>
+              {state.detail?.status && (
+                <Badge variant="secondary">{state.detail.status}</Badge>
+              )}
             </DialogTitle>
           </DialogHeader>
 

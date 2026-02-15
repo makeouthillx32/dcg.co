@@ -236,7 +236,7 @@ export function useCreateProduct(onOpenChange: (v: boolean) => void, onCreated: 
     if (!finalSlug) return toast.error("Slug is required");
     if (cents === null || cents < 0) return toast.error("Price must be valid");
 
-    // ✅ PRE-FLIGHT VALIDATION: Check for duplicate SKUs BEFORE creating product
+    // ✅ PRE-FLIGHT VALIDATION: Only validate variants if they exist
     if (variants.length > 0) {
       const generatedSkus = new Set<string>();
       
@@ -259,6 +259,14 @@ export function useCreateProduct(onOpenChange: (v: boolean) => void, onCreated: 
         
         generatedSkus.add(finalSku);
       }
+
+      // ✅ Only validate stock if variants have inventory tracking enabled
+      const hasInvalidStock = variants.some(
+        (v) => v.initial_stock.trim() !== "" && Number(v.initial_stock) < 0
+      );
+      if (hasInvalidStock) {
+        return toast.error("Stock levels cannot be negative");
+      }
     }
 
     setCreating(true);
@@ -272,8 +280,8 @@ export function useCreateProduct(onOpenChange: (v: boolean) => void, onCreated: 
           title: title.trim(), 
           slug: finalSlug, 
           description: description.trim() || null, 
-          material: material.trim() || null, // ✅ Save to DB
-          made_in: madeIn.trim() || null, // ✅ Save to DB
+          material: material.trim() || null,
+          made_in: madeIn.trim() || null,
           price_cents: cents, 
           status: "draft" 
         }),
@@ -283,41 +291,66 @@ export function useCreateProduct(onOpenChange: (v: boolean) => void, onCreated: 
       if (!res.ok || !json?.ok) throw new Error(json?.error?.message ?? "Failed to create product");
       productId = json.data?.id;
 
-      // ✅ Create variants (if any) - with transaction rollback on failure
+      // ✅ Create variants OR default variant
       try {
-        for (const variant of variants) {
-          const weight = variant.weight_grams.trim() === "" ? null : Number(variant.weight_grams);
-          const override = variant.price_override.trim() === "" ? null : moneyToCents(variant.price_override);
-          const stock = variant.initial_stock.trim() === "" ? null : Number(variant.initial_stock);
+        if (variants.length > 0) {
+          // Create user-defined variants
+          for (const variant of variants) {
+            const weight = variant.weight_grams.trim() === "" ? null : Number(variant.weight_grams);
+            const override = variant.price_override.trim() === "" ? null : moneyToCents(variant.price_override);
+            const stock = variant.initial_stock.trim() === "" ? null : Number(variant.initial_stock);
 
-          // ✅ Generate SKU from baseSku + size (UI-only, not saved to products table)
-          let finalVariantSku: string | null = null;
-          if (variant.sku.trim()) {
-            // User provided custom SKU
-            finalVariantSku = variant.sku.trim();
-          } else {
-            // Auto-generate from base SKU + size
-            finalVariantSku = generateVariantSku(variant);
+            let finalVariantSku: string | null = null;
+            if (variant.sku.trim()) {
+              finalVariantSku = variant.sku.trim();
+            } else {
+              finalVariantSku = generateVariantSku(variant);
+            }
+
+            const vRes = await fetch(`/api/products/admin/${productId}/variants`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                title: variant.title.trim() || "Default",
+                sku: finalVariantSku,
+                options: buildVariantOptions(variant),
+                weight_grams: weight,
+                price_cents: override ?? cents,
+                track_inventory: stock !== null && stock > 0,
+                quantity: stock ?? 0,
+              }),
+            });
+
+            const vJson = await safeReadJson(vRes);
+            if (!vRes.ok || !vJson?.ok) {
+              console.error("Variant creation failed:", vJson);
+              throw new Error(vJson?.error?.message ?? `Failed to create variant: ${variant.title || finalVariantSku}`);
+            }
           }
+        } else {
+          // ✅ NO VARIANTS: Create a default variant for simple products
+          const defaultOptions: Record<string, any> = {};
+          if (material.trim()) defaultOptions.material = material.trim();
+          if (madeIn.trim()) defaultOptions.made_in = madeIn.trim();
 
           const vRes = await fetch(`/api/products/admin/${productId}/variants`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              title: variant.title.trim() || "Default",
-              sku: finalVariantSku,
-              options: buildVariantOptions(variant),
-              weight_grams: weight,
-              price_cents: override ?? cents,
-              track_inventory: stock !== null && stock > 0,
-              quantity: stock ?? 0,
+              title: "Default",
+              sku: baseSku.trim() || `${finalSlug.toUpperCase()}-DEFAULT`,
+              options: defaultOptions,
+              weight_grams: null,
+              price_cents: cents,
+              track_inventory: false, // Simple products don't track inventory by default
+              quantity: 0,
             }),
           });
 
           const vJson = await safeReadJson(vRes);
           if (!vRes.ok || !vJson?.ok) {
-            console.error("Variant creation failed:", vJson);
-            throw new Error(vJson?.error?.message ?? `Failed to create variant: ${variant.title || finalVariantSku}`);
+            console.error("Default variant creation failed:", vJson);
+            throw new Error(vJson?.error?.message ?? "Failed to create default variant");
           }
         }
       } catch (variantError: any) {
