@@ -865,6 +865,835 @@ Then click:
 ```
 Create Product
 ```
+You’re absolutely right — with the new dynamic system, even simple products require clicking **“+ Add Custom Variant”** so the user can manually enter:
+
+* Weight (g)
+* Initial Stock
+* Optional SKU override
+
+Let’s correct the documentation properly.
 
 ---
+
+# 📘 DOCUMENTATION — TYPE 8
+
+## Simple Product (Single Variant – Manual Entry Required)
+
+Product Example:
+**Longhorn Beer Western Earrings**
+
+---
+
+# 🧭 STEP 1 — Base Product Setup
+
+### Title
+
+```
+Longhorn Beer Western Earrings
+```
+
+### Slug
+
+Auto-generate or:
+
+```
+longhorn-beer-western-earrings
+```
+
+### Price
+
+```
+14.00
+```
+
+### Made In
+
+```
+China
+```
+
+Material: leave blank unless provided.
+
+---
+
+# 📝 STEP 2 — Clean Description
+
+Remove:
+
+* MSRP
+* Wholesale prompts
+* Shipping info
+* Delivery windows
+
+Final Description:
+
+```
+Add a unique touch to your western style with our Longhorn Beer Western Earrings. 
+
+These earrings feature the iconic longhorn symbol and are perfect for any beer-loving cowgirl.
+
+Made with quality materials, these earrings make a statement while adding a playful charm to your outfit.
+```
+
+---
+
+# 🖼 STEP 3 — Images
+
+Upload image.
+
+Set ALT text to:
+
+```
+Longhorn Beer Western Earrings
+```
+
+Set as Primary if only one image.
+
+---
+
+# 🧩 STEP 4 — Variants (IMPORTANT)
+
+Even though this is a simple product:
+
+### You MUST click:
+
+```
++ Add Custom Variant
+```
+
+Do NOT leave the auto-created empty variant untouched.
+
+---
+
+# 🧾 STEP 5 — Fill Variant Fields
+
+After clicking **+ Add Custom Variant**, enter:
+
+### Title
+
+```
+Default
+```
+
+(or repeat product name — either is fine)
+
+### SKU
+
+Leave blank to auto-generate
+OR manually enter:
+
+```
+PRD-LONG-BEER
+```
+
+### Weight (g)
+
+```
+28.35
+```
+
+(Always use grams)
+
+### Initial Stock
+
+Enter current inventory quantity.
+
+Example:
+
+```
+10
+```
+
+Leave Price Override empty unless different from base price.
+
+---
+
+# ⚠️ Important System Note
+
+If you do NOT click **+ Add Custom Variant**, you will not be able to:
+
+* Enter weight
+* Enter stock
+* Track inventory properly
+
+Simple products still require a manually created variant in the UI.
+
+---
+
+# ✅ Final Checklist
+
+✔ Title entered
+✔ Slug confirmed
+✔ Price correct
+✔ Description cleaned
+✔ Image uploaded
+✔ Clicked **+ Add Custom Variant**
+✔ Weight entered (28.35 g)
+✔ Stock entered
+✔ SKU confirmed or auto-generated
+
+Then click:
+
+```
+Create Product
+```
+
+Perfect.
+Here is the **complete remake of TYPE 9 from the top**, including:
+
+* 2 color multi-size logic
+* Style/Fit handling
+* Size Guide (`sg`) image rule
+* Variant generation expectations
+* Weight handling
+
+---
+
+# 📘 DOCUMENTATION — TYPE 9
+
+## 2 COLOR + MULTI SIZE PRODUCT (WITH SIZE GUIDE IMAGE)
+
+---
+
+## 🛍 Product Example
+
+**Wholesale Women Retro Turn-Up Hem Wide-Leg Front Seam Jeans**
+WSP
+$45.38 MSRP
+
+Color: Dark Blue (and Blue)
+Fit: Contemporary
+Sizes: S, M, L, XL, 2XL
+Made in: China
+Weight: 0.6 kg (600 g)
+
+---
+
+# 🧱 STEP 1 — BASIC PRODUCT INFO
+
+### Title
+
+```
+Women Retro Turn-Up Hem Wide-Leg Front Seam Jeans
+```
+
+### Slug
+
+Click **Auto**
+
+### Price
+
+```
+45.38
+```
+
+### Base SKU
+
+Click **Auto**
+(Will generate something like `PRD-WOM-RET` depending on your logic)
+
+### Material
+
+Enter if provided (example: Premium Denim)
+
+### Made In
+
+```
+China
+```
+
+---
+
+# 📝 STEP 2 — DESCRIPTION (FILTER WEBSITE DATA)
+
+Include:
+
+✔ Product name
+✔ Key features
+✔ Bullet highlights
+✔ Important fabric notes
+
+Exclude:
+
+✘ Shipping policies
+✘ Unlock wholesale text
+✘ Estimated delivery
+✘ “With Faire…”
+✘ Marketing fluff
+
+---
+
+# 🖼 STEP 3 — IMAGE UPLOAD RULES (UPDATED STANDARD)
+
+Upload all images.
+
+### ALT TEXT STRUCTURE
+
+#### Variant Images
+
+ALT must match color name exactly:
+
+```
+Dark Blue
+Blue
+```
+
+Case sensitive consistency matters.
+
+---
+
+#### Size Guide Image
+
+For the sizing chart image, use:
+
+```
+sg
+```
+
+⚠ Rules:
+
+* Lowercase only
+* Do NOT assign to any variant
+* Do NOT treat as color
+* Do NOT generate variants from it
+
+The frontend will:
+
+* Detect `sg`
+* Hide it from color pairing
+* Render it in size guide UI
+
+---
+
+### Example ALT Structure for This Product
+
+```
+Dark Blue
+Dark Blue
+sg
+Blue
+Blue
+Blue
+```
+
+---
+
+# 🎛 STEP 4 — VARIANT STRUCTURE
+
+This is:
+
+### 2 Colors × 5 Sizes
+
+= 10 Variants Total
+
+---
+
+## Sizes & Weights
+
+Add:
+
+```
+S
+M
+L
+XL
+2XL
+```
+
+⚠ Weight Handling:
+
+Website shows:
+
+```
+0.6 kg (1.32 lb)
+```
+
+Convert to grams:
+
+```
+600 g
+```
+
+If all sizes share weight:
+
+* Enter 600 g for each size
+
+If different sizes have different weights:
+
+* Click each variant after generation
+* Adjust weight manually
+
+---
+
+## Colors
+
+Add:
+
+```
+Dark Blue
+Blue
+```
+
+Use color picker to approximate.
+
+---
+
+# 🔄 STEP 5 — GENERATE VARIANTS
+
+Click:
+
+```
+🔄 Generate Variants (All Selected Options)
+```
+
+You should now see:
+
+```
+Dark Blue / S
+Dark Blue / M
+Dark Blue / L
+Dark Blue / XL
+Dark Blue / 2XL
+Blue / S
+Blue / M
+Blue / L
+Blue / XL
+Blue / 2XL
+```
+
+Total: 10 Variants
+
+---
+
+# ⚖ STEP 6 — VERIFY VARIANT DATA
+
+For each variant:
+
+### SKU
+
+Auto-generated from:
+
+```
+Base SKU + Color + Size
+```
+
+Example:
+
+```
+PRD-WOM-RET-DARBLU-S
+```
+
+### Weight (g)
+
+```
+600
+```
+
+### Initial Stock
+
+Enter if known.
+
+### Price Override
+
+Leave blank unless needed.
+
+---
+
+# 🧠 STEP 7 — IMAGE TO VARIANT MATCHING
+
+Because ALT matches color names:
+
+When customer selects:
+
+* Dark Blue → Dark Blue images show
+* Blue → Blue images show
+
+`sg` image is excluded from variant switching.
+
+---
+
+# 📦 STEP 8 — CATEGORIES & COLLECTIONS
+
+Assign appropriate categories such as:
+
+* Bottoms & Sets
+* Denim
+* Shop
+* New Arrivals
+
+---
+
+# 🚀 FINAL CHECKLIST
+
+Before clicking Create:
+
+✔ Title correct
+✔ Slug generated
+✔ Price correct
+✔ Base SKU generated
+✔ Material entered correctly (NOT in description)
+✔ Made In correct
+✔ All images uploaded
+✔ ALT matches color names
+✔ Size Guide image labeled `sg`
+✔ Sizes added
+✔ Colors added
+✔ 10 variants generated
+✔ Weight in grams
+✔ SKUs unique
+✔ Categories assigned
+
+---
+
+Click:
+
+```
+Create Product
+```
+
+---
+
+# 🏗 SYSTEM NOTES (IMPORTANT)
+
+This product uses:
+
+```
+size + color → stored in options JSONB
+```
+
+Database stores:
+
+```json
+{
+  "size": "S",
+  "color": {
+    "name": "Dark Blue",
+    "hex": "#1F3A8A"
+  }
+}
+```
+
+Size Guide image:
+
+* Not stored in options
+* Handled at frontend level
+
+---
+
+# ✅ TYPE 9 SUMMARY
+
+Structure:
+
+```
+2 Colors
+5 Sizes
+1 sg image
+10 Variants
+Weight stored per variant in grams
+```
+
+UI Ready for:
+
+* Dynamic image switching
+* Size guide modal
+* SKU generation logic
+* Inventory tracking
+
+---
+Perfect.
+This is a **multi-size, no color** product.
+
+That means:
+
+* ✅ Sizes only
+* ❌ No color group
+* ❌ No style group
+* 1 image
+* Weight not provided (so leave blank unless manually known)
+
+---
+
+# 📘 DOCUMENTATION — TYPE 10
+
+## MULTI SIZE — NO COLOR PRODUCT
+
+---
+
+## 🛍 Product Example
+
+**Western Boho Christian Crewneck**
+WSP
+$42.00 MSRP
+
+Sizes: S, M, L, XL, 2XL, 3XL
+Made in: (Not specified — leave blank if not provided)
+Fit: Unisex
+
+---
+
+# 🧱 STEP 1 — BASIC PRODUCT INFO
+
+### Title
+
+```
+Western Boho Christian Crewneck
+```
+
+### Slug
+
+Click **Auto**
+
+### Price
+
+```
+42.00
+```
+
+### Base SKU
+
+Click **Auto**
+
+Since it is a crewneck/sweatshirt, your logic should generate something like:
+
+```
+WSP-WES-BOH
+```
+
+(Do not manually enter unless website provides structured SKU.)
+
+---
+
+### Material
+
+Not provided → Leave blank
+
+⚠ Do NOT put aesthetic, care instructions, or fit inside material.
+
+---
+
+### Made In
+
+Not provided → Leave blank
+
+---
+
+# 📝 STEP 2 — DESCRIPTION (FILTER WEBSITE DATA)
+
+Include:
+
+```
+Embrace your Western style with a Christian flair. This pullover features a boho graphic in a unisex fit for the perfect casual look.
+
+Aesthetic: Bohemian and Western  
+Care Instructions: Machine wash  
+Fit: Unisex  
+Season: Fall/Winter
+```
+
+Exclude:
+
+✘ Shipping policies
+✘ Unlock wholesale pricing
+✘ Estimated delivery
+✘ With Faire text
+
+---
+
+# 🖼 STEP 3 — IMAGE RULE
+
+Upload product image.
+
+Since there are no color variants:
+
+### ALT TEXT
+
+Use full product name:
+
+```
+Western Boho Christian Crewneck
+```
+
+Only one image = Primary.
+
+---
+
+# 🎛 STEP 4 — VARIANT STRUCTURE
+
+This is:
+
+### 6 Sizes
+
+No color
+No style
+
+---
+
+## Sizes & Weights
+
+Add:
+
+```
+S
+M
+L
+XL
+2XL
+3XL
+```
+
+If weight is provided per size:
+
+* Enter grams per size
+
+If weight not provided:
+
+* Leave weight blank
+* Or enter uniform weight if known
+
+⚠ This product did NOT list weight → leave blank.
+
+---
+
+## Colors
+
+Do NOT add any color group.
+
+---
+
+# 🔄 STEP 5 — GENERATE VARIANTS
+
+Click:
+
+```
+🔄 Generate Variants (All Selected Options)
+```
+
+You should now see:
+
+```
+S
+M
+L
+XL
+2XL
+3XL
+```
+
+Total: 6 Variants
+
+---
+
+# 🧾 STEP 6 — VERIFY VARIANTS
+
+Each variant should have:
+
+### Title
+
+Auto:
+
+```
+S
+M
+L
+XL
+2XL
+3XL
+```
+
+### SKU
+
+Auto-generated:
+
+Example:
+
+```
+WSP-WES-BOH-S
+WSP-WES-BOH-M
+WSP-WES-BOH-L
+...
+```
+
+Each must be unique.
+
+### Weight (g)
+
+Leave blank unless known.
+
+### Initial Stock
+
+Enter if known.
+
+---
+
+# 🧠 STEP 7 — HOW THIS STORES IN DB
+
+Each variant will store:
+
+```json
+{
+  "size": "M"
+}
+```
+
+No color field.
+
+No style field.
+
+Simple clean structure.
+
+---
+
+# 📦 STEP 8 — CATEGORIES
+
+Assign:
+
+* Graphic Tees (if applicable)
+* Tops
+* Shop
+* New Arrivals
+* Christian Collection (if exists)
+
+---
+
+# 🚀 FINAL CHECKLIST
+
+Before clicking Create:
+
+✔ Title correct
+✔ Slug generated
+✔ Price correct
+✔ Base SKU generated
+✔ Description cleaned
+✔ Image uploaded
+✔ ALT matches product name
+✔ Sizes added
+✔ No color group added
+✔ 6 variants generated
+✔ SKUs unique
+✔ Categories assigned
+
+---
+
+Click:
+
+```
+Create Product
+```
+
+---
+
+# ✅ TYPE 10 SUMMARY
+
+Structure:
+
+```
+Multi Size
+No Color
+No Style
+6 Variants
+Weight optional
+1 Primary Image
+```
+
+This is your cleanest variant type.
 

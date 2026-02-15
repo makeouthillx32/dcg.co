@@ -480,11 +480,7 @@ export function VariantSection({
                   value={v.title} 
                   onChange={(e) => actions.updateVariant(v.id, "title", e.target.value)} 
                   placeholder="Title" 
-                />
-                <Input 
-                  value={v.sku} 
-                  onChange={(e) => actions.updateVariant(v.id, "sku", e.target.value)} 
-                  placeholder="SKU (auto-generated if empty)" 
+                  className="md:col-span-2"
                 />
                 
                 {/* Show selected options */}
