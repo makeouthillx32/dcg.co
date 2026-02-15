@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { VariantInput, SizeOption, ColorOption } from "./types";
+import { VariantInput, SizeOption, ColorOption } from "../types";
 
 interface VariantSectionProps {
   variants: VariantInput[];
@@ -45,6 +45,48 @@ export function VariantSection({
       : [...current, optionId];
     
     actions.updateVariant(variantId, field, updated);
+  };
+
+  // ✅ Custom field management
+  const addCustomField = (variantId: string, fieldName: string, fieldValue: string) => {
+    const variant = variants.find(v => v.id === variantId);
+    if (!variant) return;
+
+    const updatedOptions = {
+      ...variant.customOptions,
+      [fieldName]: fieldValue
+    };
+
+    actions.updateVariant(variantId, "customOptions", updatedOptions);
+  };
+
+  const removeCustomField = (variantId: string, fieldName: string) => {
+    const variant = variants.find(v => v.id === variantId);
+    if (!variant) return;
+
+    const updatedOptions = { ...variant.customOptions };
+    delete updatedOptions[fieldName];
+
+    actions.updateVariant(variantId, "customOptions", updatedOptions);
+  };
+
+  const updateCustomField = (variantId: string, oldKey: string, newKey: string, value: string) => {
+    const variant = variants.find(v => v.id === variantId);
+    if (!variant) return;
+
+    const updatedOptions = { ...variant.customOptions };
+    
+    // Remove old key if name changed
+    if (oldKey !== newKey && oldKey in updatedOptions) {
+      delete updatedOptions[oldKey];
+    }
+    
+    // Add/update with new key
+    if (newKey.trim()) {
+      updatedOptions[newKey] = value;
+    }
+
+    actions.updateVariant(variantId, "customOptions", updatedOptions);
   };
 
   const handleAddCustomVariant = () => {
@@ -138,7 +180,7 @@ export function VariantSection({
                 placeholder="Weight" 
                 className="flex-1"
               />
-              <Button type="button" variant="ghost" size="sm" onClick={() => actions.removeSize(s.id)}>
+              <Button type="button" size="sm" variant="ghost" onClick={() => actions.removeSize(s.id)}>
                 <X size={14} />
               </Button>
             </div>
@@ -155,9 +197,24 @@ export function VariantSection({
           </div>
           {availableColors.map((c) => (
             <div key={c.id} className="flex gap-2">
-              <Input id={`color-name-${c.id}`} name={`color-name-${c.id}`} value={c.name} onChange={(e) => actions.updateColor(c.id, "name", e.target.value)} placeholder="Blue" />
-              <Input id={`color-hex-${c.id}`} name={`color-hex-${c.id}`} type="color" value={c.hex} onChange={(e) => actions.updateColor(c.id, "hex", e.target.value)} className="w-12 p-1" />
-              <Button type="button" variant="ghost" size="sm" onClick={() => actions.removeColor(c.id)}><X size={14} /></Button>
+              <Input 
+                id={`color-name-${c.id}`}
+                name={`color-name-${c.id}`}
+                value={c.name} 
+                onChange={(e) => actions.updateColor(c.id, "name", e.target.value)} 
+                placeholder="Color name" 
+                className="flex-1"
+              />
+              <input 
+                id={`color-hex-${c.id}`}
+                type="color" 
+                value={c.hex} 
+                onChange={(e) => actions.updateColor(c.id, "hex", e.target.value)} 
+                className="w-12 h-10 rounded border border-[hsl(var(--border))]"
+              />
+              <Button type="button" size="sm" variant="ghost" onClick={() => actions.removeColor(c.id)}>
+                <X size={14} />
+              </Button>
             </div>
           ))}
         </div>
@@ -167,8 +224,7 @@ export function VariantSection({
         <Button 
           type="button" 
           onClick={generateVariantsFromOptions} 
-          variant="default"
-          className="flex-1"
+          variant="outline"
         >
           🔄 Generate Variants (Color x Size)
         </Button>
@@ -188,12 +244,26 @@ export function VariantSection({
             <div key={v.id} className="border-2 border-[hsl(var(--border))] rounded-lg p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <h4 className="text-sm font-semibold">Variant {idx + 1}: {v.title}</h4>
-                <Button type="button" variant="ghost" size="sm" onClick={() => actions.removeVariant(v.id)}><X size={16} /></Button>
+                <Button type="button" variant="ghost" size="sm" onClick={() => actions.removeVariant(v.id)}>
+                  <X size={16} />
+                </Button>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <Input id={`v-title-${v.id}`} name={`v-title-${v.id}`} value={v.title} onChange={(e) => actions.updateVariant(v.id, "title", e.target.value)} placeholder="Title" />
-                <Input id={`v-sku-${v.id}`} name={`v-sku-${v.id}`} value={v.sku} onChange={(e) => actions.updateVariant(v.id, "sku", e.target.value)} placeholder="SKU (auto-generated if empty)" />
+                <Input 
+                  id={`v-title-${v.id}`} 
+                  name={`v-title-${v.id}`} 
+                  value={v.title} 
+                  onChange={(e) => actions.updateVariant(v.id, "title", e.target.value)} 
+                  placeholder="Title" 
+                />
+                <Input 
+                  id={`v-sku-${v.id}`} 
+                  name={`v-sku-${v.id}`} 
+                  value={v.sku} 
+                  onChange={(e) => actions.updateVariant(v.id, "sku", e.target.value)} 
+                  placeholder="SKU (auto-generated if empty)" 
+                />
                 
                 <div className="md:col-span-2 space-y-2">
                   <label className="text-xs font-semibold">Options Attached (Read-Only)</label>
@@ -223,9 +293,86 @@ export function VariantSection({
                   </div>
                 </div>
 
-                <Input id={`v-weight-${v.id}`} name={`v-weight-${v.id}`} value={v.weight_grams} onChange={(e) => actions.updateVariant(v.id, "weight_grams", e.target.value)} placeholder="Weight (g)" />
-                <Input id={`v-stock-${v.id}`} name={`v-stock-${v.id}`} value={v.initial_stock} onChange={(e) => actions.updateVariant(v.id, "initial_stock", e.target.value)} placeholder="Initial Stock" />
-                <Input id={`v-price-${v.id}`} name={`v-price-${v.id}`} className="md:col-span-2" value={v.price_override} onChange={(e) => actions.updateVariant(v.id, "price_override", e.target.value)} placeholder="Price Override (optional)" />
+                <Input 
+                  id={`v-weight-${v.id}`} 
+                  name={`v-weight-${v.id}`} 
+                  value={v.weight_grams} 
+                  onChange={(e) => actions.updateVariant(v.id, "weight_grams", e.target.value)} 
+                  placeholder="Weight (g)" 
+                />
+                <Input 
+                  id={`v-stock-${v.id}`} 
+                  name={`v-stock-${v.id}`} 
+                  value={v.initial_stock} 
+                  onChange={(e) => actions.updateVariant(v.id, "initial_stock", e.target.value)} 
+                  placeholder="Initial Stock" 
+                />
+                <Input 
+                  id={`v-price-${v.id}`} 
+                  name={`v-price-${v.id}`} 
+                  className="md:col-span-2" 
+                  value={v.price_override} 
+                  onChange={(e) => actions.updateVariant(v.id, "price_override", e.target.value)} 
+                  placeholder="Price Override (optional)" 
+                />
+
+                {/* ✅ Custom Fields Section */}
+                <div className="md:col-span-2 border-t border-[hsl(var(--border))] pt-3 mt-2">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-xs font-semibold">Additional Fields</label>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        const fieldName = prompt("Field name (e.g., dimensions, length, width):");
+                        if (fieldName && fieldName.trim()) {
+                          addCustomField(v.id, fieldName.trim().toLowerCase(), "");
+                        }
+                      }}
+                    >
+                      <Plus size={12} /> Add Field
+                    </Button>
+                  </div>
+
+                  {Object.entries(v.customOptions).length > 0 ? (
+                    <div className="space-y-2">
+                      {Object.entries(v.customOptions).map(([key, value]) => (
+                        <div key={key} className="flex gap-2">
+                          <Input
+                            value={key}
+                            onChange={(e) => {
+                              const newKey = e.target.value;
+                              updateCustomField(v.id, key, newKey, value as string);
+                            }}
+                            placeholder="Field name"
+                            className="flex-1"
+                          />
+                          <Input
+                            value={value as string}
+                            onChange={(e) => {
+                              updateCustomField(v.id, key, key, e.target.value);
+                            }}
+                            placeholder="Value"
+                            className="flex-[2]"
+                          />
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => removeCustomField(v.id, key)}
+                          >
+                            <X size={14} />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground italic">
+                      No additional fields. Click "+ Add Field" to add dimensions, measurements, etc.
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
           ))}

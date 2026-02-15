@@ -266,3 +266,215 @@ This guide covers **Type 1: Multi-Size, Single-Color** products.
 **Last Updated:** February 14, 2026
 **Version:** 1.0
 **Test Product:** Brown Western Aztec Printed Open Front Long Cardigan
+Perfect — then this is **not** Type 4 (single variant).
+
+This becomes:
+
+# TYPE 4
+
+# Multi-Color Only (No Size Matrix)
+
+(Accessory / Hat / One Size)
+
+This is used when:
+
+* One size (OSFM / Adjustable)
+* Multiple colorways
+* No size matrix
+* One weight per color (usually same weight)
+
+---
+
+# TYPE 4 – Multi-Color, One Size Product
+
+Example: **Howdy Honey Western Trucker Hat**
+
+Colors:
+
+* Tan/Brown
+* Tan/Camo
+
+No size options.
+
+---
+
+## 1️⃣ Basic Product Setup
+
+Title:
+
+```
+Howdy Honey Western Trucker Hat
+```
+
+Slug:
+Click **Auto**
+
+Price:
+
+```
+25.00
+```
+
+---
+
+## 2️⃣ Base SKU
+
+If vendor SKU is not provided, create normalized internal SKU:
+
+Example:
+
+```
+WSP-HOWDY-HAT
+```
+
+We will let the system append color logic (if used),
+or manually control per variant if needed.
+
+---
+
+## 3️⃣ Product-Level Metadata
+
+Made In:
+
+```
+United States
+```
+
+Material:
+Leave blank unless confirmed.
+
+Do NOT duplicate this in description.
+
+---
+
+## 4️⃣ Description (Filtered Properly)
+
+Remove:
+
+* Wholesale marketplace language
+* Shipping details
+* “Unlock wholesale pricing”
+* Packaging notes
+* Screen color disclaimer
+
+Keep clean product-focused content:
+
+```
+Show off your style in our Howdy Honey Country Western puff trucker hat.
+
+Features:
+- “Howdy Honey” in red puff ink
+- Removable small pin attached to each hat
+- Individually heat pressed
+- 5-panel construction
+- Mesh back with snapback closure
+```
+
+Keep formatting clean and readable.
+
+---
+
+## 5️⃣ Images + ALT Coordination (Important)
+
+Because this is color-based:
+
+Each image ALT must match the color variant exactly.
+
+Example:
+
+Image 1 ALT:
+
+```
+Howdy Honey Trucker Hat – Tan/Brown
+```
+
+Image 2 ALT:
+
+```
+Howdy Honey Trucker Hat – Tan/Camo
+```
+
+This keeps frontend mapping clean and allows color-image linking logic later.
+
+---
+
+## 6️⃣ Variants Section
+
+Do NOT add sizes.
+
+Under **Colors**, add:
+
+* Tan/Brown
+* Tan/Camo
+
+Then click:
+
+🔄 Generate Variants (Color x Size)
+
+Since no sizes exist, system will generate:
+
+2 variants total.
+
+---
+
+## 7️⃣ Variant Configuration
+
+Each variant will be:
+
+Variant 1:
+Tan/Brown
+
+Variant 2:
+Tan/Camo
+
+SKU handling:
+
+If using base SKU:
+System may append color automatically.
+
+If manually setting:
+
+```
+WSP-HOWDY-HAT-TANBRN
+WSP-HOWDY-HAT-TANCAMO
+```
+
+Weight:
+
+```
+85.05
+```
+
+Enter weight for both variants (if same).
+
+Initial Stock:
+Set individually per color.
+
+---
+
+## 8️⃣ Expected Result After Create
+
+System creates:
+
+1 Product
+2 Variants (one per color)
+No size matrix
+Weight stored at variant level
+Clean ALT ↔ color alignment
+
+---
+
+## ✅ Final Checklist Before Create
+
+* [ ] Clean description (filtered)
+* [ ] Color names match image ALT
+* [ ] No size options added
+* [ ] 2 variants generated
+* [ ] Weight entered per variant
+* [ ] SKUs normalized
+* [ ] Categories + Collections selected
+
+---
+
+This keeps accessory logic clean and scalable.
+

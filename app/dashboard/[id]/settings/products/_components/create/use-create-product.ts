@@ -91,15 +91,23 @@ export function useCreateProduct(onOpenChange: (v: boolean) => void, onCreated: 
 
     const parts = [base];
 
-    // Add color if present
+    // Add color if present (handles both color swatches AND charm variants)
     const colorId = variant.selectedColors?.[0];
     const colorObj = colorId ? availableColors.find(c => c.id === colorId) : null;
     if (colorObj?.name) {
-      const cleanColor = colorObj.name
-        .replace(/[^a-zA-Z0-9]/g, "")
-        .toUpperCase()
-        .substring(0, 3); // First 3 chars of color
-      parts.push(cleanColor);
+      const colorName = colorObj.name.trim();
+      
+      // Extract meaningful identifier from color name
+      // Handles cases like "Steerhead", "Wild West", "Brushed Silver", etc.
+      const cleanColor = colorName
+        .replace(/[^a-zA-Z0-9\s]/g, "") // Remove special chars but keep spaces
+        .trim()
+        .split(/\s+/) // Split by whitespace
+        .map(word => word.substring(0, 4).toUpperCase()) // Take first 4 chars of each word
+        .join("") // Join without separator
+        .substring(0, 6); // Max 6 chars total for color identifier
+      
+      if (cleanColor) parts.push(cleanColor);
     }
 
     // Add size if present
@@ -108,6 +116,19 @@ export function useCreateProduct(onOpenChange: (v: boolean) => void, onCreated: 
     if (sizeVal) {
       const cleanSize = sizeVal.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
       parts.push(cleanSize);
+    }
+
+    // ✅ Fallback: If no color or size added a differentiator, use variant title
+    if (parts.length === 1 && variant.title.trim()) {
+      const titleIdentifier = variant.title
+        .trim()
+        .replace(/[^a-zA-Z0-9\s]/g, "")
+        .split(/\s+/)
+        .map(word => word.substring(0, 3).toUpperCase())
+        .join("")
+        .substring(0, 6);
+      
+      if (titleIdentifier) parts.push(titleIdentifier);
     }
 
     return parts.length > 1 ? parts.join("-") : base;
@@ -250,11 +271,11 @@ export function useCreateProduct(onOpenChange: (v: boolean) => void, onCreated: 
         }
         
         if (!finalSku || finalSku === baseSku.trim()) {
-          return toast.error(`Variant "${variant.title}" has invalid SKU. Each variant needs a unique size selected.`);
+          return toast.error(`Variant "${variant.title}" has invalid SKU. Each variant needs a unique identifier (size, color, or custom SKU).`);
         }
         
         if (generatedSkus.has(finalSku)) {
-          return toast.error(`Duplicate SKU detected: "${finalSku}". Check that each variant has a unique size selected.`);
+          return toast.error(`Duplicate SKU detected: "${finalSku}". Each variant must have a unique combination of attributes.`);
         }
         
         generatedSkus.add(finalSku);
