@@ -331,7 +331,8 @@ export function useCreateProduct(onOpenChange: (v: boolean) => void, onCreated: 
           finalSku = generateVariantSku(variant, customGroups);
         }
         
-        if (!finalSku || finalSku === baseSku.trim()) {
+        // ✅ For simple products (no sizes, colors, or custom groups), SKU can equal base SKU
+        if (!finalSku) {
           return toast.error(`Variant "${variant.title}" has invalid SKU. Each variant needs a unique identifier (size, color, or custom SKU).`);
         }
         

@@ -627,3 +627,244 @@ pulled from the Size configuration.
 3. Generate Variants
 4. Add stock
 5. Create product
+Perfect — since this product only has **Style + Size** and no real color variation, we remove color entirely from this type.
+
+Here is the fully updated and corrected documentation.
+
+---
+
+# 📘 DOCUMENTATION — TYPE 7
+
+## Multi Size + Multi Style (No Color)
+
+Product Example:
+**WHOLESALE BOUJEE BRONC**
+
+---
+
+# 🧱 Product Structure
+
+This product contains:
+
+* Styles:
+
+  * TEE
+  * CREW
+* Sizes:
+
+  * S
+  * M
+  * L
+  * XL
+  * 2XL
+* No color variations
+
+This is a **Size × Style** dynamic variant product.
+
+---
+
+# 🧭 STEP 1 — Base Product Setup
+
+### Title
+
+```
+WHOLESALE BOUJEE BRONC
+```
+
+### Slug
+
+```
+wholesale-boujee-bronc
+```
+
+### Price
+
+```
+40.00
+```
+
+### Material
+
+Leave blank unless explicitly listed.
+
+### Made In
+
+```
+United States
+```
+
+---
+
+# 📝 STEP 2 — Description
+
+Remove:
+
+* MSRP
+* Wholesale prompts
+* Shipping policies
+* Delivery windows
+* Minimum quantities
+
+Final Description:
+
+```
+Step into the world of The Walking A with our TRUMP graphic sweatshirt. 
+This unique piece is an ideal addition to any wardrobe. 
+The unisex fit ensures comfort and style for all.
+
+Created with an emphasis on individuality, our sweatshirt reflects 
+The Walking A's commitment to helping you embrace your unique self.
+```
+
+Material does NOT go in description.
+
+---
+
+# 🖼️ STEP 3 — Images
+
+This product has one image.
+
+Upload the image.
+
+Since there are no color variations, ALT text should describe the product clearly:
+
+```
+Boujee Bronc Graphic
+```
+
+Do not use color-based ALT since color is not a variant.
+
+---
+
+# 🧩 STEP 4 — Variants Setup
+
+Expand:
+
+```
+Variants
+Sizes, colors, materials, made in, and base SKU
+```
+
+---
+
+## A) Sizes & Weights
+
+Add:
+
+* S
+* M
+* L
+* XL
+* 2XL
+
+The source lists:
+
+```
+Weight: 283.5 g
+```
+
+If weight does not change per size, enter:
+
+```
+283.5
+```
+
+for each size.
+
+Weight is stored per variant.
+
+---
+
+## B) Styles (Dynamic Option Group)
+
+Add Style options:
+
+```
+TEE
+CREW
+```
+
+This becomes a dynamic option group stored in JSON.
+
+---
+
+## C) Do NOT Add Colors
+
+Do not use the color section for this product.
+
+There is no color variation, so leave that section unused.
+
+---
+
+# 🔄 STEP 5 — Generate Variants
+
+Click:
+
+```
+Generate Variants
+```
+
+Your system will now generate:
+
+2 Styles × 5 Sizes = 10 Variants
+
+Examples:
+
+* TEE / S
+* TEE / M
+* CREW / S
+* CREW / XL
+
+---
+
+# 🧾 What Gets Stored in DB
+
+Example:
+
+```json
+{
+  "title": "CREW / M",
+  "sku": "WSP-BOUJ-BRON-CREW-M",
+  "options": {
+    "size": "M",
+    "style": "CREW"
+  },
+  "price_cents": 4000,
+  "weight_grams": 283.5
+}
+```
+
+No color object is included.
+
+---
+
+# ⚠️ Important Notes
+
+* No color option used.
+* Styles are dynamic.
+* Weight stored per variant.
+* Material is product-level only (if provided).
+* SKU auto-generation will append style + size.
+
+---
+
+# ✅ Final Checklist Before Create
+
+✔ Title entered
+✔ Slug confirmed
+✔ Price correct
+✔ Description cleaned
+✔ Image uploaded
+✔ Sizes added
+✔ Styles added
+✔ Variants generated (10 total)
+✔ Weight entered in grams
+
+Then click:
+
+```
+Create Product
+```
+
+---
+
