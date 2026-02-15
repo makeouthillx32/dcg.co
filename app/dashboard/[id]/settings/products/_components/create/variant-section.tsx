@@ -22,6 +22,7 @@ interface VariantSectionProps {
   baseSku: string;
   availableSizes: SizeOption[];
   availableColors: ColorOption[];
+  customGroups: OptionGroup[];
   actions: {
     addSize: () => void;
     updateSize: (id: string, value: string) => void;
@@ -33,6 +34,7 @@ interface VariantSectionProps {
     updateVariant: (id: string, field: keyof VariantInput, value: any) => void;
     removeVariant: (id: string) => void;
     setVariants?: (variants: VariantInput[]) => void;
+    setCustomGroups: (groups: OptionGroup[]) => void;
   };
 }
 
@@ -41,10 +43,10 @@ export function VariantSection({
   baseSku,
   availableSizes,
   availableColors,
+  customGroups,
   actions,
 }: VariantSectionProps) {
   const [localWeights, setLocalWeights] = useState<Record<string, string>>({});
-  const [customGroups, setCustomGroups] = useState<OptionGroup[]>([]);
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
 
   const generateId = () => Math.random().toString(36).substring(7);
@@ -74,13 +76,13 @@ export function VariantSection({
       options: []
     };
 
-    setCustomGroups([...customGroups, newGroup]);
+    actions.setCustomGroups([...customGroups, newGroup]);
   };
 
   // Remove custom option group
   const removeCustomGroup = (groupId: string) => {
     if (!confirm("Remove this option group and all its values?")) return;
-    setCustomGroups(customGroups.filter(g => g.id !== groupId));
+    actions.setCustomGroups(customGroups.filter(g => g.id !== groupId));
     
     // Also clear selections from variants
     if (actions.setVariants) {
@@ -96,7 +98,7 @@ export function VariantSection({
 
   // Add option to custom group (inline like Sizes & Weights)
   const addOptionToGroup = (groupId: string) => {
-    setCustomGroups(customGroups.map(g => {
+    actions.setCustomGroups(customGroups.map(g => {
       if (g.id === groupId) {
         return {
           ...g,
@@ -109,7 +111,7 @@ export function VariantSection({
 
   // Update option in custom group
   const updateGroupOption = (groupId: string, optionId: string, value: string) => {
-    setCustomGroups(customGroups.map(g => {
+    actions.setCustomGroups(customGroups.map(g => {
       if (g.id === groupId) {
         return {
           ...g,
@@ -124,7 +126,7 @@ export function VariantSection({
 
   // Remove option from custom group
   const removeGroupOption = (groupId: string, optionId: string) => {
-    setCustomGroups(customGroups.map(g => {
+    actions.setCustomGroups(customGroups.map(g => {
       if (g.id === groupId) {
         return {
           ...g,

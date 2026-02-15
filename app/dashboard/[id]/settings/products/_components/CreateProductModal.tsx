@@ -140,7 +140,7 @@ export default function CreateProductModal({
           </div>
 
           <div className="text-xs text-muted-foreground -mt-2">
-            Variants will use Base SKU + size (e.g., LC2542552-P1720-S, -M, -L)
+            Variants will use Base SKU + options + size (e.g., LC2542552-P1720-TEE-S, -CREW-M)
           </div>
 
           <div className="space-y-2">
@@ -158,13 +158,17 @@ export default function CreateProductModal({
             />
           </CollapsibleSection>
 
-          <CollapsibleSection title="Variants" description="Sizes, colors, materials, made in, and base SKU" open={secVariantsOpen} onToggle={() => setSecVariantsOpen(!secVariantsOpen)}>
+          <CollapsibleSection title="Variants" description="Sizes, colors, custom options" open={secVariantsOpen} onToggle={() => setSecVariantsOpen(!secVariantsOpen)}>
             <VariantSection 
               variants={state.variants}
               baseSku={state.baseSku}
               availableSizes={state.availableSizes}
               availableColors={state.availableColors}
-              actions={actions as any} 
+              customGroups={state.customGroups}
+              actions={{
+                ...actions,
+                setCustomGroups: actions.setCustomGroups
+              } as any} 
             />
           </CollapsibleSection>
 
