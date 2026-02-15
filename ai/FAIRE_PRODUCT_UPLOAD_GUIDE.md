@@ -476,5 +476,154 @@ Clean ALT ↔ color alignment
 
 ---
 
-This keeps accessory logic clean and scalable.
+# 🔹 Product Upload – Type 6 (Revised)
 
+## Multi-Size Product (Weight Stored on Size Level)
+
+Example:
+**Wranglin’ Country Western Graphic Crewneck**
+
+---
+
+# 🧠 Key UI Behavior (Important)
+
+In this product type:
+
+* Weight is entered inside **Sizes & Weights**
+* You must **click the size pill** to edit its weight
+* The weight auto-populates into the generated variants
+* You do NOT manually type weight inside each variant card
+
+This is critical.
+
+---
+
+# 🛠 Step 1 – Add Sizes (With Weight)
+
+In **Sizes & Weights**:
+
+Add:
+
+```
+S
+M
+L
+XL
+2XL
+```
+
+Then:
+
+👉 Click on each size
+👉 Enter weight in grams
+
+Vendor weight:
+
+```
+453.59 g
+```
+
+Since vendor does not differentiate by size, enter:
+
+```
+454
+```
+
+for all sizes.
+
+If actual weights vary, enter per size.
+
+Example:
+
+| Size | Weight (g) |
+| ---- | ---------- |
+| S    | 430        |
+| M    | 450        |
+| L    | 470        |
+| XL   | 490        |
+| 2XL  | 510        |
+
+---
+
+# ⚠ Important
+
+If you do not click the size and enter weight:
+
+* Generated variants will have empty weight
+* Shipping calculations will be incorrect
+
+Weight must exist at the size level BEFORE generating variants.
+
+---
+
+# 🎛 Step 2 – Generate Variants
+
+After all sizes have weight assigned:
+
+Click:
+
+```
+Generate Variants (Color x Size)
+```
+
+Since no colors exist, it will create:
+
+```
+S
+M
+L
+XL
+2XL
+```
+
+Each variant will now automatically inherit:
+
+```
+weight_grams
+```
+
+You do not need to re-enter weight inside the variant card.
+
+---
+
+# 📦 Step 3 – Inventory
+
+Now open each variant and set:
+
+```
+Initial Stock
+```
+
+Leave weight alone unless overriding.
+
+---
+
+# 🧬 What Happens in Database
+
+Variant stored as:
+
+```json
+{
+  "size": "M",
+  "material": "50% Cotton / 50% Polyester",
+  "made_in": "United States"
+}
+```
+
+And:
+
+```
+weight_grams: 454
+```
+
+pulled from the Size configuration.
+
+---
+
+# ✅ Correct Flow Order
+
+1. Add Sizes
+2. Click each size → Enter weight (grams)
+3. Generate Variants
+4. Add stock
+5. Create product
