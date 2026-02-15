@@ -64,7 +64,7 @@ export function VariantSection({
 
   // Add custom option group
   const addCustomOptionGroup = () => {
-    const name = prompt("Option Group Name (e.g., Style, Finish, Charm):");
+    const name = prompt("Group Name (e.g., Style, Finish, Charm):");
     if (!name || !name.trim()) return;
 
     const newGroup: OptionGroup = {
@@ -94,16 +94,13 @@ export function VariantSection({
     }
   };
 
-  // Add option to custom group
+  // Add option to custom group (inline like Sizes & Weights)
   const addOptionToGroup = (groupId: string) => {
-    const value = prompt("Option Value:");
-    if (!value || !value.trim()) return;
-
     setCustomGroups(customGroups.map(g => {
       if (g.id === groupId) {
         return {
           ...g,
-          options: [...g.options, { id: generateId(), value: value.trim() }]
+          options: [...g.options, { id: generateId(), value: "" }]
         };
       }
       return g;

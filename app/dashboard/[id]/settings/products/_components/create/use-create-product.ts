@@ -218,7 +218,7 @@ export function useCreateProduct(onOpenChange: (v: boolean) => void, onCreated: 
   const updateVariant = (id: string, field: keyof VariantInput, value: any) => setVariants(variants.map(v => (v.id === id ? { ...v, [field]: value } : v)));
   const removeVariant = (id: string) => setVariants(variants.filter(v => v.id !== id));
 
-  const buildVariantOptions = (variant: VariantInput) => {
+  const buildVariantOptions = (variant: VariantInput, customGroups?: Array<{ id: string; name: string; options: Array<{ id: string; value: string }> }>) => {
     const options: Record<string, any> = {};
     
     // Size from variant selections
@@ -242,8 +242,31 @@ export function useCreateProduct(onOpenChange: (v: boolean) => void, onCreated: 
       options.made_in = madeIn.trim();
     }
     
-    // Custom options
+    // ✅ Custom option groups (convert selection arrays to readable values)
+    if (customGroups) {
+      customGroups.forEach(group => {
+        const selectionKey = `group_${group.id}_selection`;
+        const selectedIds = (variant.customOptions[selectionKey] as string[]) || [];
+        
+        if (selectedIds.length > 0) {
+          const selectedValues = selectedIds
+            .map(id => group.options.find(opt => opt.id === id)?.value)
+            .filter(Boolean);
+          
+          if (selectedValues.length > 0) {
+            // Use the group name (lowercased) as the key in options
+            const optionKey = group.name.toLowerCase().replace(/\s+/g, '_');
+            options[optionKey] = selectedValues.length === 1 ? selectedValues[0] : selectedValues.join(", ");
+          }
+        }
+      });
+    }
+    
+    // ✅ Legacy custom options (string key-value pairs)
     Object.entries(variant.customOptions).forEach(([k, v]) => {
+      // Skip custom group selections (they're handled above)
+      if (k.startsWith('group_') && k.endsWith('_selection')) return;
+      
       const val = typeof v === "string" ? v.trim() : "";
       if (val) options[k] = val;
     });
