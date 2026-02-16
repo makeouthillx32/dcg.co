@@ -72,6 +72,17 @@ export default function CheckoutShippingPage() {
   // Tax calculation
   const [taxCents, setTaxCents] = useState(0);
   const [loadingTax, setLoadingTax] = useState(false);
+  
+  // Promo discount (client-side only)
+  const [promoDiscount, setPromoDiscount] = useState(0);
+
+  // Load promo discount from sessionStorage (client-side only)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const discount = parseInt(sessionStorage.getItem('discount_cents') || '0');
+      setPromoDiscount(discount);
+    }
+  }, []);
 
   // Redirect if cart is empty
   useEffect(() => {
@@ -232,20 +243,21 @@ export default function CheckoutShippingPage() {
       return;
     }
 
-    // Store in session storage
-    sessionStorage.setItem('checkout_email', currentEmail);
-    sessionStorage.setItem('checkout_shipping_address', JSON.stringify(currentShippingAddress));
-    sessionStorage.setItem('checkout_billing_address', JSON.stringify(
-      billingSameAsShipping ? currentShippingAddress : billingAddress
-    ));
-    sessionStorage.setItem('checkout_shipping_rate_id', selectedShippingRate);
+    // Store in session storage (client-side only)
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('checkout_email', currentEmail);
+      sessionStorage.setItem('checkout_shipping_address', JSON.stringify(currentShippingAddress));
+      sessionStorage.setItem('checkout_billing_address', JSON.stringify(
+        billingSameAsShipping ? currentShippingAddress : billingAddress
+      ));
+      sessionStorage.setItem('checkout_shipping_rate_id', selectedShippingRate);
+    }
 
     // Navigate to payment
     router.push('/checkout/payment');
   };
 
   const selectedRate = shippingRates.find(r => r.id === selectedShippingRate);
-  const promoDiscount = parseInt(sessionStorage.getItem('discount_cents') || '0');
   const shippingCents = selectedRate?.price_cents || 0;
   const totalCents = subtotal + shippingCents + taxCents - promoDiscount;
 
