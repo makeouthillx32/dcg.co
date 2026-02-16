@@ -192,19 +192,25 @@ export function HeroSlideModal({ mode, slide, onClose, onSuccess }: Props) {
       // Desktop image path
       // -------------------
       let objectPath = slide?.object_path || '';
-
+      
+      // If creating and they didn't pick a desktop image,
+      // allow mobile-only creation (desktop will fall back to mobile).
+      const creatingWithoutDesktop = mode === 'create' && !imageFile;
+      
       if (imageFile) {
         const fileExt = safeExt(imageFile.name);
         const fileName = `slide-${Date.now()}.${fileExt}`;
         const filePath = `slides/${fileName}`;
-
+      
         await uploadToBucket(filePath, imageFile);
         objectPath = filePath;
-
-        // delete old desktop image on edit
+      
         if (mode === 'edit' && slide?.object_path) {
           await supabase.storage.from(BUCKET).remove([slide.object_path]);
         }
+      } else if (creatingWithoutDesktop) {
+        // We'll set objectPath after mobile upload (fallback).
+        objectPath = '';
       } else if (mode === 'create') {
         throw new Error('Please select a desktop hero image');
       }
