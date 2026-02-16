@@ -2,7 +2,7 @@
 "use client";
 
 import { TopBanner } from "@/components/shop/_components/TopBanner";
-import { HeroCarousel } from "@/components/shop/_components/Herocarousel"; // ✅ matches filename + named export
+import { HeroCarousel } from "@/components/shop/_components/Herocarousel";
 import { LandingSkeleton } from "@/components/shop/_components/LandingSkeleton";
 import { useLandingData } from "@/components/shop/_components/useLandingData";
 import { useHeroSlides } from "@/components/shop/_components/useHeroSlides";
@@ -14,17 +14,17 @@ export default function HomePage() {
   const { categories, featured, loading, error } = useLandingData();
   const { slides, loading: slidesLoading } = useHeroSlides();
 
-  // Show skeleton while loading
   if (loading || slidesLoading) {
     return <LandingSkeleton />;
   }
 
   return (
-    <>
+    // ✅ Prevent full-bleed hero from causing horizontal scroll
+    <div className="overflow-x-hidden">
       {/* Top Banner - Outside main container */}
       <TopBanner />
 
-      {/* Hero Carousel - Full Width */}
+      {/* Hero Carousel - MUST stay outside constrained containers */}
       {slides.length > 0 && <HeroCarousel slides={slides} />}
 
       {/* Main Content Container */}
@@ -42,7 +42,6 @@ export default function HomePage() {
               </div>
             ) : null}
 
-            {/* 3 Column Grid - Shows ALL categories */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
               {(categories ?? []).map((c) => (
                 <CategoryCard
@@ -65,7 +64,6 @@ export default function HomePage() {
         {/* Promo Grid - 2x2 Grid */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 pb-16">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Large Promo Card */}
             <PromoCard
               title="Enjoy $30 off"
               subtitle="your next order when you receive your first"
@@ -74,7 +72,6 @@ export default function HomePage() {
               variant="dark"
             />
 
-            {/* QR Code Card */}
             <QRCodeCard
               title="PLAN TO SUBSCRIBE? DOWNLOAD OUR APP BEFORE IT'S OFFICIALLY LAUNCHED!"
               subtitle="Join our waitlist"
@@ -131,11 +128,9 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* Footer Spacing */}
         <div className="pb-10" />
       </div>
-      {/* End Main Content Container */}
-    </>
+    </div>
   );
 }
 
@@ -157,7 +152,6 @@ function CategoryCard({
       href={href}
       className="group relative block overflow-hidden rounded-lg aspect-square bg-[var(--sidebar)] w-full"
     >
-      {/* Category Cover Image */}
       {imageUrl ? (
         <Image
           src={imageUrl}
@@ -167,14 +161,11 @@ function CategoryCard({
           sizes="400px"
         />
       ) : (
-        // Fallback gradient if no image
         <div className="absolute inset-0 bg-gradient-to-br from-[var(--accent)] to-[var(--muted)] opacity-50" />
       )}
 
-      {/* Overlay */}
       <div className="absolute inset-0 bg-black/25 group-hover:bg-black/35 transition-all duration-300" />
 
-      {/* Title */}
       <div className="absolute inset-0 flex items-center justify-center p-6">
         <h3 className="text-2xl md:text-3xl font-bold text-white text-center drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">
           {title}
@@ -247,7 +238,6 @@ function QRCodeCard({
         {title}
       </p>
 
-      {/* QR Code Placeholder */}
       <div className="w-40 h-40 bg-[var(--muted)] rounded-lg mb-4 flex items-center justify-center">
         <div className="w-32 h-32 bg-black rounded-md flex items-center justify-center">
           <span className="text-white text-xs">QR CODE</span>
