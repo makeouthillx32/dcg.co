@@ -227,8 +227,14 @@ export function HeroSlideModal({ mode, slide, onClose, onSuccess }: Props) {
         if (mode === 'edit' && slide?.mobile_object_path) {
           await supabase.storage.from(BUCKET).remove([slide.mobile_object_path]);
         }
+            }
+      // ✅ If create + no desktop was uploaded, use mobile as desktop fallback
+      if (mode === 'create' && !imageFile) {
+        if (!mobileObjectPath) {
+          throw new Error('Please select at least a desktop or mobile hero image');
+        }
+        objectPath = mobileObjectPath;
       }
-
       // if user uploaded a new mobile image
       if (mobileImageFile) {
         const fileExt = safeExt(mobileImageFile.name);
