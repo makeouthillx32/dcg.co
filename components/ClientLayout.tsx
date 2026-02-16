@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import Nav from "@/components/nav";
 import Footer from "@/components/Layouts/footer";
-import AccessibilityOverlay from "@/components/theme/accessibility";
+import AccessibilityOverlay from "@/components/Layouts/overlays/accessibility/accessibility";
 import { CookieConsent } from "@/components/CookieConsent";
 import analytics from "@/lib/analytics";
 import { setCookie } from "@/lib/cookieUtils";

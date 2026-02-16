@@ -2,9 +2,9 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import AccessibilityOverlay from "@/components/theme/accessibility";
-import CartButton from "@/components/cart/CartButton";
-import CartDrawer from "@/components/cart/CartDrawer";
+import AccessibilityOverlay from "@/components/Layouts/overlays/accessibility/accessibility";
+import CartButton from "@/components/Layouts/overlays/cart/CartButton";
+import CartDrawer from "@/components/Layouts/overlays/cart/CartDrawer";
 
 export default function ConditionalOverlays() {
   const pathname = usePathname();
