@@ -1,4 +1,4 @@
-// app/settings/collections/page.tsx
+// app/dashboard/[id]/settings/collections/page.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -10,7 +10,7 @@ import { LoadingState } from "./_components/LoadingState";
 import { ErrorAlert } from "./_components/ErrorAlert";
 import { CollectionsActionBar } from "./_components/CollectionsActionBar";
 import { CollectionsTable, type CollectionRow } from "./_components/CollectionsTable";
-import { CreateCollectionModal } from "./_components/CreateCollectionModal";
+import CreateCollectionModal from "./_components/CreateCollectionModal"; // ✅ Changed to default import
 import { EditCollectionForm } from "./_components/EditCollectionForm";
 import { DeleteConfirmModal } from "./_components/DeleteConfirmModal";
 
@@ -40,7 +40,7 @@ export default function CollectionsPage() {
 
     const { data, error } = await supabase
       .from("collections")
-      .select("id,name,slug,description,position,is_home_section")
+      .select("id,name,slug,description,position,is_home_section,cover_image_bucket,cover_image_path,cover_image_alt") // ✅ Added cover image fields
       .order("position", { ascending: true })
       .order("name", { ascending: true });
 
@@ -100,6 +100,7 @@ export default function CollectionsPage() {
     }
 
     await load();
+    setCreateOpen(false); // ✅ Close modal after success
   };
 
   // ✅ Edit
@@ -133,6 +134,7 @@ export default function CollectionsPage() {
     }
 
     await load();
+    setEditOpen(false); // ✅ Close modal after success
   };
 
   // ✅ Delete
@@ -152,6 +154,7 @@ export default function CollectionsPage() {
     }
 
     await load();
+    setDeleteOpen(false); // ✅ Close modal after success
   };
 
   return (

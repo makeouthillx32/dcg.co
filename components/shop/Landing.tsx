@@ -1,314 +1,197 @@
-// components/home/Landing.tsx
+// components/shop/Landing.tsx
 "use client";
 
 import { TopBanner } from "@/components/shop/_components/TopBanner";
+import { HeroCarousel } from "@/components/shop/_components/HeroCarousel";
+import { LandingSkeleton } from "@/components/shop/_components/LandingSkeleton";
+import { ShopByCategory } from "@/components/shop/_components/ShopByCategory";
 import { useLandingData } from "@/components/shop/_components/useLandingData";
+import { useHeroSlides } from "@/components/shop/_components/useHeroSlides";
 import { LandingProductCard } from "@/components/shop/_components/ProductCard";
 import Link from "next/link";
-import Image from "next/image";
 
 export default function HomePage() {
-  // ✅ FIX: hook now returns collections, not categories
-  const { collections, featured, loading, error } = useLandingData();
+  const { categories, featured, loading, error } = useLandingData();
+  const { slides, loading: slidesLoading } = useHeroSlides();
+
+  // Show skeleton while loading
+  if (loading || slidesLoading) {
+    return <LandingSkeleton />;
+  }
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      {/* Top Banner (DB-driven component) */}
+    <>
+      {/* Top Banner - Outside main container */}
       <TopBanner />
 
-      {/* Hero */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 pt-8 pb-10">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
-          {/* Copy */}
-          <div className="space-y-6">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--accent)] text-[var(--accent-foreground)] text-xs border border-[var(--border)]">
-              Desert Cowgirl • Western-inspired everyday wear
-            </div>
+      {/* Hero Carousel - Full Width - Aspect Ratio 96:35 */}
+      {slides.length > 0 && <HeroCarousel slides={slides} />}
 
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-tight tracking-tight">
-              Wear the desert.
-              <br />
-              Keep it classic.
-            </h1>
+      {/* Main Content Container */}
+      <div className="bg-background text-foreground">
 
-            <p className="text-base sm:text-lg text-[var(--muted-foreground)] leading-relaxed max-w-xl">
-              Handpicked styles with a western edge—graphics, layers, denim, and
-              accessories built for real life. Shop the latest drops, restocks,
-              and favorites in one clean storefront.
-            </p>
+      {/* Shop by Category Section */}
+      <ShopByCategory categories={categories} loading={loading} error={error} />
 
-            <div className="flex flex-col sm:flex-row gap-3">
-              <a
-                href="#shop"
-                className="inline-flex items-center justify-center rounded-md px-5 py-3 font-semibold
-                           bg-[var(--primary)] text-[var(--primary-foreground)] shadow-sm
-                           hover:opacity-95 transition"
-              >
-                Shop Now
-              </a>
-
-              <a
-                href="#new-releases"
-                className="inline-flex items-center justify-center rounded-md px-5 py-3 font-semibold
-                           bg-[var(--card)] text-[var(--foreground)] border border-[var(--border)]
-                           hover:bg-[var(--accent)] transition"
-              >
-                New Releases
-              </a>
-            </div>
-
-            {/* Trust row */}
-            <div className="grid grid-cols-3 gap-3 pt-4">
-              <div className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-3">
-                <p className="text-xs text-[var(--muted-foreground)]">Fast shipping</p>
-                <p className="text-sm font-semibold">Packed with care</p>
-              </div>
-              <div className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-3">
-                <p className="text-xs text-[var(--muted-foreground)]">Easy returns</p>
-                <p className="text-sm font-semibold">Simple exchanges</p>
-              </div>
-              <div className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-3">
-                <p className="text-xs text-[var(--muted-foreground)]">Secure checkout</p>
-                <p className="text-sm font-semibold">Shop confidently</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Visual */}
-          <div className="relative">
-            <div
-              className="absolute inset-0 rounded-2xl"
-              style={{
-                background:
-                  "radial-gradient(800px circle at 30% 20%, var(--accent) 0%, transparent 60%)",
-                opacity: 0.8,
-              }}
-            />
-
-            <div className="relative rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-[var(--shadow-lg)] overflow-hidden">
-              {/* Replace this image with a hero lifestyle/product image later */}
-              <div className="aspect-[4/3] w-full bg-[var(--sidebar)] flex items-center justify-center">
-                <div className="text-center px-6">
-                  <p className="text-sm text-[var(--muted-foreground)]">
-                    Hero image placeholder
-                  </p>
-                  <p className="text-xl font-bold">
-                    Add a lifestyle photo + featured product grid
-                  </p>
-                  <p className="text-sm text-[var(--muted-foreground)] mt-2">
-                    Suggested: 1600×1200 JPG in /public/images/store/hero.jpg
-                  </p>
-                </div>
-              </div>
-
-              {/* Mini featured row */}
-              <div className="grid grid-cols-3 gap-0 border-t border-[var(--border)]">
-                <div className="p-4">
-                  <p className="text-xs text-[var(--muted-foreground)]">Featured</p>
-                  <p className="text-sm font-semibold">Graphics</p>
-                </div>
-                <div className="p-4 border-l border-r border-[var(--border)]">
-                  <p className="text-xs text-[var(--muted-foreground)]">Trending</p>
-                  <p className="text-sm font-semibold">Denim</p>
-                </div>
-                <div className="p-4">
-                  <p className="text-xs text-[var(--muted-foreground)]">Must-have</p>
-                  <p className="text-sm font-semibold">Accessories</p>
-                </div>
-              </div>
-            </div>
-          </div>
+      {/* Promo Grid - 2x2 Grid */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 pb-16">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Large Promo Card */}
+          <PromoCard
+            title="Enjoy $30 off"
+            subtitle="your next order when you receive your first"
+            highlight="in app purchase*"
+            href="/promo"
+            variant="dark"
+          />
+          
+          {/* QR Code Card */}
+          <QRCodeCard
+            title="PLAN TO SUBSCRIBE? DOWNLOAD OUR APP BEFORE IT'S OFFICIALLY LAUNCHED!"
+            subtitle="Join our waitlist"
+            qrText="SCAN TO DOWNLOAD"
+          />
         </div>
       </section>
 
-      {/* Quick Shop Tiles (REAL collections marked is_home_section) */}
-      <section id="shop" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 pb-12">
-        <div className="flex items-end justify-between gap-4 mb-5">
+      {/* Shop Bestsellers - Product Grid */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 pb-16">
+        <div className="flex items-center justify-between gap-4 mb-8">
           <div>
-            <h2 className="text-2xl sm:text-3xl font-extrabold">Shop by Category</h2>
-            <p className="text-sm text-[var(--muted-foreground)] mt-1">
-              A storefront layout that feels like Shopify—clean, fast, and easy to browse.
-            </p>
+            <h3 className="text-3xl sm:text-4xl font-bold">Shop Bestsellers</h3>
           </div>
-
           <Link
             href="/shop"
             className="text-sm font-semibold text-[var(--primary)] hover:opacity-80 transition"
           >
-            View all
+            View All →
           </Link>
         </div>
 
-        {error ? (
-          <div className="mb-4 rounded-lg border border-[var(--border)] bg-[var(--card)] p-3 text-sm text-[var(--muted-foreground)]">
-            {error}
-          </div>
-        ) : null}
-
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-          {(collections ?? []).map((c) => (
-            <CategoryTile key={c.id} title={c.name} href={`/collections/${c.slug}`} />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {(featured ?? []).slice(0, 4).map((p) => (
+            <LandingProductCard key={p.id} product={p} />
           ))}
 
-          {!loading && (collections ?? []).length === 0 ? (
-            <div className="col-span-full text-sm text-[var(--muted-foreground)]">
-              No homepage collections yet. Set <b>is_home_section</b> = true on some collections.
+          {!loading && (featured ?? []).length === 0 ? (
+            <div className="col-span-full text-center text-sm text-[var(--muted-foreground)] py-12">
+              No products found yet. Create products and set status to <b>active</b>.
             </div>
           ) : null}
         </div>
       </section>
 
-      {/* Featured Products (REAL products) */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 pb-12">
-        <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6">
-          <div className="flex items-center justify-between gap-4 mb-4">
-            <div>
-              <h3 className="text-xl sm:text-2xl font-extrabold">Featured Picks</h3>
-              <p className="text-sm text-[var(--muted-foreground)] mt-1">
-                Live products from your catalog.
-              </p>
-            </div>
-            <Link
-              href="/shop"
-              className="text-sm font-semibold text-[var(--primary)] hover:opacity-80 transition"
-            >
-              Best Sellers →
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {(featured ?? []).map((p) => (
-              <LandingProductCard key={p.id} product={p} />
-            ))}
-
-            {!loading && (featured ?? []).length === 0 ? (
-              <div className="col-span-full text-sm text-[var(--muted-foreground)]">
-                No products found yet. Create products and set status to <b>active</b>.
-              </div>
-            ) : null}
-          </div>
-        </div>
-      </section>
-
-      {/* New Releases / Restocks / Cowkids */}
-      <section
-        id="new-releases"
-        className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 pb-14"
-      >
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <PromoPanel
-            title="New Releases"
-            desc="Fresh drops and latest arrivals."
-            href="#new-releases"
-            badge="New"
-          />
-          <PromoPanel
-            title="Restocks"
-            desc="Back in stock—grab it before it’s gone."
-            href="#restocks"
-            badge="Restock"
-          />
-          <PromoPanel
-            title="Cowkids"
-            desc="Kid styles, minis, and western-inspired accessories."
-            href="#cowkids"
-            badge="Kids"
-          />
-        </div>
-      </section>
-
-      {/* Brand Story */}
+      {/* Curated For You - Product Grid */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 pb-16">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-center">
-          <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6">
-            <h3 className="text-2xl font-extrabold">Desert Cowgirl</h3>
-            <p className="text-sm text-[var(--muted-foreground)] mt-2 leading-relaxed">
-              A modern western vibe—classic silhouettes, warm tones, and statement graphics.
-              Built to browse like a Shopify store, but powered by your own stack.
-            </p>
-
-            <div className="flex flex-col sm:flex-row gap-3 mt-5">
-              <a
-                href="#about"
-                className="inline-flex items-center justify-center rounded-md px-5 py-3 font-semibold
-                           bg-[var(--primary)] text-[var(--primary-foreground)] hover:opacity-95 transition"
-              >
-                About the Brand
-              </a>
-              <a
-                href="#gift-card"
-                className="inline-flex items-center justify-center rounded-md px-5 py-3 font-semibold
-                           bg-[var(--card)] text-[var(--foreground)] border border-[var(--border)]
-                           hover:bg-[var(--accent)] transition"
-              >
-                Gift Card
-              </a>
-            </div>
+        <div className="flex items-center justify-between gap-4 mb-8">
+          <div>
+            <h3 className="text-3xl sm:text-4xl font-bold">Curated for you</h3>
           </div>
+          <Link
+            href="/shop"
+            className="text-sm font-semibold text-[var(--primary)] hover:opacity-80 transition"
+          >
+            View All →
+          </Link>
+        </div>
 
-          <div className="rounded-2xl border border-[var(--border)] bg-[var(--sidebar)] p-6">
-            <p className="text-sm text-[var(--muted-foreground)]">Section placeholder</p>
-            <p className="text-lg font-bold mt-1">
-              Add a “Shop Occasions” carousel + email signup here
-            </p>
-            <p className="text-sm text-[var(--muted-foreground)] mt-2">
-              Suggested: featured collection tiles (Galentine, Date Night, Denim Edit…)
-            </p>
-          </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {(featured ?? []).slice(4, 8).map((p) => (
+            <LandingProductCard key={p.id} product={p} />
+          ))}
         </div>
       </section>
 
       {/* Footer Spacing */}
       <div className="pb-10" />
-    </div>
+      </div>
+      {/* End Main Content Container */}
+    </>
   );
 }
 
 /* ------------------------------ */
-/* Small internal components      */
+/* Promo Card Component           */
 /* ------------------------------ */
 
-function CategoryTile({ title, href }: { title: string; href: string }) {
+function PromoCard({
+  title,
+  subtitle,
+  highlight,
+  href,
+  variant = "light"
+}: {
+  title: string;
+  subtitle: string;
+  highlight: string;
+  href: string;
+  variant?: "light" | "dark";
+}) {
   return (
     <Link
       href={href}
-      className="group rounded-xl border border-[var(--border)] bg-[var(--card)] p-4
-                 hover:bg-[var(--accent)] transition shadow-[var(--shadow-xs)]"
+      className={`
+        group relative block overflow-hidden rounded-lg aspect-[4/3] p-8
+        ${variant === "dark" 
+          ? "bg-gradient-to-br from-gray-800 to-gray-900 text-white" 
+          : "bg-gradient-to-br from-pink-50 to-purple-50"
+        }
+      `}
     >
-      <div className="text-xs text-[var(--muted-foreground)]">Shop</div>
-      <div className="font-bold leading-snug mt-1">{title}</div>
-      <div className="text-sm font-semibold text-[var(--primary)] mt-2 group-hover:opacity-90">
-        Browse →
+      <div className="relative z-10 h-full flex flex-col justify-center">
+        <h3 className="text-3xl md:text-4xl font-bold mb-2">
+          {title}
+        </h3>
+        <p className="text-lg mb-1">
+          {subtitle}
+        </p>
+        <p className="text-lg font-semibold">
+          {highlight}
+        </p>
+        
+        <div className="mt-6">
+          <span className="text-sm font-semibold opacity-80 group-hover:opacity-100 transition-opacity">
+            Find out →
+          </span>
+        </div>
       </div>
     </Link>
   );
 }
 
-function PromoPanel({
+/* ------------------------------ */
+/* QR Code Card Component         */
+/* ------------------------------ */
+
+function QRCodeCard({
   title,
-  desc,
-  href,
-  badge,
+  subtitle,
+  qrText
 }: {
   title: string;
-  desc: string;
-  href: string;
-  badge: string;
+  subtitle: string;
+  qrText: string;
 }) {
   return (
-    <a
-      href={href}
-      className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6
-                 hover:bg-[var(--accent)] transition shadow-[var(--shadow-sm)]"
-    >
-      <div className="flex items-center justify-between">
-        <span className="text-xs px-2 py-1 rounded-full border border-[var(--border)] bg-[var(--background)]">
-          {badge}
-        </span>
-        <span className="text-sm font-semibold text-[var(--primary)]">Open →</span>
+    <div className="rounded-lg border border-[var(--border)] bg-[var(--card)] aspect-[4/3] p-8 flex flex-col items-center justify-center text-center">
+      <p className="text-xs uppercase tracking-wider text-[var(--muted-foreground)] mb-4">
+        {title}
+      </p>
+      
+      {/* QR Code Placeholder */}
+      <div className="w-40 h-40 bg-[var(--muted)] rounded-lg mb-4 flex items-center justify-center">
+        <div className="w-32 h-32 bg-black rounded-md flex items-center justify-center">
+          <span className="text-white text-xs">QR CODE</span>
+        </div>
       </div>
-      <div className="mt-4 text-xl font-extrabold">{title}</div>
-      <p className="text-sm text-[var(--muted-foreground)] mt-2">{desc}</p>
-    </a>
+      
+      <p className="text-xs font-semibold mb-2">
+        {qrText}
+      </p>
+      
+      <button className="text-sm font-semibold text-[var(--primary)] hover:opacity-80 transition">
+        {subtitle}
+      </button>
+    </div>
   );
 }

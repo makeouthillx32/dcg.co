@@ -1,3 +1,4 @@
+// app/dashboard/[id]/settings/categories/page.tsx
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -54,7 +55,7 @@ export default function CategoriesPage() {
 
     const { data, error } = await supabase
       .from("categories")
-      .select("id,name,slug,parent_id,position")
+      .select("id,name,slug,parent_id,position,cover_image_bucket,cover_image_path,cover_image_alt") // ✅ Added cover image fields
       .order("position", { ascending: true })
       .order("name", { ascending: true });
 

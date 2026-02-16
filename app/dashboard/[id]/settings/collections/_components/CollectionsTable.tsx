@@ -1,7 +1,10 @@
-// app/settings/collections/_components/CollectionsTable.tsx
+// app/dashboard/[id]/settings/collections/_components/CollectionsTable.tsx
 "use client";
 
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2, Image as ImageIcon } from "lucide-react";
+import Image from "next/image";
+import { createClient } from "@/utils/supabase/client";
+import { useMemo } from "react";
 
 export type CollectionRow = {
   id: string;
@@ -10,6 +13,9 @@ export type CollectionRow = {
   description: string | null;
   position: number;
   is_home_section: boolean;
+  cover_image_bucket?: string | null;
+  cover_image_path?: string | null;
+  cover_image_alt?: string | null;
 };
 
 type Props = {
@@ -19,44 +25,91 @@ type Props = {
 };
 
 export function CollectionsTable({ collections, onEdit, onDelete }: Props) {
+  const supabase = useMemo(() => createClient(), []);
+
+  const getCoverImageUrl = (collection: CollectionRow): string | null => {
+    if (!collection.cover_image_bucket || !collection.cover_image_path) {
+      return null;
+    }
+
+    const { data } = supabase.storage
+      .from(collection.cover_image_bucket)
+      .getPublicUrl(collection.cover_image_path);
+
+    return data.publicUrl;
+  };
+
   return (
     <div className="space-y-2">
-      {collections.map((col) => (
-        <div
-          key={col.id}
-          className="flex items-center justify-between rounded-[var(--radius)] border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-3 py-2"
-        >
-          <div className="min-w-0">
-            <p className="truncate text-sm font-medium text-[hsl(var(--foreground))]">
-              {col.name}
-            </p>
-            <p className="truncate text-xs text-[hsl(var(--muted-foreground))]">
-              /collections/{col.slug}
-            </p>
-            {col.is_home_section && (
-              <p className="mt-1 text-xs text-[hsl(var(--primary))]">
-                Shown on homepage
+      {collections.map((col) => {
+        const coverUrl = getCoverImageUrl(col);
+
+        return (
+          <div
+            key={col.id}
+            className="flex items-center gap-3 rounded-[var(--radius)] border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-3"
+          >
+            {/* Cover Image Thumbnail */}
+            <div className="flex-shrink-0">
+              {coverUrl ? (
+                <div className="relative w-16 h-20 rounded-md overflow-hidden border border-[hsl(var(--border))]">
+                  <Image
+                    src={coverUrl}
+                    alt={col.cover_image_alt || col.name}
+                    fill
+                    className="object-cover"
+                    sizes="64px"
+                  />
+                </div>
+              ) : (
+                <div className="w-16 h-20 rounded-md border-2 border-dashed border-[hsl(var(--border))] bg-[hsl(var(--muted))] flex items-center justify-center">
+                  <ImageIcon className="h-6 w-6 text-[hsl(var(--muted-foreground))]" />
+                </div>
+              )}
+            </div>
+
+            {/* Collection Info */}
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium text-[hsl(var(--foreground))]">
+                {col.name}
               </p>
-            )}
-          </div>
+              <p className="truncate text-xs text-[hsl(var(--muted-foreground))]">
+                /collections/{col.slug}
+              </p>
+              {col.is_home_section && (
+                <p className="mt-1 text-xs text-[hsl(var(--primary))]">
+                  ✓ Shown on homepage
+                </p>
+              )}
+            </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => onEdit(col)}
-              className="rounded-[var(--radius)] p-1.5 hover:bg-[hsl(var(--muted))]"
-            >
-              <Pencil className="h-4 w-4 text-[hsl(var(--foreground))]" />
-            </button>
+            {/* Actions */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => onEdit(col)}
+                className="rounded-[var(--radius)] p-1.5 hover:bg-[hsl(var(--muted))] transition-colors"
+                aria-label="Edit collection"
+              >
+                <Pencil className="h-4 w-4 text-[hsl(var(--foreground))]" />
+              </button>
 
-            <button
-              onClick={() => onDelete(col)}
-              className="rounded-[var(--radius)] p-1.5 hover:bg-[hsl(var(--muted))]"
-            >
-              <Trash2 className="h-4 w-4 text-[hsl(var(--destructive))]" />
-            </button>
+              <button
+                onClick={() => onDelete(col)}
+                className="rounded-[var(--radius)] p-1.5 hover:bg-[hsl(var(--muted))] transition-colors"
+                aria-label="Delete collection"
+              >
+                <Trash2 className="h-4 w-4 text-[hsl(var(--destructive))]" />
+              </button>
+            </div>
           </div>
+        );
+      })}
+
+      {collections.length === 0 && (
+        <div className="text-center py-12 text-sm text-[hsl(var(--muted-foreground))]">
+          No collections yet. Click "Create Collection" to get started.
         </div>
-      ))}
+      )}
     </div>
   );
 }

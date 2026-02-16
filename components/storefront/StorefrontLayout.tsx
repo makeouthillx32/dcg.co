@@ -3,9 +3,6 @@
 
 import Header from "@/components/Layouts/shop/Header";
 import Footer from "@/components/Layouts/footer";
-import { CartProvider } from "@/lib/cart-context";
-import CartButton from "@/components/cart/CartButton";
-import CartDrawer from "@/components/cart/CartDrawer";
 import { useState } from "react";
 
 export default function StorefrontLayout({ children }: { children: React.ReactNode }) {
@@ -19,27 +16,19 @@ export default function StorefrontLayout({ children }: { children: React.ReactNo
   };
 
   return (
-    <CartProvider>
-      <div className="flex min-h-screen flex-col bg-background text-foreground">
-        <Header
-          theme="light"
-          mobileMenuOpen={mobileMenuOpen}
-          setMobileMenuOpen={setMobileMenuOpen}
-          navigateTo={navigateTo}
-        />
+    <div className="flex min-h-screen flex-col bg-background text-foreground">
+      <Header
+        theme="light"
+        mobileMenuOpen={mobileMenuOpen}
+        setMobileMenuOpen={setMobileMenuOpen}
+        navigateTo={navigateTo}
+      />
 
-        <main className="flex-grow">
-          {children}
-        </main>
+      <main className="flex-grow">
+        {children}
+      </main>
 
-        <Footer />
-        
-        {/* Floating Cart Button - appears on all storefront pages */}
-        <CartButton />
-        
-        {/* Cart Drawer - slide-out overlay */}
-        <CartDrawer />
-      </div>
-    </CartProvider>
+      <Footer />
+    </div>
   );
 }

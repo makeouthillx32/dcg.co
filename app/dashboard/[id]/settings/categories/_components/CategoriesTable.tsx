@@ -1,13 +1,19 @@
-// app/settings/categories/_components/CategoriesTable.tsx
+// app/dashboard/[id]/settings/categories/_components/CategoriesTable.tsx
 "use client";
 
-import { ChevronRight, Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2, Image as ImageIcon } from "lucide-react";
+import Image from "next/image";
+import { createClient } from "@/utils/supabase/client";
+import { useMemo } from "react";
 
 export type CategoryRow = {
   id: string;
   name: string;
   slug: string;
   parent_id: string | null;
+  cover_image_bucket?: string | null;
+  cover_image_path?: string | null;
+  cover_image_alt?: string | null;
 };
 
 type Props = {
@@ -16,130 +22,102 @@ type Props = {
   onDelete: (category: CategoryRow) => void;
 };
 
-function buildMaps(categories: CategoryRow[]) {
-  const byId = new Map<string, CategoryRow>();
-  const byParent = new Map<string | null, CategoryRow[]>();
-
-  for (const c of categories) {
-    byId.set(c.id, c);
-    const key = c.parent_id ?? null;
-    const arr = byParent.get(key) ?? [];
-    arr.push(c);
-    byParent.set(key, arr);
-  }
-
-  return { byId, byParent };
-}
-
-function buildPathLabel(cat: CategoryRow, byId: Map<string, CategoryRow>) {
-  const names: string[] = [cat.name];
-  let cur = cat;
-
-  // walk up parents to root
-  while (cur.parent_id) {
-    const p = byId.get(cur.parent_id);
-    if (!p) break;
-    names.push(p.name);
-    cur = p;
-  }
-
-  return names.reverse().join(" → ");
-}
-
 export function CategoriesTable({ categories, onEdit, onDelete }: Props) {
-  const { byId, byParent } = buildMaps(categories);
+  const supabase = useMemo(() => createClient(), []);
 
-  // optional: sort siblings by name (keeps it predictable even if position isn't included)
-  const getChildren = (parentId: string | null) => {
-    const kids = byParent.get(parentId ?? null) ?? [];
-    return [...kids].sort((a, b) => a.name.localeCompare(b.name));
+  const getCoverImageUrl = (category: CategoryRow): string | null => {
+    if (!category.cover_image_bucket || !category.cover_image_path) {
+      return null;
+    }
+
+    const { data } = supabase.storage
+      .from(category.cover_image_bucket)
+      .getPublicUrl(category.cover_image_path);
+
+    return data.publicUrl;
   };
 
-  const renderRows = (parentId: string | null, depth = 0) => {
-    const rows = getChildren(parentId);
+  // Build hierarchy labels
+  const labelMap = useMemo(() => {
+    const map = new Map<string, CategoryRow>();
+    categories.forEach((c) => map.set(c.id, c));
 
-    return rows.map((cat) => {
-      const children = getChildren(cat.id);
-      const hasChildren = children.length > 0;
-      const path = buildPathLabel(cat, byId);
+    const labelFor = (cat: CategoryRow): string => {
+      if (!cat.parent_id) return cat.name;
+      const parent = map.get(cat.parent_id);
+      return parent ? `${labelFor(parent)} → ${cat.name}` : cat.name;
+    };
 
-      return (
-        <div key={cat.id} className="space-y-2">
+    return new Map(categories.map((c) => [c.id, labelFor(c)]));
+  }, [categories]);
+
+  return (
+    <div className="space-y-2">
+      {categories.map((cat) => {
+        const coverUrl = getCoverImageUrl(cat);
+        const label = labelMap.get(cat.id) ?? cat.name;
+
+        return (
           <div
-            className="flex items-center justify-between rounded-[var(--radius)] border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-3 py-2"
-            style={{ paddingLeft: `${12 + depth * 18}px` }}
+            key={cat.id}
+            className="flex items-center gap-3 rounded-[var(--radius)] border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-3"
           >
-            <div className="flex min-w-0 items-center gap-2">
-              {/* branch indicator */}
-              <span
-                className="relative mr-1 inline-flex h-4 w-4 items-center justify-center"
-                aria-hidden="true"
-              >
-                {hasChildren ? (
-                  <ChevronRight className="h-4 w-4 text-[hsl(var(--muted-foreground))]" />
-                ) : (
-                  <span className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--muted-foreground))]" />
-                )}
-              </span>
-
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="truncate text-sm font-medium text-[hsl(var(--foreground))]">
-                    {cat.name}
-                  </p>
-
-                  {/* Shows nesting context */}
-                  {depth > 0 ? (
-                    <span className="truncate text-xs text-[hsl(var(--muted-foreground))]">
-                      {path}
-                    </span>
-                  ) : null}
-
-                  {/* Shows how many are inside */}
-                  {hasChildren ? (
-                    <span className="rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--muted))] px-2 py-0.5 text-xs text-[hsl(var(--muted-foreground))]">
-                      Contains: {children.length}
-                    </span>
-                  ) : null}
+            {/* Cover Image Thumbnail */}
+            <div className="flex-shrink-0">
+              {coverUrl ? (
+                <div className="relative w-16 h-20 rounded-md overflow-hidden border border-[hsl(var(--border))]">
+                  <Image
+                    src={coverUrl}
+                    alt={cat.cover_image_alt || cat.name}
+                    fill
+                    className="object-cover"
+                    sizes="64px"
+                  />
                 </div>
-
-                <p className="truncate text-xs text-[hsl(var(--muted-foreground))]">
-                  /{cat.slug}
-                </p>
-              </div>
+              ) : (
+                <div className="w-16 h-20 rounded-md border-2 border-dashed border-[hsl(var(--border))] bg-[hsl(var(--muted))] flex items-center justify-center">
+                  <ImageIcon className="h-6 w-6 text-[hsl(var(--muted-foreground))]" />
+                </div>
+              )}
             </div>
 
+            {/* Category Info */}
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium text-[hsl(var(--foreground))]">
+                {label}
+              </p>
+              <p className="truncate text-xs text-[hsl(var(--muted-foreground))]">
+                /{cat.slug}
+              </p>
+            </div>
+
+            {/* Actions */}
             <div className="flex items-center gap-2">
               <button
-                type="button"
                 onClick={() => onEdit(cat)}
-                className="rounded-[var(--radius)] p-1.5 hover:bg-[hsl(var(--muted))]"
-                aria-label={`Edit ${cat.name}`}
+                className="rounded-[var(--radius)] p-1.5 hover:bg-[hsl(var(--muted))] transition-colors"
+                aria-label="Edit category"
               >
                 <Pencil className="h-4 w-4 text-[hsl(var(--foreground))]" />
               </button>
 
               <button
-                type="button"
                 onClick={() => onDelete(cat)}
-                className="rounded-[var(--radius)] p-1.5 hover:bg-[hsl(var(--muted))]"
-                aria-label={`Delete ${cat.name}`}
+                className="rounded-[var(--radius)] p-1.5 hover:bg-[hsl(var(--muted))] transition-colors"
+                aria-label="Delete category"
               >
                 <Trash2 className="h-4 w-4 text-[hsl(var(--destructive))]" />
               </button>
             </div>
           </div>
+        );
+      })}
 
-          {/* children */}
-          {hasChildren ? (
-            <div className="space-y-2">
-              {renderRows(cat.id, depth + 1)}
-            </div>
-          ) : null}
+      {categories.length === 0 && (
+        <div className="text-center py-12 text-sm text-[hsl(var(--muted-foreground))]">
+          No categories yet. Click "Create Category" to get started.
         </div>
-      );
-    });
-  };
-
-  return <div className="space-y-2">{renderRows(null)}</div>;
+      )}
+    </div>
+  );
 }
