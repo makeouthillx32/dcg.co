@@ -1,138 +1,140 @@
+// app/products/[slug]/page.tsx - CORRECTED VERSION
 import { createServerClient, createServiceClient } from "@/utils/supabase/server";
 import { notFound } from "next/navigation";
-import CategoryPageClient from "./_components/CategoryPageClient";
+import ProductDetailClient from "./_components/ProductDetailClient";
 import StorefrontLayout from "@/components/storefront/StorefrontLayout";
 
-// Generate static params for all active categories at build time
+// Generate static params for all active products at build time
 export async function generateStaticParams() {
-  // ✅ Use service client for build-time data fetching (no cookies needed)
   const supabase = createServiceClient();
-  const { data: categories } = await supabase
-    .from("categories")
+  const { data: products } = await supabase
+    .from("products")
     .select("slug")
-    .eq("is_active", true);
+    .eq("status", "active");
 
-  return categories?.map((category) => ({
-    categorySlug: category.slug,
+  return products?.map((product) => ({
+    slug: product.slug,
   })) ?? [];
 }
 
 // Generate metadata for SEO
-export async function generateMetadata({ params }: { params: Promise<{ categorySlug: string }> }) {
-  const { categorySlug } = await params;
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
   const supabase = await createServerClient();
 
-  const { data: category } = await supabase
-    .from("categories")
-    .select("name")
-    .eq("slug", categorySlug)
-    .eq("is_active", true)
+  const { data: product } = await supabase
+    .from("products")
+    .select("title, description")
+    .eq("slug", slug)
+    .eq("status", "active")
     .single();
 
-  if (!category) {
+  if (!product) {
     return {
-      title: "Category Not Found",
+      title: "Product Not Found",
     };
   }
 
   return {
-    title: category.name,
-    description: `Shop ${category.name} products`,
+    title: product.title,
+    description: product.description || `Shop ${product.title} at Desert Cowgirl`,
   };
 }
 
-export default async function CategoryPage({ params }: { params: Promise<{ categorySlug: string }> }) {
-  const { categorySlug } = await params;
+export default async function ProductPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
   const supabase = await createServerClient();
 
-  // Fetch category data
-  const { data: category } = await supabase
-    .from("categories")
-    .select("*")
-    .eq("slug", categorySlug)
-    .eq("is_active", true)
-    .single();
-
-  if (!category) {
-    notFound();
-  }
-
-  // Fetch subcategories (children of this category)
-  const { data: subcategories } = await supabase
-    .from("categories")
-    .select("*")
-    .eq("parent_id", category.id)
-    .eq("is_active", true)
-    .order("position", { ascending: true });
-
-  // Fetch products in this category
-  const { data: productCategories } = await supabase
-    .from("product_categories")
+  // Fetch product with all related data
+  const { data: product, error } = await supabase
+    .from("products")
     .select(`
-      product_id,
-      products (
+      id,
+      title,
+      slug,
+      description,
+      status,
+      brand,
+      is_featured,
+      badge,
+      price_cents,
+      compare_at_price_cents,
+      currency,
+      material,
+      made_in,
+      created_at,
+      updated_at,
+      product_images (
         id,
+        object_path,
+        bucket_name,
+        alt_text,
+        position,
+        is_primary
+      ),
+      product_variants (
+        id,
+        sku,
         title,
-        slug,
+        options,
         price_cents,
         compare_at_price_cents,
-        currency,
-        status,
-        badge,
-        is_featured,
-        product_images (
+        inventory_qty,
+        weight_grams,
+        position,
+        is_active
+      ),
+      product_categories (
+        categories (
           id,
-          object_path,
-          bucket_name,
-          alt_text,
-          position,
-          is_primary
+          name,
+          slug
         )
       )
     `)
-    .eq("category_id", category.id);
+    .eq("slug", slug)
+    .eq("status", "active")
+    .single();
 
-  // Extract and filter active products with images
-  const products = (productCategories || [])
-    .map((pc: any) => pc.products)
-    .filter((p: any) => p && p.status === "active")
-    .map((product: any) => ({
-      ...product,
-      images: product.product_images || [],
-    }));
-
-  // Build breadcrumb trail
-  const breadcrumbs = [];
-  let currentCategory = category;
-  breadcrumbs.unshift(currentCategory);
-
-  // Traverse up to build full breadcrumb path
-  while (currentCategory.parent_id) {
-    const { data: parent } = await supabase
-      .from("categories")
-      .select("*")
-      .eq("id", currentCategory.parent_id)
-      .single();
-
-    if (parent) {
-      breadcrumbs.unshift(parent);
-      currentCategory = parent;
-    } else {
-      break;
-    }
+  if (error) {
+    console.error("Error fetching product:", error);
+    notFound();
   }
+
+  if (!product) {
+    notFound();
+  }
+
+  // Format product data for client component
+  const formattedProduct = {
+    ...product,
+    images: (product.product_images || [])
+      .sort((a: any, b: any) => (a.position || 0) - (b.position || 0)),
+    variants: (product.product_variants || [])
+      .filter((v: any) => v.is_active !== false)
+      .sort((a: any, b: any) => (a.position || 0) - (b.position || 0))
+      .map((v: any) => ({
+        id: v.id,
+        sku: v.sku,
+        title: v.title,
+        options: v.options || {},
+        price_cents: v.price_cents,
+        compare_at_price_cents: v.compare_at_price_cents,
+        inventory_quantity: v.inventory_qty || 0,
+        weight_grams: v.weight_grams,
+        position: v.position,
+      })),
+    categories: (product.product_categories || [])
+      .map((pc: any) => pc.categories)
+      .filter(Boolean),
+  };
 
   return (
     <StorefrontLayout>
-      <CategoryPageClient
-        category={category}
-        subcategories={subcategories || []}
-        products={products}
-        breadcrumbs={breadcrumbs}
-      />
+      <ProductDetailClient product={formattedProduct} />
     </StorefrontLayout>
   );
 }
 
-// Revalidate every 5 minutes (same as collections)
-export const revalidate = 300;
+// Revalidate every hour (products change less often than collections)
+export const revalidate = 3600;

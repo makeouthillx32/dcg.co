@@ -1,8 +1,9 @@
-// app/layout.tsx - UPDATED BRANDING FOR DESERT COWGIRL
+// app/layout.tsx - UPDATED WITH CONDITIONAL OVERLAYS
 import { Providers } from "./provider";
 import Nav from "@/components/nav";
 import Footer from "@/components/Layouts/footer";
-import AccessibilityOverlay from "@/components/theme/accessibility";
+import ConditionalOverlays from "@/components/ConditionalOverlays";
+import { CartProvider } from "@/lib/cart-context";
 import "./globals.css";
 import type { Metadata } from "next";
 import ClientLayoutWrapper from "@/components/ClientLayout";
@@ -142,7 +143,13 @@ export default function RootLayout({
       </head>
       <body className="min-h-screen font-[var(--font-sans)]">
         <Providers>
-          <ClientLayoutWrapper>{children}</ClientLayoutWrapper>
+          {/* 🛒 Wrap with CartProvider for global cart state */}
+          <CartProvider>
+            <ClientLayoutWrapper>{children}</ClientLayoutWrapper>
+            
+            {/* 🎯 Conditional Overlays - only show on storefront pages (excludes /app and /dashboard) */}
+            <ConditionalOverlays />
+          </CartProvider>
         </Providers>
       </body>
     </html>
