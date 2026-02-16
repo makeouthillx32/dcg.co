@@ -8,7 +8,7 @@ import { useLandingData } from "@/components/shop/_components/useLandingData";
 import { useHeroSlides } from "@/components/shop/_components/useHeroSlides";
 import { LandingProductCard } from "@/components/shop/_components/ProductCard";
 import Link from "next/link";
-import Image from "next/image";
+import Image from "next/image"; 
 
 export default function HomePage() {
   const { categories, featured, loading, error } = useLandingData();
