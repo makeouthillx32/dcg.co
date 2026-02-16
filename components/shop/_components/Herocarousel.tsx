@@ -70,58 +70,47 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
 
   return (
     <section className="w-full">
-      <Carousel 
+      <Carousel
         className="w-full"
         opts={{
-          align: "start",
+          align: 'start',
           loop: true,
         }}
       >
         <CarouselContent className="-ml-0">
           {slides.map((slide) => (
-            <CarouselItem key={slide.id} className="pl-0">
-              <Link 
+            <CarouselItem key={slide.id} className="pl-0 basis-full">
+              <Link
                 href={slide.primary_button_href}
                 className="relative block w-full bg-no-repeat"
               >
-                {/* Desktop Image */}
-                <div className="hidden lg:block">
-                  <div className="relative w-full aspect-[96/35]">
-                    <Image
-                      src={slide.image_url}
-                      alt={slide.alt_text || slide.headline_line1}
-                      fill
-                      className="object-cover object-center"
-                      priority
-                      sizes="100vw"
-                    />
-                  </div>
-                </div>
-
-                {/* Mobile Image */}
-                <div className="block lg:hidden">
-                  <div className="relative w-full aspect-[96/35]">
-                    <Image
-                      src={slide.image_url}
-                      alt={slide.alt_text || slide.headline_line1}
-                      fill
-                      className="object-cover object-center"
-                      priority
-                      sizes="100vw"
-                    />
-                  </div>
+                {/* ONE image container for all breakpoints */}
+                <div
+                  className="relative w-full bg-black"
+                  style={{
+                    aspectRatio: `${slide.width || 2880} / ${slide.height || 1050}`,
+                  }}
+                >
+                  <Image
+                    src={slide.image_url}
+                    alt={slide.alt_text || slide.headline_line1}
+                    fill
+                    priority
+                    sizes="100vw"
+                    style={{ objectFit: 'contain', objectPosition: 'center' }}
+                  />
                 </div>
 
                 {/* Overlay */}
                 {parseFloat(slide.overlay_opacity) > 0 && (
-                  <div 
+                  <div
                     className="absolute inset-0 bg-black"
                     style={{ opacity: parseFloat(slide.overlay_opacity) }}
                   />
                 )}
 
                 {/* Content Overlay */}
-                <div 
+                <div
                   className={cn(
                     'absolute top-0 left-0 z-10 flex h-full w-full items-center px-5 lg:px-20',
                     getJustifyClass(slide.text_alignment)
@@ -131,12 +120,12 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
                     {/* Pill Text */}
                     {slide.pill_text && (
                       <div className="mb-4">
-                        <span 
+                        <span
                           className="inline-block px-4 py-2 text-xs font-semibold tracking-wide uppercase rounded-full"
                           style={{
                             backgroundColor: 'rgba(255, 255, 255, 0.2)',
                             backdropFilter: 'blur(10px)',
-                            ...getTextColorStyle(slide.text_color)
+                            ...getTextColorStyle(slide.text_color),
                           }}
                         >
                           {slide.pill_text}
@@ -166,7 +155,7 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
                     </div>
 
                     {/* CTA Buttons */}
-                    <div 
+                    <div
                       className={cn(
                         'mt-8 flex gap-3',
                         slide.text_alignment === 'center' && 'justify-center',
@@ -204,6 +193,10 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
             </CarouselItem>
           ))}
         </CarouselContent>
+
+        {/* keep these if you want arrows; safe to leave */}
+        <CarouselPrevious />
+        <CarouselNext />
       </Carousel>
     </section>
   );
