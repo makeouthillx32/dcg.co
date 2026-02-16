@@ -5,8 +5,6 @@ import { NextRequest, NextResponse } from "next/server";
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createServerClient();
-
-    // Parse request body
     const body = await request.json();
     const { subtotal_cents, shipping_cents, state } = body;
 
@@ -17,41 +15,46 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Call database function to calculate tax
-    const { data, error } = await supabase
-      .rpc('calculate_order_tax', {
-        p_subtotal_cents: subtotal_cents,
-        p_shipping_cents: shipping_cents || 0,
-        p_state: state,
-      });
+    console.log('Calculating tax for:', { subtotal_cents, shipping_cents, state });
+
+    // Query tax rates for the state
+    const { data: taxRates, error } = await supabase
+      .from('tax_rates')
+      .select('rate, type, description')
+      .eq('state', state.toUpperCase())
+      .eq('is_active', true);
 
     if (error) {
-      console.error('Calculate tax error:', error);
+      console.error('Tax rates query error:', error);
       return NextResponse.json(
-        { error: 'Failed to calculate tax' },
+        { error: 'Failed to load tax rates', details: error.message },
         { status: 500 }
       );
     }
 
-    // Get tax rate details for display
-    const { data: taxRates } = await supabase
-      .from('tax_rates')
-      .select('rate, type, description')
-      .eq('state', state)
-      .eq('is_active', true);
+    console.log('Tax rates from DB:', taxRates);
 
+    // Calculate total tax rate
     const totalRate = taxRates?.reduce((sum, rate) => sum + Number(rate.rate), 0) || 0;
 
+    // Calculate taxable amount (subtotal + shipping)
+    const taxableAmount = subtotal_cents + (shipping_cents || 0);
+
+    // Calculate tax
+    const tax_cents = Math.round(taxableAmount * totalRate);
+
+    console.log('Tax calculation:', { totalRate, taxableAmount, tax_cents });
+
     return NextResponse.json({
-      tax_cents: data,
+      tax_cents,
       tax_rate: totalRate,
       tax_breakdown: taxRates || [],
-      state: state,
+      state: state.toUpperCase(),
     });
   } catch (error: any) {
-    console.error('Tax calculation error:', error);
+    console.error('Tax calculation API error:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Internal server error', details: error.message },
       { status: 500 }
     );
   }

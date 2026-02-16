@@ -1,7 +1,7 @@
 // app/checkout/shipping/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useCart } from "@/lib/cart-context";
@@ -26,6 +26,18 @@ interface ShippingRate {
 export default function CheckoutShippingPage() {
   const router = useRouter();
   const { items, itemCount, subtotal, cart } = useCart();
+
+  // Refs for autofill detection
+  const formRef = useRef<HTMLFormElement>(null);
+  const emailRef = useRef<HTMLInputElement>(null);
+  const firstNameRef = useRef<HTMLInputElement>(null);
+  const lastNameRef = useRef<HTMLInputElement>(null);
+  const address1Ref = useRef<HTMLInputElement>(null);
+  const address2Ref = useRef<HTMLInputElement>(null);
+  const cityRef = useRef<HTMLInputElement>(null);
+  const stateRef = useRef<HTMLInputElement>(null);
+  const zipRef = useRef<HTMLInputElement>(null);
+  const phoneRef = useRef<HTMLInputElement>(null);
 
   // Form state
   const [email, setEmail] = useState("");
@@ -67,6 +79,62 @@ export default function CheckoutShippingPage() {
       router.push("/shop");
     }
   }, [itemCount, router]);
+
+  // Autofill detection using MutationObserver and polling
+  useEffect(() => {
+    const checkAutofill = () => {
+      if (emailRef.current && emailRef.current.value !== email) {
+        setEmail(emailRef.current.value);
+      }
+      if (firstNameRef.current && firstNameRef.current.value !== shippingAddress.firstName) {
+        setShippingAddress(prev => ({ ...prev, firstName: firstNameRef.current!.value }));
+      }
+      if (lastNameRef.current && lastNameRef.current.value !== shippingAddress.lastName) {
+        setShippingAddress(prev => ({ ...prev, lastName: lastNameRef.current!.value }));
+      }
+      if (address1Ref.current && address1Ref.current.value !== shippingAddress.address1) {
+        setShippingAddress(prev => ({ ...prev, address1: address1Ref.current!.value }));
+      }
+      if (address2Ref.current && address2Ref.current.value !== shippingAddress.address2) {
+        setShippingAddress(prev => ({ ...prev, address2: address2Ref.current!.value }));
+      }
+      if (cityRef.current && cityRef.current.value !== shippingAddress.city) {
+        setShippingAddress(prev => ({ ...prev, city: cityRef.current!.value }));
+      }
+      if (stateRef.current && stateRef.current.value !== shippingAddress.state) {
+        setShippingAddress(prev => ({ ...prev, state: stateRef.current!.value.toUpperCase() }));
+      }
+      if (zipRef.current && zipRef.current.value !== shippingAddress.zip) {
+        setShippingAddress(prev => ({ ...prev, zip: zipRef.current!.value }));
+      }
+      if (phoneRef.current && phoneRef.current.value !== shippingAddress.phone) {
+        setShippingAddress(prev => ({ ...prev, phone: phoneRef.current!.value }));
+      }
+    };
+
+    // Check for autofill on mount and periodically
+    const timer = setInterval(checkAutofill, 100);
+    
+    // Also check after animations (browsers delay autofill)
+    setTimeout(checkAutofill, 500);
+    setTimeout(checkAutofill, 1000);
+
+    // MutationObserver to detect DOM changes
+    const observer = new MutationObserver(checkAutofill);
+    if (formRef.current) {
+      observer.observe(formRef.current, {
+        attributes: true,
+        childList: true,
+        subtree: true,
+        attributeFilter: ['value']
+      });
+    }
+
+    return () => {
+      clearInterval(timer);
+      observer.disconnect();
+    };
+  }, [email, shippingAddress]);
 
   // Load shipping rates when state is entered
   useEffect(() => {
@@ -137,10 +205,24 @@ export default function CheckoutShippingPage() {
 
   // Handle form submission
   const handleContinue = () => {
+    // Read current values from DOM (in case React state is stale)
+    const currentEmail = emailRef.current?.value || email;
+    const currentShippingAddress = {
+      firstName: firstNameRef.current?.value || shippingAddress.firstName,
+      lastName: lastNameRef.current?.value || shippingAddress.lastName,
+      address1: address1Ref.current?.value || shippingAddress.address1,
+      address2: address2Ref.current?.value || shippingAddress.address2,
+      city: cityRef.current?.value || shippingAddress.city,
+      state: (stateRef.current?.value || shippingAddress.state).toUpperCase(),
+      zip: zipRef.current?.value || shippingAddress.zip,
+      country: "US",
+      phone: phoneRef.current?.value || shippingAddress.phone,
+    };
+
     // Validation
-    if (!email || !shippingAddress.firstName || !shippingAddress.lastName ||
-        !shippingAddress.address1 || !shippingAddress.city ||
-        !shippingAddress.state || !shippingAddress.zip) {
+    if (!currentEmail || !currentShippingAddress.firstName || !currentShippingAddress.lastName ||
+        !currentShippingAddress.address1 || !currentShippingAddress.city ||
+        !currentShippingAddress.state || !currentShippingAddress.zip) {
       alert('Please fill in all required fields');
       return;
     }
@@ -151,10 +233,10 @@ export default function CheckoutShippingPage() {
     }
 
     // Store in session storage
-    sessionStorage.setItem('checkout_email', email);
-    sessionStorage.setItem('checkout_shipping_address', JSON.stringify(shippingAddress));
+    sessionStorage.setItem('checkout_email', currentEmail);
+    sessionStorage.setItem('checkout_shipping_address', JSON.stringify(currentShippingAddress));
     sessionStorage.setItem('checkout_billing_address', JSON.stringify(
-      billingSameAsShipping ? shippingAddress : billingAddress
+      billingSameAsShipping ? currentShippingAddress : billingAddress
     ));
     sessionStorage.setItem('checkout_shipping_rate_id', selectedShippingRate);
 
@@ -193,7 +275,7 @@ export default function CheckoutShippingPage() {
           Back to Cart
         </Link>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <form ref={formRef} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left Column - Shipping Form */}
           <div className="lg:col-span-2 space-y-8">
             <div>
@@ -209,9 +291,13 @@ export default function CheckoutShippingPage() {
               <div>
                 <Label htmlFor="email">Email Address *</Label>
                 <Input
+                  ref={emailRef}
                   id="email"
+                  name="email"
                   type="email"
-                  value={email}
+                  autoComplete="email"
+                  defaultValue={email}
+                  onBlur={(e) => setEmail(e.target.value)}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
                   required
@@ -227,18 +313,26 @@ export default function CheckoutShippingPage() {
                 <div>
                   <Label htmlFor="firstName">First Name *</Label>
                   <Input
+                    ref={firstNameRef}
                     id="firstName"
-                    value={shippingAddress.firstName}
-                    onChange={(e) => setShippingAddress({...shippingAddress, firstName: e.target.value})}
+                    name="given-name"
+                    autoComplete="given-name"
+                    defaultValue={shippingAddress.firstName}
+                    onBlur={(e) => setShippingAddress(prev => ({ ...prev, firstName: e.target.value }))}
+                    onChange={(e) => setShippingAddress(prev => ({ ...prev, firstName: e.target.value }))}
                     required
                   />
                 </div>
                 <div>
                   <Label htmlFor="lastName">Last Name *</Label>
                   <Input
+                    ref={lastNameRef}
                     id="lastName"
-                    value={shippingAddress.lastName}
-                    onChange={(e) => setShippingAddress({...shippingAddress, lastName: e.target.value})}
+                    name="family-name"
+                    autoComplete="family-name"
+                    defaultValue={shippingAddress.lastName}
+                    onBlur={(e) => setShippingAddress(prev => ({ ...prev, lastName: e.target.value }))}
+                    onChange={(e) => setShippingAddress(prev => ({ ...prev, lastName: e.target.value }))}
                     required
                   />
                 </div>
@@ -247,9 +341,13 @@ export default function CheckoutShippingPage() {
               <div>
                 <Label htmlFor="address1">Address *</Label>
                 <Input
+                  ref={address1Ref}
                   id="address1"
-                  value={shippingAddress.address1}
-                  onChange={(e) => setShippingAddress({...shippingAddress, address1: e.target.value})}
+                  name="address-line1"
+                  autoComplete="address-line1"
+                  defaultValue={shippingAddress.address1}
+                  onBlur={(e) => setShippingAddress(prev => ({ ...prev, address1: e.target.value }))}
+                  onChange={(e) => setShippingAddress(prev => ({ ...prev, address1: e.target.value }))}
                   placeholder="Street address"
                   required
                 />
@@ -258,9 +356,13 @@ export default function CheckoutShippingPage() {
               <div>
                 <Label htmlFor="address2">Apartment, suite, etc. (optional)</Label>
                 <Input
+                  ref={address2Ref}
                   id="address2"
-                  value={shippingAddress.address2}
-                  onChange={(e) => setShippingAddress({...shippingAddress, address2: e.target.value})}
+                  name="address-line2"
+                  autoComplete="address-line2"
+                  defaultValue={shippingAddress.address2}
+                  onBlur={(e) => setShippingAddress(prev => ({ ...prev, address2: e.target.value }))}
+                  onChange={(e) => setShippingAddress(prev => ({ ...prev, address2: e.target.value }))}
                 />
               </div>
 
@@ -268,18 +370,26 @@ export default function CheckoutShippingPage() {
                 <div>
                   <Label htmlFor="city">City *</Label>
                   <Input
+                    ref={cityRef}
                     id="city"
-                    value={shippingAddress.city}
-                    onChange={(e) => setShippingAddress({...shippingAddress, city: e.target.value})}
+                    name="address-level2"
+                    autoComplete="address-level2"
+                    defaultValue={shippingAddress.city}
+                    onBlur={(e) => setShippingAddress(prev => ({ ...prev, city: e.target.value }))}
+                    onChange={(e) => setShippingAddress(prev => ({ ...prev, city: e.target.value }))}
                     required
                   />
                 </div>
                 <div>
                   <Label htmlFor="state">State *</Label>
                   <Input
+                    ref={stateRef}
                     id="state"
-                    value={shippingAddress.state}
-                    onChange={(e) => setShippingAddress({...shippingAddress, state: e.target.value.toUpperCase()})}
+                    name="address-level1"
+                    autoComplete="address-level1"
+                    defaultValue={shippingAddress.state}
+                    onBlur={(e) => setShippingAddress(prev => ({ ...prev, state: e.target.value.toUpperCase() }))}
+                    onChange={(e) => setShippingAddress(prev => ({ ...prev, state: e.target.value.toUpperCase() }))}
                     placeholder="AZ"
                     maxLength={2}
                     required
@@ -291,19 +401,27 @@ export default function CheckoutShippingPage() {
                 <div>
                   <Label htmlFor="zip">ZIP Code *</Label>
                   <Input
+                    ref={zipRef}
                     id="zip"
-                    value={shippingAddress.zip}
-                    onChange={(e) => setShippingAddress({...shippingAddress, zip: e.target.value})}
+                    name="postal-code"
+                    autoComplete="postal-code"
+                    defaultValue={shippingAddress.zip}
+                    onBlur={(e) => setShippingAddress(prev => ({ ...prev, zip: e.target.value }))}
+                    onChange={(e) => setShippingAddress(prev => ({ ...prev, zip: e.target.value }))}
                     required
                   />
                 </div>
                 <div>
                   <Label htmlFor="phone">Phone (optional)</Label>
                   <Input
+                    ref={phoneRef}
                     id="phone"
+                    name="tel"
                     type="tel"
-                    value={shippingAddress.phone}
-                    onChange={(e) => setShippingAddress({...shippingAddress, phone: e.target.value})}
+                    autoComplete="tel"
+                    defaultValue={shippingAddress.phone}
+                    onBlur={(e) => setShippingAddress(prev => ({ ...prev, phone: e.target.value }))}
+                    onChange={(e) => setShippingAddress(prev => ({ ...prev, phone: e.target.value }))}
                   />
                 </div>
               </div>
@@ -355,14 +473,6 @@ export default function CheckoutShippingPage() {
                   Billing address same as shipping
                 </Label>
               </div>
-
-              {!billingSameAsShipping && (
-                <div className="space-y-4 pl-6 border-l-2">
-                  <h3 className="font-semibold">Billing Address</h3>
-                  {/* Similar fields as shipping address */}
-                  {/* Omitted for brevity - copy shipping address fields */}
-                </div>
-              )}
             </div>
           </div>
 
@@ -412,6 +522,7 @@ export default function CheckoutShippingPage() {
               </div>
 
               <Button 
+                type="button"
                 size="lg" 
                 className="w-full"
                 onClick={handleContinue}
@@ -421,7 +532,7 @@ export default function CheckoutShippingPage() {
               </Button>
             </div>
           </div>
-        </div>
+        </form>
       </div>
     </div>
   );

@@ -10,12 +10,8 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createServerClient();
-    
-    const sessionId = request.headers.get('x-session-id');
-    const { data: { user } } = await supabase.auth.getUser();
-
-    // Parse request body
     const body = await request.json();
+    
     const {
       cart_id,
       email,
@@ -27,44 +23,176 @@ export async function POST(request: NextRequest) {
       shipping_rate_id,
     } = body;
 
-    // Validate required fields
-    if (!cart_id || !email || !shipping_address || !billing_address) {
+    console.log('Creating payment intent for:', { cart_id, email });
+
+    // Validation
+    if (!cart_id || !email || !shipping_address || !shipping_rate_id) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
       );
     }
 
-    // Get client IP and user agent
-    const forwardedFor = request.headers.get('x-forwarded-for');
-    const customerIp = forwardedFor ? forwardedFor.split(',')[0] : null;
-    const userAgent = request.headers.get('user-agent') || null;
+    // Get cart items
+    const { data: cartItems, error: cartError } = await supabase
+      .from('cart_items')
+      .select(`
+        id,
+        quantity,
+        price_cents,
+        product_id,
+        variant_id,
+        products (
+          id,
+          title,
+          images
+        ),
+        product_variants (
+          id,
+          title,
+          sku
+        )
+      `)
+      .eq('cart_id', cart_id);
 
-    // Create order and calculate totals using database function
-    const { data: orderResult, error: orderError } = await supabase
-      .rpc('create_payment_intent_order', {
-        p_cart_id: cart_id,
-        p_email: email,
-        p_shipping_address: shipping_address,
-        p_billing_address: billing_address,
-        p_phone: phone || null,
-        p_customer_notes: customer_notes || null,
-        p_promo_code: promo_code || null,
-        p_shipping_rate_id: shipping_rate_id || null,
-        p_customer_ip: customerIp,
-        p_user_agent: userAgent,
-      });
+    if (cartError || !cartItems || cartItems.length === 0) {
+      console.error('Cart error:', cartError);
+      return NextResponse.json(
+        { error: 'Cart not found or empty' },
+        { status: 400 }
+      );
+    }
 
-    if (orderError || !orderResult || orderResult.length === 0) {
-      console.error('Failed to create order:', orderError);
+    console.log('Cart items:', cartItems);
+
+    // Calculate subtotal
+    const subtotal_cents = cartItems.reduce(
+      (sum, item) => sum + (item.price_cents * item.quantity),
+      0
+    );
+
+    // Get shipping rate
+    const { data: shippingRate, error: shippingError } = await supabase
+      .from('shipping_rates')
+      .select('*')
+      .eq('id', shipping_rate_id)
+      .single();
+
+    if (shippingError || !shippingRate) {
+      console.error('Shipping rate error:', shippingError);
+      return NextResponse.json(
+        { error: 'Invalid shipping rate' },
+        { status: 400 }
+      );
+    }
+
+    const shipping_cents = shippingRate.price_cents || 0;
+
+    // Calculate tax
+    const { data: taxData } = await supabase
+      .from('tax_rates')
+      .select('rate')
+      .eq('state', shipping_address.state)
+      .eq('is_active', true);
+
+    const taxRate = taxData?.reduce((sum, t) => sum + Number(t.rate), 0) || 0;
+    const tax_cents = Math.round((subtotal_cents + shipping_cents) * taxRate);
+
+    // Handle promo code
+    let discount_cents = 0;
+    let promo_code_id = null;
+
+    if (promo_code) {
+      const { data: promoData } = await supabase
+        .from('promo_codes')
+        .select('*')
+        .eq('code', promo_code.toUpperCase())
+        .eq('is_active', true)
+        .single();
+
+      if (promoData) {
+        promo_code_id = promoData.id;
+        
+        if (promoData.discount_type === 'percentage') {
+          discount_cents = Math.round(subtotal_cents * (promoData.discount_value / 100));
+        } else if (promoData.discount_type === 'fixed_amount') {
+          discount_cents = promoData.discount_value * 100;
+        } else if (promoData.discount_type === 'free_shipping') {
+          discount_cents = shipping_cents;
+        }
+
+        // Apply max discount cap
+        if (promoData.max_discount_cents && discount_cents > promoData.max_discount_cents) {
+          discount_cents = promoData.max_discount_cents;
+        }
+      }
+    }
+
+    // Calculate total
+    const total_cents = Math.max(0, subtotal_cents + shipping_cents + tax_cents - discount_cents);
+
+    console.log('Order totals:', { subtotal_cents, shipping_cents, tax_cents, discount_cents, total_cents });
+
+    // Generate order number
+    const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const random = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const order_number = `DCG-${timestamp}-${random}`;
+
+    // Create order
+    const { data: order, error: orderError } = await supabase
+      .from('orders')
+      .insert({
+        order_number,
+        user_id: null, // Guest checkout
+        email,
+        status: 'pending',
+        payment_status: 'pending',
+        subtotal_cents,
+        shipping_cents,
+        tax_cents,
+        discount_cents,
+        total_cents,
+        shipping_address,
+        billing_address: billing_address || shipping_address,
+        phone,
+        customer_notes,
+        promo_code_id,
+        shipping_rate_id,
+        checkout_step: 'payment',
+      })
+      .select()
+      .single();
+
+    if (orderError || !order) {
+      console.error('Order creation error:', orderError);
       return NextResponse.json(
         { error: 'Failed to create order', details: orderError?.message },
         { status: 500 }
       );
     }
 
-    const order = orderResult[0];
-    const { order_id, order_number, total_cents } = order;
+    console.log('Order created:', order.id);
+
+    // Create order items
+    const orderItems = cartItems.map(item => ({
+      order_id: order.id,
+      product_id: item.product_id,
+      variant_id: item.variant_id,
+      quantity: item.quantity,
+      price_cents: item.price_cents,
+      title: item.products?.title || 'Product',
+      variant_title: item.product_variants?.title || null,
+      sku: item.product_variants?.sku || null,
+    }));
+
+    const { error: itemsError } = await supabase
+      .from('order_items')
+      .insert(orderItems);
+
+    if (itemsError) {
+      console.error('Order items error:', itemsError);
+      // Don't fail - order is created, items can be fixed later
+    }
 
     // Create Stripe Payment Intent
     const paymentIntent = await stripe.paymentIntents.create({
@@ -74,68 +202,41 @@ export async function POST(request: NextRequest) {
         enabled: true,
       },
       metadata: {
-        order_id: order_id,
-        order_number: order_number,
-        customer_email: email,
+        order_id: order.id,
+        order_number: order.order_number,
       },
-      description: `Order ${order_number}`,
-      receipt_email: email,
-      // Include shipping details for Stripe Dashboard
+      description: `Order ${order.order_number}`,
       shipping: {
         name: `${shipping_address.firstName} ${shipping_address.lastName}`,
         address: {
           line1: shipping_address.address1,
-          line2: shipping_address.address2 || null,
+          line2: shipping_address.address2 || undefined,
           city: shipping_address.city,
           state: shipping_address.state,
           postal_code: shipping_address.zip,
-          country: shipping_address.country || 'US',
+          country: 'US',
         },
       },
     });
 
-    // Update order with Stripe Payment Intent details
-    const { error: updateError } = await supabase
+    console.log('Payment intent created:', paymentIntent.id);
+
+    // Update order with payment intent
+    await supabase
       .from('orders')
       .update({
         stripe_payment_intent_id: paymentIntent.id,
         stripe_client_secret: paymentIntent.client_secret,
-        payment_method_types: paymentIntent.payment_method_types,
-        checkout_step: 'payment',
-        updated_at: new Date().toISOString(),
       })
-      .eq('id', order_id);
-
-    if (updateError) {
-      console.error('Failed to update order with Payment Intent:', updateError);
-    }
-
-    // Get full order details with items
-    const { data: fullOrder, error: fetchError } = await supabase
-      .from('orders')
-      .select(`
-        *,
-        order_items (
-          id,
-          product_id,
-          variant_id,
-          title,
-          variant_title,
-          sku,
-          quantity,
-          price_cents
-        )
-      `)
-      .eq('id', order_id)
-      .single();
-
-    if (fetchError) {
-      console.error('Failed to fetch full order:', fetchError);
-    }
+      .eq('id', order.id);
 
     return NextResponse.json({
       success: true,
-      order: fullOrder,
+      order: {
+        id: order.id,
+        order_number: order.order_number,
+        total_cents: order.total_cents,
+      },
       payment_intent: {
         id: paymentIntent.id,
         client_secret: paymentIntent.client_secret,
@@ -147,8 +248,9 @@ export async function POST(request: NextRequest) {
     console.error('Create payment intent error:', error);
     return NextResponse.json(
       { 
-        error: 'Internal server error', 
-        details: error.message 
+        error: 'Failed to create payment intent',
+        details: error.message,
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
       },
       { status: 500 }
     );
