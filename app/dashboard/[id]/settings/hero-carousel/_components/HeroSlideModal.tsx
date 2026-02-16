@@ -255,9 +255,9 @@ export function HeroSlideModal({ mode, slide, onClose, onSuccess }: Props) {
         bucket_name: BUCKET,
         object_path: objectPath,
         alt_text: formData.alt_text || null,
-        width: imageDimensions?.width || slide?.['width'] || null,
-        height: imageDimensions?.height || slide?.['height'] || null,
-
+        width: imageDimensions?.width || (mode === 'create' && !imageFile ? mobileImageDimensions?.width : null) || slide?.['width'] || null,
+        height: imageDimensions?.height || (mode === 'create' && !imageFile ? mobileImageDimensions?.height : null) || slide?.['height'] || null,
+        
         // Content overlay
         pill_text: formData.pill_text || null,
         headline_line1: formData.headline_line1,
