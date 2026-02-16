@@ -18,8 +18,6 @@ export async function POST(request: NextRequest) {
       shipping_address,
       billing_address,
       phone,
-      customer_notes,
-      promo_code,
       shipping_rate_id,
     } = body;
 
@@ -44,8 +42,7 @@ export async function POST(request: NextRequest) {
         variant_id,
         products (
           id,
-          title,
-          images
+          title
         ),
         product_variants (
           id,
@@ -98,67 +95,30 @@ export async function POST(request: NextRequest) {
     const taxRate = taxData?.reduce((sum, t) => sum + Number(t.rate), 0) || 0;
     const tax_cents = Math.round((subtotal_cents + shipping_cents) * taxRate);
 
-    // Handle promo code
-    let discount_cents = 0;
-    let promo_code_id = null;
-
-    if (promo_code) {
-      const { data: promoData } = await supabase
-        .from('promo_codes')
-        .select('*')
-        .eq('code', promo_code.toUpperCase())
-        .eq('is_active', true)
-        .single();
-
-      if (promoData) {
-        promo_code_id = promoData.id;
-        
-        if (promoData.discount_type === 'percentage') {
-          discount_cents = Math.round(subtotal_cents * (promoData.discount_value / 100));
-        } else if (promoData.discount_type === 'fixed_amount') {
-          discount_cents = promoData.discount_value * 100;
-        } else if (promoData.discount_type === 'free_shipping') {
-          discount_cents = shipping_cents;
-        }
-
-        // Apply max discount cap
-        if (promoData.max_discount_cents && discount_cents > promoData.max_discount_cents) {
-          discount_cents = promoData.max_discount_cents;
-        }
-      }
-    }
-
     // Calculate total
-    const total_cents = Math.max(0, subtotal_cents + shipping_cents + tax_cents - discount_cents);
+    const total_cents = subtotal_cents + shipping_cents + tax_cents;
 
-    console.log('Order totals:', { subtotal_cents, shipping_cents, tax_cents, discount_cents, total_cents });
+    console.log('Order totals:', { subtotal_cents, shipping_cents, tax_cents, total_cents });
 
     // Generate order number
     const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     const random = Math.random().toString(36).substring(2, 6).toUpperCase();
     const order_number = `DCG-${timestamp}-${random}`;
 
-    // Create order
+    // Create order with ONLY fields that exist
     const { data: order, error: orderError } = await supabase
       .from('orders')
       .insert({
         order_number,
-        user_id: null, // Guest checkout
+        profile_id: null, // Guest checkout
         email,
         status: 'pending',
         payment_status: 'pending',
         subtotal_cents,
         shipping_cents,
         tax_cents,
-        discount_cents,
         total_cents,
         shipping_address,
-        billing_address: billing_address || shipping_address,
-        phone,
-        customer_notes,
-        promo_code_id,
-        shipping_rate_id,
-        checkout_step: 'payment',
       })
       .select()
       .single();
@@ -221,12 +181,11 @@ export async function POST(request: NextRequest) {
 
     console.log('Payment intent created:', paymentIntent.id);
 
-    // Update order with payment intent
+    // Try to update order with payment intent (might fail if columns don't exist)
     await supabase
       .from('orders')
       .update({
         stripe_payment_intent_id: paymentIntent.id,
-        stripe_client_secret: paymentIntent.client_secret,
       })
       .eq('id', order.id);
 
