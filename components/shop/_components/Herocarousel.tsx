@@ -36,7 +36,7 @@ interface HeroCarouselProps {
 }
 
 export function HeroCarousel({ slides }: HeroCarouselProps) {
-  if (slides.length === 0) return null;
+  if (!slides?.length) return null;
 
   const getJustifyClass = (alignment: 'left' | 'center' | 'right') => {
     switch (alignment) {
@@ -80,25 +80,35 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
         <CarouselContent className="-ml-0">
           {slides.map((slide) => (
             <CarouselItem key={slide.id} className="pl-0 basis-full">
-              <Link
-                href={slide.primary_button_href}
-                className="relative block w-full bg-no-repeat"
-              >
-                {/* ONE image container for all breakpoints */}
-                <div
-                  className="relative w-full bg-black"
-                  style={{
-                    aspectRatio: `${slide.width || 2880} / ${slide.height || 1050}`,
-                  }}
-                >
-                  <Image
-                    src={slide.image_url}
-                    alt={slide.alt_text || slide.headline_line1}
-                    fill
-                    priority
-                    sizes="100vw"
-                    style={{ objectFit: 'contain', objectPosition: 'center' }}
-                  />
+              <Link href={slide.primary_button_href} className="relative block w-full bg-no-repeat">
+                {/* Desktop: fixed height like reference (480) */}
+                <div className="hidden lg:block">
+                  <div className="relative w-full h-[480px]">
+                    <Image
+                      src={slide.image_url}
+                      alt={slide.alt_text || slide.headline_line1}
+                      fill
+                      priority
+                      sizes="100vw"
+                      className="h-full w-full object-cover"
+                      style={{ objectPosition: 'center top' }}
+                    />
+                  </div>
+                </div>
+
+                {/* Mobile: fixed height like reference (490) */}
+                <div className="block lg:hidden">
+                  <div className="relative w-full h-[490px]">
+                    <Image
+                      src={slide.image_url}
+                      alt={slide.alt_text || slide.headline_line1}
+                      fill
+                      priority
+                      sizes="100vw"
+                      className="h-full w-full object-cover"
+                      style={{ objectPosition: 'center top' }}
+                    />
+                  </div>
                 </div>
 
                 {/* Overlay */}
@@ -117,7 +127,6 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
                   )}
                 >
                   <div className={getTextAlignClass(slide.text_alignment)}>
-                    {/* Pill Text */}
                     {slide.pill_text && (
                       <div className="mb-4">
                         <span
@@ -133,7 +142,6 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
                       </div>
                     )}
 
-                    {/* Headlines */}
                     <div className="relative">
                       <div className="rich-text-block mt-2" style={getTextColorStyle(slide.text_color)}>
                         {slide.headline_line1 && (
@@ -154,7 +162,6 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
                       </div>
                     </div>
 
-                    {/* CTA Buttons */}
                     <div
                       className={cn(
                         'mt-8 flex gap-3',
@@ -194,7 +201,7 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
           ))}
         </CarouselContent>
 
-        {/* keep these if you want arrows; safe to leave */}
+        {/* optional arrows */}
         <CarouselPrevious />
         <CarouselNext />
       </Carousel>
