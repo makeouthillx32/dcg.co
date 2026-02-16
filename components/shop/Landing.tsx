@@ -4,11 +4,11 @@
 import { TopBanner } from "@/components/shop/_components/TopBanner";
 import { HeroCarousel } from "@/components/shop/_components/HeroCarousel";
 import { LandingSkeleton } from "@/components/shop/_components/LandingSkeleton";
-import { ShopByCategory } from "@/components/shop/_components/ShopByCategory";
 import { useLandingData } from "@/components/shop/_components/useLandingData";
 import { useHeroSlides } from "@/components/shop/_components/useHeroSlides";
 import { LandingProductCard } from "@/components/shop/_components/ProductCard";
 import Link from "next/link";
+import Image from "next/image";
 
 export default function HomePage() {
   const { categories, featured, loading, error } = useLandingData();
@@ -24,14 +24,44 @@ export default function HomePage() {
       {/* Top Banner - Outside main container */}
       <TopBanner />
 
-      {/* Hero Carousel - Full Width - Aspect Ratio 96:35 */}
+      {/* Hero Carousel - Full Width - Fixed Height (480px desktop, 490px mobile) */}
       {slides.length > 0 && <HeroCarousel slides={slides} />}
 
       {/* Main Content Container */}
       <div className="bg-background text-foreground">
 
-      {/* Shop by Category Section */}
-      <ShopByCategory categories={categories} loading={loading} error={error} />
+      {/* Shop by Category - 3 Column Grid */}
+      <section className="py-16 md:py-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10">
+          <h2 className="text-3xl sm:text-4xl font-bold text-center mb-12">
+            Shop by Category
+          </h2>
+
+          {error ? (
+            <div className="mb-4 rounded-lg border border-[var(--border)] bg-[var(--card)] p-3 text-sm text-[var(--muted-foreground)]">
+              {error}
+            </div>
+          ) : null}
+
+          {/* 3 Column Grid - Shows ALL categories */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
+            {(categories ?? []).map((c) => (
+              <CategoryCard 
+                key={c.id}
+                title={c.name} 
+                href={`/${c.slug}`}
+                imageUrl={c.coverImageUrl}
+              />
+            ))}
+
+            {!loading && (categories ?? []).length === 0 ? (
+              <div className="col-span-full text-center text-sm text-[var(--muted-foreground)] py-12">
+                No categories yet. Create categories in Dashboard → Settings → Categories.
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </section>
 
       {/* Promo Grid - 2x2 Grid */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 pb-16">
@@ -107,6 +137,51 @@ export default function HomePage() {
       </div>
       {/* End Main Content Container */}
     </>
+  );
+}
+
+/* ------------------------------ */
+/* Category Card Component        */
+/* ------------------------------ */
+
+function CategoryCard({ 
+  title, 
+  href, 
+  imageUrl 
+}: { 
+  title: string; 
+  href: string;
+  imageUrl?: string | null;
+}) {
+  return (
+    <Link
+      href={href}
+      className="group relative block overflow-hidden rounded-lg aspect-square bg-[var(--sidebar)] w-full"
+    >
+      {/* Category Cover Image */}
+      {imageUrl ? (
+        <Image 
+          src={imageUrl} 
+          fill 
+          className="object-cover transition-transform duration-500 group-hover:scale-110" 
+          alt={title}
+          sizes="400px"
+        />
+      ) : (
+        // Fallback gradient if no image
+        <div className="absolute inset-0 bg-gradient-to-br from-[var(--accent)] to-[var(--muted)] opacity-50" />
+      )}
+      
+      {/* Overlay */}
+      <div className="absolute inset-0 bg-black/25 group-hover:bg-black/35 transition-all duration-300" />
+      
+      {/* Title */}
+      <div className="absolute inset-0 flex items-center justify-center p-6">
+        <h3 className="text-2xl md:text-3xl font-bold text-white text-center drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">
+          {title}
+        </h3>
+      </div>
+    </Link>
   );
 }
 
