@@ -25,34 +25,30 @@ interface HeroCarouselProps {
 }
 
 /**
- * Fixes your “3 images on desktop” problem:
- * - Desktop carousel ONLY includes slides that have a desktop image.
- * - Mobile carousel includes slides that have mobile OR desktop (fallback).
- *
- * This supports your current reality where you might have:
- * - 2 normal slides (desktop images present)
- * - 1 mobile-only slide (no desktop image)  ✅ should NOT appear on desktop
+ * Skeptical behavior:
+ * - Desktop ONLY renders slides that explicitly have desktop_image_url.
+ *   (No fallback to image_url, because that is what causes mobile-only slides to leak into desktop.)
+ * - Mobile renders mobile_image_url, else desktop_image_url, else image_url.
  */
 export function HeroCarousel({ slides }: HeroCarouselProps) {
   if (!slides?.length) return null;
 
-  const getDesktopUrl = (s: HeroSlide) =>
-    s.desktop_image_url ?? s.image_url ?? null;
+  // IMPORTANT: Desktop does NOT fall back to image_url.
+  const getDesktopUrl = (s: HeroSlide) => s.desktop_image_url ?? null;
 
+  // Mobile can safely fall back.
   const getMobileUrl = (s: HeroSlide) =>
     s.mobile_image_url ?? s.desktop_image_url ?? s.image_url ?? null;
 
-  // ✅ Desktop shows ONLY slides with desktop images
+  // Desktop shows ONLY slides with explicit desktop image
   const desktopSlides = slides.filter((s) => !!getDesktopUrl(s));
 
-  // ✅ Mobile shows slides with mobile OR desktop fallback
+  // Mobile shows slides with mobile OR desktop fallback OR legacy URL
   const mobileSlides = slides.filter((s) => !!getMobileUrl(s));
 
   return (
     <section id="homepage-hero-carousel" className="w-full">
-      {/* =========================
-          DESKTOP (lg and up)
-          ========================= */}
+      {/* DESKTOP (lg+) */}
       <div className="hidden lg:block">
         {desktopSlides.length ? (
           <Carousel className="w-full" opts={{ align: 'start', loop: true }}>
@@ -86,9 +82,7 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
         ) : null}
       </div>
 
-      {/* =========================
-          MOBILE (below lg)
-          ========================= */}
+      {/* MOBILE (< lg) */}
       <div className="block lg:hidden">
         {mobileSlides.length ? (
           <Carousel className="w-full" opts={{ align: 'start', loop: true }}>
