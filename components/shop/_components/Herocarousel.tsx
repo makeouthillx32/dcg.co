@@ -1,19 +1,17 @@
 'use client';
 
-import Image from 'next/image';
 import Link from 'next/link';
 import { Carousel, CarouselContent, CarouselItem } from '@/components/ui/carousel';
 
 interface HeroSlideProps {
   id: string;
 
-  // Desktop image
+  // Desktop (required)
   image_url: string;
   alt_text: string | null;
 
-  // ✅ Mobile image (optional)
+  // Mobile (optional)
   mobile_image_url?: string | null;
-  mobile_alt_text?: string | null;
 
   primary_button_href: string;
 }
@@ -33,50 +31,29 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
             const desktopSrc = slide.image_url;
             const mobileSrc = slide.mobile_image_url || slide.image_url;
 
-            const desktopAlt = slide.alt_text || 'Hero Image';
-            const mobileAlt = slide.mobile_alt_text || slide.alt_text || 'Hero Image';
-
             return (
               <CarouselItem key={slide.id} className="pl-0 basis-full">
                 <div id="hero-banner-id">
                   <Link
                     href={slide.primary_button_href}
-                    className="relative block w-full bg-no-repeat min-h-[512px] lg:min-h-[600px]"
+                    data-testid="hero-banner"
+                    className="relative block w-full bg-no-repeat overflow-hidden min-h-[512px] lg:min-h-[600px]"
+                    aria-label={slide.alt_text || 'Hero banner'}
                   >
-                    {/* Desktop (lg+) */}
-                    <div className="hidden lg:block">
-                      <div className="relative w-full min-h-[600px]">
-                        <Image
-                          src={desktopSrc}
-                          alt={desktopAlt}
-                          fill
-                          priority
-                          sizes="100vw"
-                          className="h-full w-full object-cover"
-                          style={{ objectPosition: 'center top' }}
-                        />
-                      </div>
-                    </div>
+                    {/* ONE element. Browser swaps sources; never renders both. */}
+                    <picture>
+                      <source media="(min-width: 1024px)" srcSet={desktopSrc} />
+                      <source media="(max-width: 1023px)" srcSet={mobileSrc} />
+                      <img
+                        src={mobileSrc}
+                        alt={slide.alt_text || 'Hero Image'}
+                        className="absolute inset-0 h-full w-full object-cover object-top"
+                        loading="eager"
+                        decoding="async"
+                      />
+                    </picture>
 
-                    {/* Mobile (<lg) */}
-                    <div className="block lg:hidden">
-                      <div className="relative w-full min-h-[512px]">
-                        <Image
-                          src={mobileSrc}
-                          alt={mobileAlt}
-                          fill
-                          priority
-                          sizes="100vw"
-                          className="h-full w-full object-cover"
-                          style={{ objectPosition: 'center top' }}
-                        />
-                      </div>
-                    </div>
-
-                    {/* NOTE:
-                      Text overlay removed temporarily to refine hero sizing.
-                      Will reintroduce once layout and cropping are finalized.
-                    */}
+                    {/* NOTE: No overlay on purpose. */}
                   </Link>
                 </div>
               </CarouselItem>
