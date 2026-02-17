@@ -1,4 +1,3 @@
-// components/shop/_components/useHeroSlides.ts
 "use client";
 
 import { useEffect, useState } from "react";
@@ -6,22 +5,14 @@ import { createClient } from "@/utils/supabase/client";
 
 export interface HeroSlide {
   id: string;
-  image_url: string;
+
+  desktop_image_url: string | null;
+  mobile_image_url: string | null;
+
   alt_text: string | null;
-  pill_text: string | null;
-  headline_line1: string;
-  headline_line2: string | null;
-  subtext: string | null;
-  primary_button_label: string;
+  mobile_alt_text: string | null;
+
   primary_button_href: string;
-  secondary_button_label: string | null;
-  secondary_button_href: string | null;
-  text_alignment: 'left' | 'center' | 'right';
-  text_color: 'dark' | 'light';
-  overlay_opacity: string;
-  blurhash: string | null;
-  width: number;
-  height: number;
 }
 
 export function useHeroSlides() {
@@ -33,7 +24,7 @@ export function useHeroSlides() {
     async function fetchSlides() {
       try {
         const supabase = createClient();
-        
+
         const { data, error: fetchError } = await supabase
           .from("hero_slides")
           .select("*")
@@ -41,27 +32,41 @@ export function useHeroSlides() {
           .order("position", { ascending: true });
 
         if (fetchError) {
-          console.error("Error fetching hero slides:", fetchError);
           setError(fetchError.message);
           setSlides([]);
           return;
         }
 
-        // Generate public URLs for each slide
         const slidesWithUrls = (data || []).map((slide) => {
-          const { data: urlData } = supabase.storage
-            .from(slide.bucket_name)
-            .getPublicUrl(slide.object_path);
+          let desktopUrl: string | null = null;
+          let mobileUrl: string | null = null;
+
+          if (slide.object_path) {
+            const { data } = supabase.storage
+              .from(slide.bucket_name)
+              .getPublicUrl(slide.object_path);
+            desktopUrl = data.publicUrl;
+          }
+
+          if (slide.mobile_object_path) {
+            const { data } = supabase.storage
+              .from(slide.mobile_bucket_name || slide.bucket_name)
+              .getPublicUrl(slide.mobile_object_path);
+            mobileUrl = data.publicUrl;
+          }
 
           return {
-            ...slide,
-            image_url: urlData.publicUrl,
+            id: slide.id,
+            desktop_image_url: desktopUrl,
+            mobile_image_url: mobileUrl,
+            alt_text: slide.alt_text ?? null,
+            mobile_alt_text: slide.mobile_alt_text ?? null,
+            primary_button_href: slide.primary_button_href,
           };
         });
 
-        setSlides(slidesWithUrls as HeroSlide[]);
+        setSlides(slidesWithUrls);
       } catch (err) {
-        console.error("Unexpected error fetching slides:", err);
         setError("Failed to load hero carousel");
         setSlides([]);
       } finally {
