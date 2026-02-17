@@ -9,11 +9,11 @@
   flex-direction: column;
   align-items: stretch;
 
-  /* MOBILE: 16/9 */
-  aspect-ratio: 16 / 9;
+  /* ✅ MOBILE: portrait ratio (1125×1470 => 75/98) */
+  aspect-ratio: 75 / 98;
 
   @media (min-width: 1024px) {
-    /* DESKTOP: shallow banner */
+    /* ✅ DESKTOP: shallow banner */
     aspect-ratio: 25 / 9;
   }
 
