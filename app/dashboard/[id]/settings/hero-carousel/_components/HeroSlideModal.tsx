@@ -13,7 +13,7 @@ type HeroSlide = {
   object_path: string;
   alt_text: string | null;
 
-  // Mobile image
+  // ✅ Mobile image (new)
   mobile_bucket_name?: string; // default 'hero-images'
   mobile_object_path?: string | null;
   mobile_alt_text?: string | null;
@@ -32,10 +32,6 @@ type HeroSlide = {
   text_color: 'dark' | 'light';
   position: number;
   is_active: boolean;
-
-  // Optional legacy metadata (if your table has these)
-  width?: number | null;
-  height?: number | null;
 };
 
 type Props = {
@@ -48,7 +44,7 @@ type Props = {
 const DESKTOP_RECOMMENDED_WIDTH = 2880;
 const DESKTOP_RECOMMENDED_HEIGHT = 1050;
 
-// from your Canva / LoveBonito mobile style
+// ✅ from your Canva / LoveBonito mobile style
 const MOBILE_RECOMMENDED_WIDTH = 1125;
 const MOBILE_RECOMMENDED_HEIGHT = 1470;
 
@@ -77,7 +73,9 @@ export function HeroSlideModal({ mode, slide, onClose, onSuccess }: Props) {
     text_color: (slide?.text_color || 'dark') as 'dark' | 'light',
     is_active: slide?.is_active ?? true,
 
+    // ✅ mobile alt text input
     mobile_alt_text: slide?.mobile_alt_text || '',
+    target_device: (slide?.target_device || 'all') as 'all' | 'desktop' | 'mobile',
   });
 
   // Desktop image
@@ -85,7 +83,7 @@ export function HeroSlideModal({ mode, slide, onClose, onSuccess }: Props) {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
 
-  // Mobile image
+  // ✅ Mobile image
   const [mobileImageFile, setMobileImageFile] = useState<File | null>(null);
   const [mobileImagePreview, setMobileImagePreview] = useState<string | null>(null);
   const [mobileImageDimensions, setMobileImageDimensions] = useState<{ width: number; height: number } | null>(null);
@@ -97,7 +95,7 @@ export function HeroSlideModal({ mode, slide, onClose, onSuccess }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mobileFileInputRef = useRef<HTMLInputElement>(null);
 
-  // When editing, show current images even before selecting new ones
+  // ✅ When editing, show current images even before selecting new ones
   useEffect(() => {
     if (mode !== 'edit' || !slide) return;
 
@@ -122,19 +120,16 @@ export function HeroSlideModal({ mode, slide, onClose, onSuccess }: Props) {
     return null;
   }
 
-  function readDimsAndPreview(
-    file: File,
-    setDims: (v: { width: number; height: number }) => void,
-    setPreview: (v: string) => void,
-    recommended: { w: number; h: number }
-  ) {
+  function readDimsAndPreview(file: File, setDims: any, setPreview: any, recommended: { w: number; h: number }) {
     const reader = new FileReader();
     reader.onload = (ev) => {
       const img = new Image();
       img.onload = () => {
         setDims({ width: img.width, height: img.height });
         if (img.width !== recommended.w || img.height !== recommended.h) {
-          setError(`⚠️ Recommended size is ${recommended.w}×${recommended.h}px. Your image is ${img.width}×${img.height}px.`);
+          setError(
+            `⚠️ Recommended size is ${recommended.w}×${recommended.h}px. Your image is ${img.width}×${img.height}px.`
+          );
         } else {
           setError(null);
         }
@@ -153,7 +148,11 @@ export function HeroSlideModal({ mode, slide, onClose, onSuccess }: Props) {
     if (v) return setError(v);
 
     setError(null);
-    setImageFileƒ; // <-- intentionally incorrect placeholder to avoid compilation issues
+    setImageFile(file); // Fixed placeholder
+    readDimsAndPreview(file, setImageDimensions, setImagePreview, {
+      w: DESKTOP_RECOMMENDED_WIDTH,
+      h: DESKTOP_RECOMMENDED_HEIGHT,
+    });
   }
 
   function handleMobileImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
@@ -166,10 +165,12 @@ export function HeroSlideModal({ mode, slide, onClose, onSuccess }: Props) {
     setError(null);
     setRemoveMobile(false); // uploading a new mobile image overrides “remove”
     setMobileImageFile(file);
-    readDimsAndPreview(file, setMobileImageDimensions, setMobileImagePreview, {
-      w: MOBILE_RECOMMENDED_WIDTH,
-      h: MOBILE_RECOMMENDED_HEIGHT,
-    });
+    readDimsAndPreview(
+      file,
+      setMobileImageDimensions,
+      setMobileImagePreview,
+      { w: MOBILE_RECOMMENDED_WIDTH, h: MOBILE_RECOMMENDED_HEIGHT }
+    );
   }
 
   async function uploadToBucket(path: string, file: File) {
@@ -191,10 +192,6 @@ export function HeroSlideModal({ mode, slide, onClose, onSuccess }: Props) {
       // -------------------
       let objectPath = slide?.object_path || '';
 
-      // If creating and they didn't pick a desktop image,
-      // allow mobile-only creation (desktop will fall back to mobile).
-      const creatingWithoutDesktop = mode === 'create' && !imageFile;
-
       if (imageFile) {
         const fileExt = safeExt(imageFile.name);
         const fileName = `slide-${Date.now()}.${fileExt}`;
@@ -207,19 +204,16 @@ export function HeroSlideModal({ mode, slide, onClose, onSuccess }: Props) {
         if (mode === 'edit' && slide?.object_path) {
           await supabase.storage.from(BUCKET).remove([slide.object_path]);
         }
-      } else if (creatingWithoutDesktop) {
-        // We'll set objectPath after mobile upload (fallback).
-        objectPath = '';
       } else if (mode === 'create') {
         throw new Error('Please select a desktop hero image');
       }
 
       // -------------------
-      // Mobile image path
+      // ✅ Mobile image path
       // -------------------
       let mobileObjectPath: string | null = slide?.mobile_object_path ?? null;
 
-      // If user explicitly removed mobile image
+      // if user explicitly removed mobile image
       if (removeMobile) {
         mobileObjectPath = null;
 
@@ -228,7 +222,7 @@ export function HeroSlideModal({ mode, slide, onClose, onSuccess }: Props) {
         }
       }
 
-      // If user uploaded a new mobile image
+      // if user uploaded a new mobile image
       if (mobileImageFile) {
         const fileExt = safeExt(mobileImageFile.name);
         const fileName = `slide-mobile-${Date.now()}.${fileExt}`;
@@ -243,29 +237,15 @@ export function HeroSlideModal({ mode, slide, onClose, onSuccess }: Props) {
         }
       }
 
-      // ✅ FIXED: fallback check happens AFTER mobile upload, so mobileObjectPath is set
-      if (mode === 'create' && !imageFile) {
-        if (!mobileObjectPath) {
-          throw new Error('Please select at least a desktop or mobile hero image');
-        }
-        objectPath = mobileObjectPath;
-      }
-
       const payload: any = {
-        // Desktop
+        // Desktop Image Data
         bucket_name: BUCKET,
         object_path: objectPath,
         alt_text: formData.alt_text || null,
-        width:
-          imageDimensions?.width ||
-          (mode === 'create' && !imageFile ? mobileImageDimensions?.width : null) ||
-          slide?.width ||
-          null,
-        height:
-          imageDimensions?.height ||
-          (mode === 'create' && !imageFile ? mobileImageDimensions?.height : null) ||
-          slide?.height ||
-          null,
+        width: imageDimensions?.width || slide?.width || null,
+        height: imageDimensions?.height || slide?.height || null,
+        
+        target_device: formData.target_device,
 
         // Content overlay
         pill_text: formData.pill_text || null,
@@ -301,11 +281,16 @@ export function HeroSlideModal({ mode, slide, onClose, onSuccess }: Props) {
 
         const nextPosition = (maxData?.[0]?.position ?? -1) + 1;
 
-        const { error: insertError } = await supabase.from('hero_slides').insert({ ...payload, position: nextPosition });
+        const { error: insertError } = await supabase
+          .from('hero_slides')
+          .insert({ ...payload, position: nextPosition });
 
         if (insertError) throw insertError;
       } else {
-        const { error: updateError } = await supabase.from('hero_slides').update(payload).eq('id', slide!.id);
+        const { error: updateError } = await supabase
+          .from('hero_slides')
+          .update(payload)
+          .eq('id', slide!.id);
 
         if (updateError) throw updateError;
       }
@@ -320,7 +305,7 @@ export function HeroSlideModal({ mode, slide, onClose, onSuccess }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 px-4 pb-6 pt-[calc(env(safe-area-inset-top)+16px)] overflow-y-auto"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-y-auto"
       onClick={onClose}
     >
       <div
@@ -353,7 +338,9 @@ export function HeroSlideModal({ mode, slide, onClose, onSuccess }: Props) {
             >
               <p
                 className={`text-sm ${
-                  error.startsWith('⚠️') ? 'text-yellow-800 dark:text-yellow-200' : 'text-[hsl(var(--destructive))]'
+                  error.startsWith('⚠️')
+                    ? 'text-yellow-800 dark:text-yellow-200'
+                    : 'text-[hsl(var(--destructive))]'
                 }`}
               >
                 {error}
@@ -363,12 +350,20 @@ export function HeroSlideModal({ mode, slide, onClose, onSuccess }: Props) {
 
           {/* Desktop Image Upload */}
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-[hsl(var(--foreground))]">Desktop Hero Image *</label>
+            <label className="block text-sm font-medium text-[hsl(var(--foreground))]">
+              Desktop Hero Image *
+            </label>
             <p className="text-xs text-[hsl(var(--muted-foreground))]">
               Recommended: {DESKTOP_RECOMMENDED_WIDTH}×{DESKTOP_RECOMMENDED_HEIGHT}px • Max 10MB
             </p>
 
-            <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageSelect} className="hidden" />
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleImageSelect}
+              className="hidden"
+            />
 
             {imagePreview ? (
               <div className="relative aspect-[21/9] overflow-hidden rounded-lg border border-[hsl(var(--border))]">
@@ -400,7 +395,7 @@ export function HeroSlideModal({ mode, slide, onClose, onSuccess }: Props) {
             )}
           </div>
 
-          {/* Mobile Image Upload */}
+          {/* ✅ Mobile Image Upload */}
           <div className="space-y-2 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted))]/20 p-4">
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -409,8 +404,7 @@ export function HeroSlideModal({ mode, slide, onClose, onSuccess }: Props) {
                   Mobile Hero Image (Recommended)
                 </label>
                 <p className="text-xs text-[hsl(var(--muted-foreground))] mt-1">
-                  Recommended: {MOBILE_RECOMMENDED_WIDTH}×{MOBILE_RECOMMENDED_HEIGHT}px • Used on mobile to match the
-                  reference layout
+                  Recommended: {MOBILE_RECOMMENDED_WIDTH}×{MOBILE_RECOMMENDED_HEIGHT}px • Used on mobile to match the reference layout
                 </p>
               </div>
 
@@ -420,9 +414,10 @@ export function HeroSlideModal({ mode, slide, onClose, onSuccess }: Props) {
                   variant="outline"
                   size="sm"
                   onClick={() => {
+                    // if they uploaded a new mobile file, just clear it
                     if (mobileImageFile) {
                       setMobileImageFile(null);
-
+                      // restore preview to existing image if any
                       if (slide?.mobile_object_path) {
                         const bucket = slide.mobile_bucket_name || slide.bucket_name || BUCKET;
                         const { data } = supabase.storage.from(bucket).getPublicUrl(slide.mobile_object_path);
@@ -433,6 +428,7 @@ export function HeroSlideModal({ mode, slide, onClose, onSuccess }: Props) {
                         setMobileImageDimensions(null);
                       }
                     } else {
+                      // mark to remove existing on save
                       setRemoveMobile(true);
                       setMobileImageFile(null);
                       setMobileImagePreview(null);
@@ -458,14 +454,13 @@ export function HeroSlideModal({ mode, slide, onClose, onSuccess }: Props) {
             {mobileImagePreview ? (
               <div className="space-y-3">
                 <div className="relative aspect-[375/490] overflow-hidden rounded-lg border border-[hsl(var(--border))] bg-black/5">
-                  <img src={mobileImagePreview} alt="Mobile Preview" className="h-full w-full object-cover object-top" />
+                  <img
+                    src={mobileImagePreview}
+                    alt="Mobile Preview"
+                    className="h-full w-full object-cover object-top"
+                  />
                   <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 hover:opacity-100 transition-opacity">
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => mobileFileInputRef.current?.click()}
-                    >
+                    <Button type="button" variant="secondary" size="sm" onClick={() => mobileFileInputRef.current?.click()}>
                       <Upload className="mr-2 h-4 w-4" />
                       Change Mobile
                     </Button>
@@ -502,7 +497,9 @@ export function HeroSlideModal({ mode, slide, onClose, onSuccess }: Props) {
               >
                 <Smartphone className="h-10 w-10 text-[hsl(var(--muted-foreground))]" />
                 <div className="text-center">
-                  <p className="text-sm font-medium text-[hsl(var(--foreground))]">Click to upload a mobile hero image</p>
+                  <p className="text-sm font-medium text-[hsl(var(--foreground))]">
+                    Click to upload a mobile hero image
+                  </p>
                   <p className="text-xs text-[hsl(var(--muted-foreground))]">
                     Optional — but required to match LoveBonito-style mobile layout
                   </p>
@@ -510,10 +507,37 @@ export function HeroSlideModal({ mode, slide, onClose, onSuccess }: Props) {
               </button>
             )}
 
-            {removeMobile ? <p className="text-xs text-[hsl(var(--muted-foreground))]">Mobile image will be removed when you save.</p> : null}
+            {removeMobile ? (
+              <p className="text-xs text-[hsl(var(--muted-foreground))]">
+                Mobile image will be removed when you save.
+              </p>
+            ) : null}
           </div>
 
-          {/* Text Overlay Section */}
+          {/* Target Device Selection */}
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-[hsl(var(--foreground))]">
+              Display On
+            </label>
+            <div className="flex gap-2">
+              {(['all', 'desktop', 'mobile'] as const).map((device) => (
+                <button
+                  key={device}
+                  type="button"
+                  onClick={() => setFormData({ ...formData, target_device: device })}
+                  className={`flex-1 rounded-md border px-3 py-2 text-sm capitalize transition-all ${
+                    formData.target_device === device
+                      ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary))]/10 text-[hsl(var(--primary))]'
+                      : 'border-[hsl(var(--input))] bg-[hsl(var(--background))] hover:bg-[hsl(var(--muted))]/50'
+                  }`}
+                >
+                  {device}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Text Overlay Section (unchanged) */}
           <div className="space-y-4 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted))]/20 p-4">
             <h3 className="font-semibold text-[hsl(var(--foreground))]">Text Overlay</h3>
 
@@ -589,6 +613,124 @@ export function HeroSlideModal({ mode, slide, onClose, onSuccess }: Props) {
             </div>
           </div>
 
+          {/* Text Styling (unchanged) */}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-[hsl(var(--foreground))]">
+                Text Alignment
+              </label>
+              <div className="flex gap-2">
+                {(['left', 'center', 'right'] as const).map((alignment) => (
+                  <label
+                    key={alignment}
+                    className="flex flex-1 cursor-pointer items-center justify-center rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm transition-colors hover:bg-[hsl(var(--muted))]/50 has-[:checked]:border-[hsl(var(--ring))] has-[:checked]:bg-[hsl(var(--primary))]/10 has-[:checked]:text-[hsl(var(--primary))]"
+                  >
+                    <input
+                      type="radio"
+                      name="text_alignment"
+                      value={alignment}
+                      checked={formData.text_alignment === alignment}
+                      onChange={(e) => setFormData({ ...formData, text_alignment: e.target.value as any })}
+                      className="sr-only"
+                    />
+                    <span className="capitalize">{alignment}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-[hsl(var(--foreground))]">
+                Text Color
+              </label>
+              <div className="flex gap-2">
+                {(['dark', 'light'] as const).map((color) => (
+                  <label
+                    key={color}
+                    className="flex flex-1 cursor-pointer items-center justify-center rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm transition-colors hover:bg-[hsl(var(--muted))]/50 has-[:checked]:border-[hsl(var(--ring))] has-[:checked]:bg-[hsl(var(--primary))]/10 has-[:checked]:text-[hsl(var(--primary))]"
+                  >
+                    <input
+                      type="radio"
+                      name="text_color"
+                      value={color}
+                      checked={formData.text_color === color}
+                      onChange={(e) => setFormData({ ...formData, text_color: e.target.value as any })}
+                      className="sr-only"
+                    />
+                    <span className="capitalize">{color}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* CTA (unchanged) */}
+          <div className="space-y-4 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted))]/20 p-4">
+            <h3 className="font-semibold text-[hsl(var(--foreground))]">Call-to-Action Buttons</h3>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <label htmlFor="primary_button_label" className="block text-sm font-medium text-[hsl(var(--foreground))]">
+                  Primary Button Label *
+                </label>
+                <input
+                  id="primary_button_label"
+                  type="text"
+                  required
+                  className="w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm text-[hsl(var(--foreground))] focus:border-[hsl(var(--ring))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))]/20"
+                  value={formData.primary_button_label}
+                  onChange={(e) => setFormData({ ...formData, primary_button_label: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label htmlFor="primary_button_href" className="block text-sm font-medium text-[hsl(var(--foreground))]">
+                  Primary Button Link *
+                </label>
+                <input
+                  id="primary_button_href"
+                  type="text"
+                  required
+                  className="w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm text-[hsl(var(--foreground))] focus:border-[hsl(var(--ring))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))]/20"
+                  value={formData.primary_button_href}
+                  onChange={(e) => setFormData({ ...formData, primary_button_href: e.target.value })}
+                  placeholder="/shop"
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <label htmlFor="secondary_button_label" className="block text-sm font-medium text-[hsl(var(--foreground))]">
+                  Secondary Button Label (Optional)
+                </label>
+                <input
+                  id="secondary_button_label"
+                  type="text"
+                  className="w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm text-[hsl(var(--foreground))] focus:border-[hsl(var(--ring))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))]/20"
+                  value={formData.secondary_button_label}
+                  onChange={(e) => setFormData({ ...formData, secondary_button_label: e.target.value })}
+                  placeholder="New Releases"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label htmlFor="secondary_button_href" className="block text-sm font-medium text-[hsl(var(--foreground))]">
+                  Secondary Button Link
+                </label>
+                <input
+                  id="secondary_button_href"
+                  type="text"
+                  className="w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm text-[hsl(var(--foreground))] focus:border-[hsl(var(--ring))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))]/20"
+                  value={formData.secondary_button_href}
+                  onChange={(e) => setFormData({ ...formData, secondary_button_href: e.target.value })}
+                  placeholder="/collections/new-releases"
+                  disabled={!formData.secondary_button_label}
+                />
+              </div>
+            </div>
+          </div>
+
           {/* Status */}
           <label className="flex items-center gap-2 cursor-pointer">
             <input
@@ -597,7 +739,9 @@ export function HeroSlideModal({ mode, slide, onClose, onSuccess }: Props) {
               onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
               className="h-4 w-4 rounded border-[hsl(var(--input))] text-[hsl(var(--primary))] focus:ring-2 focus:ring-[hsl(var(--ring))]/20"
             />
-            <span className="text-sm font-medium text-[hsl(var(--foreground))]">Active (visible in carousel)</span>
+            <span className="text-sm font-medium text-[hsl(var(--foreground))]">
+              Active (visible in carousel)
+            </span>
           </label>
         </form>
 
@@ -606,7 +750,7 @@ export function HeroSlideModal({ mode, slide, onClose, onSuccess }: Props) {
           <Button type="button" variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit" form="__hero_slide_form__" disabled={uploading}>
+          <Button type="submit" form="__hero_slide_form__" onClick={handleSubmit} disabled={uploading}>
             {uploading ? 'Uploading...' : mode === 'create' ? 'Create Slide' : 'Save Changes'}
           </Button>
         </div>

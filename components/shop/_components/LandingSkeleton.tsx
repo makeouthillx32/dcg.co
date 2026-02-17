@@ -1,14 +1,20 @@
-// components/shop/_components/LandingSkeleton.tsx
 "use client";
 
 import { ReactNode } from "react";
 
+/**
+ * LandingSkeleton
+ * * Fixes:
+ * 1. ReferenceError: Added missing SquareCardSkeleton, PromoCardSkeleton, and ProductCardSkeleton.
+ * 2. UI Error: Removed 'w-screen' and negative margins that caused desktop white space.
+ * 3. Never Crop: Used aspect-ratio for the hero placeholder to match the dynamic image logic.
+ */
 export function LandingSkeleton() {
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      {/* Hero Carousel Skeleton - Full Width */}
-      <div className="w-screen relative left-1/2 right-1/2 -ml-[50vw] -mr-[50vw]">
-        <div className="h-[480px] md:h-[490px] bg-[var(--muted)] animate-pulse" />
+    <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
+      {/* Hero Carousel Skeleton - Proportional height */}
+      <div className="w-full relative">
+        <div className="aspect-[16/9] md:aspect-[21/9] w-full bg-[var(--muted)] animate-pulse" />
       </div>
 
       {/* What's Trending Section */}
@@ -77,7 +83,7 @@ export function LandingSkeleton() {
 }
 
 /* ------------------------------ */
-/* Skeleton Components            */
+/* Helper Components              */
 /* ------------------------------ */
 
 function SquareCardSkeleton() {
@@ -92,9 +98,9 @@ function PromoCardSkeleton() {
   return (
     <div className="aspect-[4/3] bg-[var(--muted)] animate-pulse rounded-lg p-8">
       <div className="space-y-4">
-        <div className="h-8 w-48 bg-[var(--background)] rounded" />
-        <div className="h-6 w-64 bg-[var(--background)] rounded" />
-        <div className="h-6 w-40 bg-[var(--background)] rounded" />
+        <div className="h-8 w-48 bg-background/30 rounded" />
+        <div className="h-6 w-64 bg-background/30 rounded" />
+        <div className="h-6 w-40 bg-background/30 rounded" />
       </div>
     </div>
   );

@@ -1,125 +1,102 @@
-'use client';
+"use client";
 
-import Image from 'next/image';
-import Link from 'next/link';
-import { Carousel, CarouselContent, CarouselItem } from '@/components/ui/carousel';
+import React, { useState, useEffect, useMemo } from "react";
+import Image from "next/image";
+import Link from "next/link";
+import { useViewport } from "@/hooks/use-viewport";
+import { Carousel, CarouselContent, CarouselItem, type CarouselApi } from "@/components/ui/carousel";
+import { cn } from "@/lib/utils";
+import "./HeroCarousel.scss";
 
 type HeroSlide = {
   id: string;
-
-  // computed by API (recommended)
-  desktop_image_url?: string | null;
-  mobile_image_url?: string | null;
-
-  // legacy fallback (if you still pass it)
-  image_url?: string;
-
-  alt_text?: string | null;
-  mobile_alt_text?: string | null;
-
+  desktop_image_url: string | null;
+  mobile_image_url: string | null;
+  alt_text: string | null;
+  mobile_alt_text: string | null;
   primary_button_href: string;
 };
 
-interface HeroCarouselProps {
-  slides: HeroSlide[];
-}
+export function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
+  const { isMobile } = useViewport();
+  const [api, setApi] = useState<CarouselApi | undefined>(undefined);
+  const [current, setCurrent] = useState(0);
 
-/**
- * Skeptical behavior:
- * - Desktop ONLY renders slides that explicitly have desktop_image_url.
- *   (No fallback to image_url, because that is what causes mobile-only slides to leak into desktop.)
- * - Mobile renders mobile_image_url, else desktop_image_url, else image_url.
- */
-export function HeroCarousel({ slides }: HeroCarouselProps) {
-  if (!slides?.length) return null;
+  const desktopSlides = useMemo(() => slides.filter((s) => !!s.desktop_image_url), [slides]);
+  const mobileSlides = useMemo(() => slides.filter((s) => !!s.mobile_image_url), [slides]);
 
-  // IMPORTANT: Desktop does NOT fall back to image_url.
-  const getDesktopUrl = (s: HeroSlide) => s.desktop_image_url ?? null;
+  // Prefer the viewport-specific set, but fall back if empty.
+  const activeSlides = useMemo(() => {
+    if (isMobile === true) return mobileSlides.length ? mobileSlides : desktopSlides;
+    if (isMobile === false) return desktopSlides.length ? desktopSlides : mobileSlides;
+    return [];
+  }, [isMobile, mobileSlides, desktopSlides]);
 
-  // Mobile can safely fall back.
-  const getMobileUrl = (s: HeroSlide) =>
-    s.mobile_image_url ?? s.desktop_image_url ?? s.image_url ?? null;
+  useEffect(() => {
+    if (!api) return;
 
-  // Desktop shows ONLY slides with explicit desktop image
-  const desktopSlides = slides.filter((s) => !!getDesktopUrl(s));
+    api.scrollTo(0);
+    setCurrent(0);
 
-  // Mobile shows slides with mobile OR desktop fallback OR legacy URL
-  const mobileSlides = slides.filter((s) => !!getMobileUrl(s));
+    const onSelect = () => setCurrent(api.selectedScrollSnap());
+    api.on("select", onSelect);
+
+    return () => {
+      // Embla supports off(); if your wrapper doesn’t, this still won’t crash,
+      // but if it does support it, this prevents stacked listeners.
+      // @ts-expect-error - depends on carousel wrapper typing
+      api.off?.("select", onSelect);
+    };
+  }, [api, isMobile]);
+
+  // Loading state placeholder (no fixed height to prevent jump)
+  if (isMobile === null) return <div className="hero-carousel-container opacity-0" />;
+  if (!activeSlides.length) return null;
 
   return (
-    <section id="homepage-hero-carousel" className="w-full">
-      {/* DESKTOP (lg+) */}
-      <div className="hidden lg:block">
-        {desktopSlides.length ? (
-          <Carousel className="w-full" opts={{ align: 'start', loop: true }}>
-            <CarouselContent className="-ml-0">
-              {desktopSlides.map((slide) => {
-                const src = getDesktopUrl(slide)!;
+    <section className="hero-carousel-container">
+      <Carousel
+        key={isMobile ? "viewport-mobile" : "viewport-desktop"}
+        setApi={setApi}
+        opts={{ loop: true, duration: 15 }}
+      >
+        <CarouselContent className="ml-0">
+          {activeSlides.map((slide) => {
+            const src = (isMobile ? slide.mobile_image_url : slide.desktop_image_url) || slide.desktop_image_url || slide.mobile_image_url;
+            const alt = (isMobile ? slide.mobile_alt_text : slide.alt_text) || slide.alt_text || slide.mobile_alt_text || "Hero Image";
 
-                return (
-                  <CarouselItem key={slide.id} className="pl-0 basis-full">
-                    <Link
-                      href={slide.primary_button_href}
-                      className="relative block w-full bg-no-repeat min-h-[600px]"
-                    >
-                      <div className="relative w-full min-h-[600px]">
-                        <Image
-                          src={src}
-                          alt={slide.alt_text || slide.mobile_alt_text || 'Hero Image'}
-                          fill
-                          priority
-                          sizes="100vw"
-                          className="h-full w-full"
-                          style={{ objectFit: 'cover', objectPosition: 'center top' }}
-                        />
-                      </div>
-                    </Link>
-                  </CarouselItem>
-                );
-              })}
-            </CarouselContent>
-          </Carousel>
-        ) : null}
+            if (!src) return null;
+
+            return (
+              <CarouselItem key={slide.id} className="hero-slide-item">
+                <Link href={slide.primary_button_href} className="slide-link">
+                  <Image
+                    src={src}
+                    alt={alt}
+                    width={1920}
+                    height={1080}
+                    sizes="100vw"
+                    priority
+                    className="hero-img"
+                  />
+                </Link>
+              </CarouselItem>
+            );
+          })}
+        </CarouselContent>
+      </Carousel>
+
+      <div className="dots-container">
+        {activeSlides.map((_, i) => (
+          <button
+            key={i}
+            type="button"
+            onClick={() => api?.scrollTo(i)}
+            className={cn("dot", current === i && "active")}
+            aria-label={`Go to slide ${i + 1}`}
+          />
+        ))}
       </div>
-
-      {/* MOBILE (< lg) */}
-      <div className="block lg:hidden">
-        {mobileSlides.length ? (
-          <Carousel className="w-full" opts={{ align: 'start', loop: true }}>
-            <CarouselContent className="-ml-0">
-              {mobileSlides.map((slide) => {
-                const src = getMobileUrl(slide)!;
-
-                return (
-                  <CarouselItem key={slide.id} className="pl-0 basis-full">
-                    <Link
-                      href={slide.primary_button_href}
-                      className="relative block w-full bg-no-repeat min-h-[512px]"
-                    >
-                      <div className="relative w-full min-h-[512px]">
-                        <Image
-                          src={src}
-                          alt={slide.mobile_alt_text || slide.alt_text || 'Hero Image'}
-                          fill
-                          priority
-                          sizes="100vw"
-                          className="h-full w-full"
-                          style={{ objectFit: 'cover', objectPosition: 'center top' }}
-                        />
-                      </div>
-                    </Link>
-                  </CarouselItem>
-                );
-              })}
-            </CarouselContent>
-          </Carousel>
-        ) : null}
-      </div>
-
-      {/*
-        NOTE:
-        Text overlay intentionally NOT included (per your request).
-      */}
     </section>
   );
 }
