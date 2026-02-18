@@ -98,7 +98,7 @@ export function CategoryModal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[100]" role="dialog" aria-modal="true">
+    <div className="fixed inset-0 z-[80]" role="dialog" aria-modal="true">
       {/* backdrop */}
       <button
         type="button"

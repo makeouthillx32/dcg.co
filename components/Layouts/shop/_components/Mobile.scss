@@ -174,7 +174,7 @@
   
   /* Ensure it stays on top */
   position: relative !important;
-  z-index: 100 !important;
+  z-index: 20 !important;
   
   /* Force hardware acceleration to separate layer */
   transform: translateZ(0) !important;
@@ -225,25 +225,28 @@
   will-change: transform;
 }
 
-/* Mobile drawer overlay - position it relative to header */
+/* Mobile drawer overlay */
 .mobile-drawer-overlay {
   position: fixed;
   inset: 0;
-  z-index: 9998;
-
-  /* grey out */
+  z-index: 60; 
   background: rgba(0, 0, 0, 0.45);
-
-  /* subtle glass */
   backdrop-filter: blur(2px);
   -webkit-backdrop-filter: blur(2px);
-
-  /* fade in/out */
-  opacity: 1;
-  transition: opacity 240ms ease;
-
-  /* tap */
+  
+  /* Critical Fix: Hide by default */
+  opacity: 0;
+  pointer-events: none; 
+  visibility: hidden;
+  transition: opacity 240ms ease, visibility 240ms;
   cursor: pointer;
+}
+
+/* Show only when the drawer is open */
+.mobile-drawer-open .mobile-drawer-overlay {
+  opacity: 1;
+  pointer-events: auto;
+  visibility: visible;
 }
 
 .mobile-drawer-shell {
@@ -253,7 +256,7 @@
   height: 100vh;
   width: min(86vw, 360px);
 
-  z-index: 9999;
+  z-index: 61; /* --z-drawer panel */
 
   background: hsl(var(--background));
   border-right: 1px solid hsl(var(--border));
@@ -302,7 +305,7 @@
     -webkit-backdrop-filter: none !important;
     
     /* Highest z-index */
-    z-index: 999 !important;
+    z-index: 20 !important; /* --z-header */
     position: relative !important;
     
     /* Force GPU layer */

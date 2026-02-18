@@ -154,7 +154,7 @@ $header-height: 70px; // Define header height for consistent spacing
 // =======================================
 .message-context-menu {
   position: fixed;
-  z-index: 9999; // Highest priority to stay above everything
+  z-index: 80; /* --z-modal */
   padding: 6px;
   min-width: 160px;
   animation: context-menu-appear 0.2s cubic-bezier(0.16, 1, 0.3, 1);

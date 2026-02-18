@@ -20,7 +20,7 @@ export function DeleteConfirmModal({ open, item, onClose, onConfirm }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 z-[100]">
+    <div className="fixed inset-0 z-80">
       {/* Backdrop */}
       <button
         aria-label="Close"

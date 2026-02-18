@@ -13,6 +13,14 @@
 @layer base {
   /* ——— App theme (DEFAULTS) ——— */
   :root {
+    /* Z-INDEX LAYER SCALE */
+    --z-page:       10;
+    --z-header:     20;
+    --z-dropdown:   30;
+    --z-drawer:     60;
+    --z-modal:      80;
+    --z-overlay:   100;
+    --z-transition: 9000;
     --background: 36 33% 97%;
     --foreground: 20 10% 15%;
     --card: 36 33% 95%;
@@ -182,7 +190,7 @@
     left: 0;
     width: 100vw;
     height: 100vh;
-    z-index: 9999;
+    z-index: 9000; /* --z-transition */
     pointer-events: none;
     background: radial-gradient(
       circle at var(--x, 50%) var(--y, 50%),

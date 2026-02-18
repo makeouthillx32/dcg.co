@@ -25,7 +25,7 @@ export function TagModal({ open, title, description, children, onClose }: Props)
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[100]">
+    <div className="fixed inset-0 z-80">
       <button
         type="button"
         aria-label="Close modal"

@@ -38,7 +38,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 50;
+  z-index: 100; /* --z-overlay */
   @include flex-center;
   padding: 1rem;
   padding-top: calc(1rem + var(--header-height, 70px));
@@ -411,7 +411,7 @@
   }
 
   .theme-toggle {
-    z-index: 9999;
+    z-index: 100;
     bottom: 4rem;
   }
 }
