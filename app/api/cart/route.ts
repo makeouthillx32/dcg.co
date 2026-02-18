@@ -2,249 +2,202 @@
 import { createServerClient } from "@/utils/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
-type ProductImageRow = {
-  id?: string;
-  product_id: string;
-  variant_id?: string | null;
-  bucket_name: string | null;
-  object_path: string | null;
-  is_public?: boolean | null;
-  is_primary?: boolean | null;
-  position?: number | null;
-};
+function jsonOk(data: any) {
+  return NextResponse.json({ ok: true, data });
+}
 
-function pickBestImage(
-  images: ProductImageRow[],
-  productId: string,
-  variantId?: string | null
-) {
+function jsonError(status: number, code: string, message: string, details?: any) {
+  return NextResponse.json({ ok: false, error: { code, message, details } }, { status });
+}
+
+async function getIdentity(req: NextRequest, supabase: Awaited<ReturnType<typeof createServerClient>>) {
+  const sessionId = req.headers.get("x-session-id");
+  const { data: { user }, error } = await supabase.auth.getUser();
+  const userId = !error ? user?.id : undefined;
+  if (!userId && !sessionId) return null;
+  return { userId: userId ?? null, sessionId: sessionId ?? null };
+}
+
+function pickPrimaryImage(images: any[]) {
   if (!images?.length) return null;
-
-  // Prefer variant-specific images first (only matters if your schema uses variant_id)
-  const variantMatches =
-    variantId ? images.filter((img) => img.variant_id === variantId) : [];
-
-  // Product-level images (no variant_id)
-  const productMatches = images.filter(
-    (img) => img.product_id === productId && (img.variant_id == null)
-  );
-
-  const pool = variantMatches.length ? variantMatches : productMatches;
-  if (!pool.length) return null;
-
-  // Best-first: primary first, then position
-  const sorted = pool.slice().sort((a, b) => {
-    const ap = a.is_primary ? 1 : 0;
-    const bp = b.is_primary ? 1 : 0;
-    if (bp !== ap) return bp - ap;
-
+  return [...images].sort((a, b) => {
+    if (b.is_primary && !a.is_primary) return 1;
+    if (a.is_primary && !b.is_primary) return -1;
     const apos = a.position ?? 9999;
     const bpos = b.position ?? 9999;
     if (apos !== bpos) return apos - bpos;
-
-    return 0;
-  });
-
-  const best = sorted[0];
-  if (!best?.bucket_name || !best?.object_path) return null;
-  if (best.is_public === false) return null;
-
-  return best;
+    return (a.sort_order ?? 9999) - (b.sort_order ?? 9999);
+  })[0];
 }
 
-function publicUrlFromImage(supabase: any, img: ProductImageRow | null) {
-  if (!img?.bucket_name || !img?.object_path) return null;
-  const { data } = supabase.storage.from(img.bucket_name).getPublicUrl(img.object_path);
-  return data?.publicUrl ?? null;
-}
-
+// ─────────────────────────────────────────────
+// GET /api/cart — fetch active cart with images
+// ─────────────────────────────────────────────
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createServerClient();
+    const identity = await getIdentity(request, supabase);
 
-    // Guest session ID
-    const sessionId = request.headers.get("x-session-id");
-
-    // Auth user
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    const userId = user?.id;
-
-    if (!userId && !sessionId) {
-      return NextResponse.json(
-        { error: "No user or session identified" },
-        { status: 400 }
-      );
+    if (!identity) {
+      return jsonError(400, "NO_IDENTITY", "No user or session identified");
     }
 
     // Find active cart
     let cartQuery = supabase
       .from("carts")
-      .select(
-        `
-        id,
-        status,
-        share_token,
-        share_enabled,
-        share_name,
-        share_message,
-        cart_items (
-          id,
-          product_id,
-          variant_id,
-          quantity,
-          price_cents,
-          added_note,
-          products (
-            id,
-            title,
-            slug
-          ),
-          product_variants (
-            id,
-            sku,
-            title,
-            options
-          )
-        )
-      `
-      )
+      .select("id, status, share_token, share_enabled, share_name, share_message")
       .eq("status", "active")
       .single();
 
-    cartQuery = userId
-      ? cartQuery.eq("user_id", userId)
-      : cartQuery.eq("session_id", sessionId);
+    cartQuery = identity.userId
+      ? cartQuery.eq("user_id", identity.userId)
+      : cartQuery.eq("session_id", identity.sessionId);
 
-    let { data: cart, error } = await cartQuery;
+    const { data: cart } = await cartQuery;
 
-    // Create cart if missing
-    if (error || !cart) {
-      const { data: newCart, error: createError } = await supabase
-        .from("carts")
-        .insert({
-          user_id: userId || null,
-          session_id: sessionId || null,
-          status: "active",
-        })
-        .select()
-        .single();
-
-      if (createError) {
-        console.error("Failed to create cart:", createError);
-        return NextResponse.json(
-          { error: "Failed to create cart" },
-          { status: 500 }
-        );
-      }
-
-      cart = { ...newCart, cart_items: [] };
+    if (!cart) {
+      // No cart yet — return empty state
+      return jsonOk({
+        id: null,
+        items: [],
+        item_count: 0,
+        subtotal_cents: 0,
+        share_token: null,
+        share_enabled: false,
+        share_name: null,
+        share_message: null,
+        share_url: null,
+      });
     }
 
-    const cartItems = cart.cart_items || [];
+    // Fetch cart items + product + variant
+    const { data: items, error: itemsError } = await supabase
+      .from("cart_items")
+      .select(`
+        id,
+        cart_id,
+        product_id,
+        variant_id,
+        quantity,
+        price_cents,
+        added_note,
+        products:products (
+          id,
+          title,
+          slug
+        ),
+        variants:product_variants (
+          id,
+          title,
+          sku,
+          option_values,
+          options,
+          price_cents
+        )
+      `)
+      .eq("cart_id", cart.id)
+      .order("created_at", { ascending: true });
 
-    // -----------------------------------------
-    // ✅ Fetch product images for cart items
-    // -----------------------------------------
+    if (itemsError) {
+      return jsonError(500, "ITEMS_FETCH_FAILED", "Failed to fetch cart items", itemsError);
+    }
+
+    // Fetch product images in one query
     const productIds = Array.from(
-      new Set(cartItems.map((ci: any) => ci.product_id).filter(Boolean))
+      new Set((items ?? []).map((i: any) => i.product_id).filter(Boolean))
     );
 
-    const imagesByProduct: Record<string, ProductImageRow[]> = {};
+    const imagesByProductId = new Map<string, any[]>();
 
     if (productIds.length) {
-      const { data: images, error: imgError } = await supabase
+      const { data: images } = await supabase
         .from("product_images")
-        .select(
-          "id, product_id, variant_id, bucket_name, object_path, is_public, is_primary, position"
-        )
-        .in("product_id", productIds);
+        .select("id, product_id, bucket_name, object_path, alt_text, position, sort_order, is_primary")
+        .in("product_id", productIds)
+        .neq("is_public", false); // allow true OR null
 
-      if (imgError) {
-        console.error("Failed to fetch product images:", imgError);
-      } else {
-        for (const img of images || []) {
-          if (!img?.product_id) continue;
-          if (!imagesByProduct[img.product_id]) imagesByProduct[img.product_id] = [];
-          imagesByProduct[img.product_id].push(img as any);
-        }
+      for (const img of images ?? []) {
+        const pid = img.product_id as string;
+        const arr = imagesByProductId.get(pid) ?? [];
+        arr.push(img);
+        imagesByProductId.set(pid, arr);
       }
     }
 
-    // Format items
-    const items = cartItems.map((item: any) => {
-      const product = item.products;
-      const variant = item.product_variants;
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 
-      const productId = item.product_id as string;
-      const variantId = (item.variant_id as string | null) ?? null;
+    // Build enriched items
+    const enrichedItems = (items ?? []).map((item: any) => {
+      const imgs = imagesByProductId.get(item.product_id) ?? [];
+      const primary = pickPrimaryImage(imgs);
 
-      const productImages = imagesByProduct[productId] || [];
-      const best = pickBestImage(productImages, productId, variantId);
-      const image_url = publicUrlFromImage(supabase, best);
+      const image_url =
+        primary?.bucket_name && primary?.object_path
+          ? `${supabaseUrl}/storage/v1/object/public/${primary.bucket_name}/${primary.object_path}`
+          : null;
 
       return {
         id: item.id,
-        cart_id: cart.id,
+        cart_id: item.cart_id,
         product_id: item.product_id,
         variant_id: item.variant_id,
         quantity: item.quantity,
         price_cents: item.price_cents,
-        product_title: product?.title || "Unknown Product",
-        product_slug: product?.slug || "",
-        variant_title: variant?.title || null,
-        variant_sku: variant?.sku || null,
-        options: variant?.options || null,
-        image_url, // ✅ now returns a real URL when product_images exist
-        added_note: item.added_note,
+        added_note: item.added_note ?? null,
+
+        // Flat fields the cart UI expects
+        product_title: item.products?.title ?? "Unknown Product",
+        product_slug: item.products?.slug ?? "",
+        variant_title: item.variants?.title ?? null,
+        variant_sku: item.variants?.sku ?? null,
+        options: item.variants?.options ?? item.variants?.option_values ?? null,
+
+        // Nested for components that prefer it
+        product: item.products ?? null,
+        variant: item.variants ?? null,
+
+        image_url,
+        image_alt: primary?.alt_text ?? null,
       };
     });
 
-    // Totals
-    const itemCount = items.reduce((sum: number, i: any) => sum + i.quantity, 0);
-    const subtotalCents = items.reduce(
-      (sum: number, i: any) => sum + i.price_cents * i.quantity,
-      0
+    const item_count = enrichedItems.reduce((sum, i) => sum + i.quantity, 0);
+    const subtotal_cents = enrichedItems.reduce(
+      (sum, i) => sum + i.price_cents * i.quantity, 0
     );
 
-    const shareUrl =
+    const share_url =
       cart.share_enabled && cart.share_token
         ? `${request.nextUrl.origin}/share/cart/${cart.share_token}`
         : null;
 
-    return NextResponse.json({
+    return jsonOk({
       id: cart.id,
-      items,
-      item_count: itemCount,
-      subtotal_cents: subtotalCents,
-      share_token: cart.share_token,
-      share_enabled: cart.share_enabled,
-      share_url: shareUrl,
-      share_name: cart.share_name,
-      share_message: cart.share_message,
+      items: enrichedItems,
+      item_count,
+      subtotal_cents,
+      share_token: cart.share_token ?? null,
+      share_enabled: cart.share_enabled ?? false,
+      share_name: cart.share_name ?? null,
+      share_message: cart.share_message ?? null,
+      share_url,
     });
   } catch (error) {
-    console.error("Cart API error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    console.error("GET /api/cart error:", error);
+    return jsonError(500, "INTERNAL", "Internal server error", error);
   }
 }
 
+// ─────────────────────────────────────────────
+// DELETE /api/cart — clear entire cart
+// ─────────────────────────────────────────────
 export async function DELETE(request: NextRequest) {
   try {
     const supabase = await createServerClient();
+    const identity = await getIdentity(request, supabase);
 
-    const sessionId = request.headers.get("x-session-id");
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    const userId = user?.id;
-
-    if (!userId && !sessionId) {
-      return NextResponse.json(
-        { error: "No user or session identified" },
-        { status: 400 }
-      );
+    if (!identity) {
+      return jsonError(400, "NO_IDENTITY", "No user or session identified");
     }
 
     let cartQuery = supabase
@@ -253,19 +206,26 @@ export async function DELETE(request: NextRequest) {
       .eq("status", "active")
       .single();
 
-    cartQuery = userId
-      ? cartQuery.eq("user_id", userId)
-      : cartQuery.eq("session_id", sessionId);
+    cartQuery = identity.userId
+      ? cartQuery.eq("user_id", identity.userId)
+      : cartQuery.eq("session_id", identity.sessionId);
 
     const { data: cart } = await cartQuery;
 
-    if (cart) {
-      await supabase.from("cart_items").delete().eq("cart_id", cart.id);
+    if (cart?.id) {
+      const { error } = await supabase
+        .from("cart_items")
+        .delete()
+        .eq("cart_id", cart.id);
+
+      if (error) {
+        return jsonError(500, "CLEAR_FAILED", "Failed to clear cart", error);
+      }
     }
 
-    return NextResponse.json({ success: true });
+    return jsonOk({ cleared: true });
   } catch (error) {
-    console.error("Clear cart error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    console.error("DELETE /api/cart error:", error);
+    return jsonError(500, "INTERNAL", "Internal server error", error);
   }
 }
