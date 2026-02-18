@@ -20,19 +20,19 @@ function pickBestImage(
 ) {
   if (!images?.length) return null;
 
-  // Prefer variant-specific images first (if variant_id exists in your schema)
+  // Prefer variant-specific images first (only matters if your schema uses variant_id)
   const variantMatches =
     variantId ? images.filter((img) => img.variant_id === variantId) : [];
 
+  // Product-level images (no variant_id)
   const productMatches = images.filter(
-    (img) => img.product_id === productId && (!img.variant_id || img.variant_id === null)
+    (img) => img.product_id === productId && (img.variant_id == null)
   );
 
   const pool = variantMatches.length ? variantMatches : productMatches;
-
   if (!pool.length) return null;
 
-  // Sort best-first: primary desc, position asc, fallback stable
+  // Best-first: primary first, then position
   const sorted = pool.slice().sort((a, b) => {
     const ap = a.is_primary ? 1 : 0;
     const bp = b.is_primary ? 1 : 0;
@@ -52,20 +52,25 @@ function pickBestImage(
   return best;
 }
 
+function publicUrlFromImage(supabase: any, img: ProductImageRow | null) {
+  if (!img?.bucket_name || !img?.object_path) return null;
+  const { data } = supabase.storage.from(img.bucket_name).getPublicUrl(img.object_path);
+  return data?.publicUrl ?? null;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createServerClient();
 
-    // Get session ID from headers (for guests)
+    // Guest session ID
     const sessionId = request.headers.get("x-session-id");
 
-    // Get authenticated user
+    // Auth user
     const {
       data: { user },
     } = await supabase.auth.getUser();
     const userId = user?.id;
 
-    // Must have either user_id or session_id
     if (!userId && !sessionId) {
       return NextResponse.json(
         { error: "No user or session identified" },
@@ -73,7 +78,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Try to find existing cart
+    // Find active cart
     let cartQuery = supabase
       .from("carts")
       .select(
@@ -108,13 +113,13 @@ export async function GET(request: NextRequest) {
       .eq("status", "active")
       .single();
 
-    // Filter by user_id or session_id
-    if (userId) cartQuery = cartQuery.eq("user_id", userId);
-    else cartQuery = cartQuery.eq("session_id", sessionId);
+    cartQuery = userId
+      ? cartQuery.eq("user_id", userId)
+      : cartQuery.eq("session_id", sessionId);
 
     let { data: cart, error } = await cartQuery;
 
-    // If no cart exists, create one
+    // Create cart if missing
     if (error || !cart) {
       const { data: newCart, error: createError } = await supabase
         .from("carts")
@@ -146,15 +151,9 @@ export async function GET(request: NextRequest) {
       new Set(cartItems.map((ci: any) => ci.product_id).filter(Boolean))
     );
 
-    const variantIds = Array.from(
-      new Set(cartItems.map((ci: any) => ci.variant_id).filter(Boolean))
-    );
-
-    let imagesByProduct: Record<string, ProductImageRow[]> = {};
+    const imagesByProduct: Record<string, ProductImageRow[]> = {};
 
     if (productIds.length) {
-      // Pull images once, then map in-memory
-      // NOTE: If your product_images table does NOT have variant_id, this still works.
       const { data: images, error: imgError } = await supabase
         .from("product_images")
         .select(
@@ -173,22 +172,17 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Format cart items for frontend
+    // Format items
     const items = cartItems.map((item: any) => {
       const product = item.products;
       const variant = item.product_variants;
 
       const productId = item.product_id as string;
-      const variantId = item.variant_id as string | null;
+      const variantId = (item.variant_id as string | null) ?? null;
 
       const productImages = imagesByProduct[productId] || [];
       const best = pickBestImage(productImages, productId, variantId);
-
-      const image_url =
-        best?.bucket_name && best?.object_path
-          ? supabase.storage.from(best.bucket_name).getPublicUrl(best.object_path).data
-              .publicUrl
-          : null;
+      const image_url = publicUrlFromImage(supabase, best);
 
       return {
         id: item.id,
@@ -202,19 +196,18 @@ export async function GET(request: NextRequest) {
         variant_title: variant?.title || null,
         variant_sku: variant?.sku || null,
         options: variant?.options || null,
-        image_url, // ✅ FIXED
+        image_url, // ✅ now returns a real URL when product_images exist
         added_note: item.added_note,
       };
     });
 
-    // Calculate totals
-    const itemCount = items.reduce((sum: number, item: any) => sum + item.quantity, 0);
+    // Totals
+    const itemCount = items.reduce((sum: number, i: any) => sum + i.quantity, 0);
     const subtotalCents = items.reduce(
-      (sum: number, item: any) => sum + item.price_cents * item.quantity,
+      (sum: number, i: any) => sum + i.price_cents * i.quantity,
       0
     );
 
-    // Build share URL if sharing is enabled
     const shareUrl =
       cart.share_enabled && cart.share_token
         ? `${request.nextUrl.origin}/share/cart/${cart.share_token}`
@@ -254,20 +247,19 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // Find cart
     let cartQuery = supabase
       .from("carts")
       .select("id")
       .eq("status", "active")
       .single();
 
-    if (userId) cartQuery = cartQuery.eq("user_id", userId);
-    else cartQuery = cartQuery.eq("session_id", sessionId);
+    cartQuery = userId
+      ? cartQuery.eq("user_id", userId)
+      : cartQuery.eq("session_id", sessionId);
 
     const { data: cart } = await cartQuery;
 
     if (cart) {
-      // Delete all cart items
       await supabase.from("cart_items").delete().eq("cart_id", cart.id);
     }
 
