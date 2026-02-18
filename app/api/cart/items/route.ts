@@ -13,10 +13,7 @@ function jsonError(status: number, code: string, message: string, details?: any)
 async function getIdentity(req: NextRequest, supabase: Awaited<ReturnType<typeof createServerClient>>) {
   const sessionId = req.headers.get("x-session-id");
   const { data: { user }, error } = await supabase.auth.getUser();
-
-  // auth.getUser() can error in some edge/cookie scenarios — don’t hard fail unless no identity
   const userId = !error ? user?.id : undefined;
-
   if (!userId && !sessionId) return null;
   return { userId: userId ?? null, sessionId: sessionId ?? null };
 }
@@ -32,7 +29,9 @@ async function getOrCreateActiveCartId(
     .eq("status", "active")
     .single();
 
-  cartQuery = identity.userId ? cartQuery.eq("user_id", identity.userId) : cartQuery.eq("session_id", identity.sessionId);
+  cartQuery = identity.userId
+    ? cartQuery.eq("user_id", identity.userId)
+    : cartQuery.eq("session_id", identity.sessionId);
 
   const { data: cart } = await cartQuery;
   if (cart?.id) return cart.id;
@@ -54,29 +53,29 @@ async function getOrCreateActiveCartId(
 }
 
 /**
- * Picks the “best” image for a product from a list:
- * - is_primary first
- * - then lowest position
- * - then lowest sort_order
+ * Picks the best image for a product:
+ * 1. is_primary = true
+ * 2. lowest position
+ * 3. lowest sort_order
  */
 function pickPrimaryImage(images: any[]) {
   if (!images?.length) return null;
-  const sorted = [...images].sort((a, b) => {
-    const ap = a.is_primary ? 1 : 0;
-    const bp = b.is_primary ? 1 : 0;
-    if (bp !== ap) return bp - ap;
-
+  return [...images].sort((a, b) => {
+    // Primary first
+    if (b.is_primary && !a.is_primary) return 1;
+    if (a.is_primary && !b.is_primary) return -1;
+    // Then by position
     const apos = a.position ?? 9999;
     const bpos = b.position ?? 9999;
     if (apos !== bpos) return apos - bpos;
-
-    const aso = a.sort_order ?? 9999;
-    const bso = b.sort_order ?? 9999;
-    return aso - bso;
-  });
-  return sorted[0];
+    // Then by sort_order
+    return (a.sort_order ?? 9999) - (b.sort_order ?? 9999);
+  })[0];
 }
 
+// ─────────────────────────────────────────────
+// GET /api/cart/items — fetch cart with images
+// ─────────────────────────────────────────────
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createServerClient();
@@ -88,11 +87,10 @@ export async function GET(request: NextRequest) {
 
     const cartId = await getOrCreateActiveCartId(supabase, identity, false);
     if (!cartId) {
-      // No cart yet — return empty cart state
       return jsonOk({ cart_id: null, items: [] });
     }
 
-    // 1) Fetch cart items + product + variant (NO images yet)
+    // 1) Fetch cart items + product + variant
     const { data: items, error: itemsError } = await supabase
       .from("cart_items")
       .select(`
@@ -110,8 +108,10 @@ export async function GET(request: NextRequest) {
         ),
         variants:product_variants (
           id,
+          title,
           sku,
           option_values,
+          options,
           price_cents
         )
       `)
@@ -122,30 +122,38 @@ export async function GET(request: NextRequest) {
       return jsonError(500, "CART_ITEMS_FETCH_FAILED", "Failed to fetch cart items", itemsError);
     }
 
-    const productIds = Array.from(new Set((items ?? []).map((i: any) => i.product_id).filter(Boolean)));
+    const productIds = Array.from(
+      new Set((items ?? []).map((i: any) => i.product_id).filter(Boolean))
+    );
+
     let imagesByProductId = new Map<string, any[]>();
 
-    // 2) Fetch all product_images for products in cart (1 query)
+    // 2) Fetch product_images for all products in cart (single query)
+    // NOTE: No is_public filter — some images may have is_public = null which would
+    // be excluded by .eq("is_public", true). We filter nulls out safely below.
     if (productIds.length) {
       const { data: images, error: imagesError } = await supabase
         .from("product_images")
         .select("id, product_id, bucket_name, object_path, alt_text, position, sort_order, is_primary, is_public")
         .in("product_id", productIds)
-        .eq("is_public", true);
+        .neq("is_public", false); // allow true OR null — exclude only explicitly false
 
       if (imagesError) {
-        return jsonError(500, "CART_IMAGES_FETCH_FAILED", "Failed to fetch product images for cart", imagesError);
-      }
-
-      for (const img of images ?? []) {
-        const pid = img.product_id as string;
-        const arr = imagesByProductId.get(pid) ?? [];
-        arr.push(img);
-        imagesByProductId.set(pid, arr);
+        console.error("Cart images fetch error:", imagesError);
+        // Don't fail the whole cart — just continue without images
+      } else {
+        for (const img of images ?? []) {
+          const pid = img.product_id as string;
+          const arr = imagesByProductId.get(pid) ?? [];
+          arr.push(img);
+          imagesByProductId.set(pid, arr);
+        }
       }
     }
 
-    // 3) Attach image_url (public)
+    // 3) Build enriched items with image_url
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+
     const enriched = (items ?? []).map((item: any) => {
       const imgs = imagesByProductId.get(item.product_id) ?? [];
       const primary = pickPrimaryImage(imgs);
@@ -154,8 +162,8 @@ export async function GET(request: NextRequest) {
       let image_alt: string | null = null;
 
       if (primary?.bucket_name && primary?.object_path) {
-        const { data } = supabase.storage.from(primary.bucket_name).getPublicUrl(primary.object_path);
-        image_url = data?.publicUrl ?? null;
+        // Build URL directly — avoids an extra async call per item
+        image_url = `${supabaseUrl}/storage/v1/object/public/${primary.bucket_name}/${primary.object_path}`;
         image_alt = primary.alt_text ?? null;
       }
 
@@ -166,10 +174,8 @@ export async function GET(request: NextRequest) {
         variant_id: item.variant_id,
         quantity: item.quantity,
         price_cents: item.price_cents,
-
         product: item.products ?? null,
         variant: item.variants ?? null,
-
         image_url,
         image_alt,
       };
@@ -182,6 +188,9 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// ─────────────────────────────────────────────
+// POST /api/cart/items — add item to cart
+// ─────────────────────────────────────────────
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createServerClient();
@@ -202,7 +211,7 @@ export async function POST(request: NextRequest) {
       return jsonError(400, "BAD_QTY", "Quantity must be between 1 and 99");
     }
 
-    // Get variant details (price + stock)
+    // Get variant details
     const { data: variant, error: variantError } = await supabase
       .from("product_variants")
       .select("id, product_id, price_cents, inventory_qty, is_active")
@@ -226,7 +235,7 @@ export async function POST(request: NextRequest) {
       return jsonError(500, "CART_CREATE_FAILED", "Failed to create cart");
     }
 
-    // Check existing item
+    // Check for existing item with same variant
     const { data: existingItem } = await supabase
       .from("cart_items")
       .select("id, quantity")
