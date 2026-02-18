@@ -1,7 +1,8 @@
+//app/categorySlug]/age.tsx
 import { createServerClient, createServiceClient } from "@/utils/supabase/server";
 import { notFound } from "next/navigation";
 import CategoryPageClient from "./_components/CategoryPageClient";
-import StorefrontLayout from "@/components/storefront/StorefrontLayout";
+
 
 // Generate static params for all active categories at build time
 export async function generateStaticParams() {
@@ -123,14 +124,12 @@ export default async function CategoryPage({ params }: { params: Promise<{ categ
   }
 
   return (
-    <StorefrontLayout>
-      <CategoryPageClient
-        category={category}
-        subcategories={subcategories || []}
-        products={products}
-        breadcrumbs={breadcrumbs}
-      />
-    </StorefrontLayout>
+    <CategoryPageClient
+      category={category}
+      subcategories={subcategories || []}
+      products={products}
+      breadcrumbs={breadcrumbs}
+    />
   );
 }
 

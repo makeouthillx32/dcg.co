@@ -1,7 +1,7 @@
 import { createServerClient, createServiceClient } from "@/utils/supabase/server";
 import { notFound } from "next/navigation";
 import CollectionPageClient from "./_components/CollectionPageClient";
-import StorefrontLayout from "@/components/storefront/StorefrontLayout";
+
 
 // Generate static params for all collections at build time
 export async function generateStaticParams() {
@@ -91,9 +91,7 @@ export default async function CollectionPage({ params }: { params: Promise<{ slu
     }));
 
   return (
-    <StorefrontLayout>
-      <CollectionPageClient collection={collection} products={products} />
-    </StorefrontLayout>
+    <CollectionPageClient collection={collection} products={products} />
   );
 }
 

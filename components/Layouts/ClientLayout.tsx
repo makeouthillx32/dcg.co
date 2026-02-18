@@ -4,7 +4,8 @@
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import Nav from "@/components/nav";
+import ShopHeader from "@/components/Layouts/shop/Header";
+import AppHeader from "@/components/Layouts/app/nav";
 import Footer from "@/components/Layouts/footer";
 import AccessibilityOverlay from "@/components/Layouts/overlays/accessibility/accessibility";
 import { CookieConsent } from "@/components/CookieConsent";
@@ -74,6 +75,7 @@ export default function ClientLayoutWrapper({
   const isCollectionsPage = pathname.toLowerCase().startsWith("/collections");
   const isCategoryPage = /^\/[^\/]+$/.test(pathname) && !isToolsPage && !isDashboardPage && !isProductsPage && !pathname.startsWith("/auth");
 
+  const isCheckoutRoute = pathname.toLowerCase().startsWith("/checkout") || pathname.toLowerCase().startsWith("/cart");
   const isShopRoute = isHome || isProductsPage || isCollectionsPage || isCategoryPage;
 
   useEffect(() => {
@@ -185,8 +187,8 @@ export default function ClientLayoutWrapper({
   }, [isDarkMode]);
 
   // ✅ FIX: Show the wrapper's Nav/Footer FOR shop routes
-  const showNav = false; // Shop header is rendered inside each page component
-  const showFooter = false; // Footer is rendered inside each page component  
+  const showNav = isShopRoute;
+  const showFooter = isShopRoute;
   const showAccessibility = isShopRoute;
 
   return (
@@ -194,9 +196,9 @@ export default function ClientLayoutWrapper({
       {/* ✅ Runs once when a session exists; sets profiles.region if missing */}
       <RegionBootstrap />
 
-      {showNav && <Nav />}
-      <main className="flex-1">{children}</main>
-      {showFooter && <Footer />}
+      {isCheckoutRoute ? <AppHeader /> : showNav && <ShopHeader />}
+      {children}
+      {!isCheckoutRoute && showFooter && <Footer />}
       {showAccessibility && <AccessibilityOverlay />}
 
       <CookieConsent

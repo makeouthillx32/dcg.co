@@ -7,7 +7,7 @@ import { useSidebarContext } from "../sidebar/sidebar-context";
 import { MenuIcon } from "./icons";
 import { Notification } from "./notification";
 import { ThemeToggleSwitch } from "./theme-toggle";
-import SwitchtoDarkMode from "@/components/SwitchtoDarkMode";
+import SwitchtoDarkMode from "@/components/Layouts/SwitchtoDarkMode";
 
 export function Header() {
   const { toggleSidebar, isMobile } = useSidebarContext();

@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { Menu, X, User } from "lucide-react";
 import Link from "next/link";
 import { useTheme } from "@/app/provider";
-import SwitchtoDarkMode from "@/components/SwitchtoDarkMode";
+import SwitchtoDarkMode from "@/components/Layouts/SwitchtoDarkMode";
 import useLoginSession from "@/lib/useLoginSession";
 import MobileDrawer from "@/components/Layouts/shop/MobileDrawer";
 import DesktopNav from "@/components/Layouts/shop/DesktopNav";

@@ -2,8 +2,7 @@
 "use client";
 
 import React, { useEffect } from "react";
-import Header from "@/components/Layouts/shop/Header";
-import Footer from "@/components/Layouts/footer";
+
 import useThemeCookie from "@/lib/useThemeCookie";
 
 import Landing from "@/components/shop/Landing";
@@ -30,14 +29,8 @@ export default function Home() {
   }, []);
 
   return (
-    <div className="flex min-h-screen flex-col bg-background text-foreground">
-      <Header />
-
-      <main className="flex-grow">
-        <Landing />
-      </main>
-
-      <Footer />
-    </div>
+    <main className="flex-grow">
+      <Landing />
+    </main>
   );
 }

@@ -5,7 +5,7 @@ import ConditionalOverlays from "@/components/Layouts/overlays/ConditionalOverla
 import { CartProvider } from "@/components/Layouts/overlays/cart/cart-context";
 import "./globals.css";
 import type { Metadata } from "next";
-import ClientLayoutWrapper from "@/components/ClientLayout";
+import ClientLayoutWrapper from "@/components/Layouts/ClientLayout";
 
 // ✅ UPDATED: Metadata for Desert Cowgirl (western-inspired clothing storefront)
 export const metadata: Metadata = {
