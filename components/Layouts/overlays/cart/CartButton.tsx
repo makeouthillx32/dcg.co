@@ -2,7 +2,7 @@
 "use client";
 
 import { ShoppingCart } from "lucide-react";
-import { useCart } from "@/lib/cart-context";
+import { useCart } from "@/components/Layouts/overlays/cart/cart-context";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 

@@ -7,7 +7,7 @@ import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ChevronLeft, ChevronRight, ShoppingCart, Heart, Share2 } from "lucide-react";
-import { useCart } from "@/lib/cart-context";
+import { useCart } from "@/components/Layouts/overlays/cart/cart-context";
 
 interface ProductImage {
   id: string;

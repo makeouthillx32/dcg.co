@@ -1,7 +1,7 @@
 // components/cart/CartDrawer.tsx
 "use client";
 
-import { useCart } from "@/lib/cart-context";
+import { useCart } from "@/components/Layouts/overlays/cart/cart-context";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";

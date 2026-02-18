@@ -3,7 +3,7 @@ import { Providers } from "./provider";
 import Nav from "@/components/nav";
 import Footer from "@/components/Layouts/footer";
 import ConditionalOverlays from "@/components/Layouts/overlays/ConditionalOverlays";
-import { CartProvider } from "@/lib/cart-context";
+import { CartProvider } from "@/components/Layouts/overlays/cart/cart-context";
 import "./globals.css";
 import type { Metadata } from "next";
 import ClientLayoutWrapper from "@/components/ClientLayout";
