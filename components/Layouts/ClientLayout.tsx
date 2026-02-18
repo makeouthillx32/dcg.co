@@ -66,16 +66,26 @@ export default function ClientLayoutWrapper({
   const screenSize = useScreenSize();
   const cookieVariant = getCookieConsentVariant(screenSize);
 
-  const isHome = pathname === "/";
-  const isToolsPage = pathname.toLowerCase().startsWith("/tools");
-  const isDashboardPage = pathname.toLowerCase().startsWith("/dashboard");
-  const isProductsPage = pathname.toLowerCase().startsWith("/products");
-  
-  // ✅ NEW: Catch Collections and dynamic Categories (e.g., /tops, /graphic-tees)
-  const isCollectionsPage = pathname.toLowerCase().startsWith("/collections");
-  const isCategoryPage = /^\/[^\/]+$/.test(pathname) && !isToolsPage && !isDashboardPage && !isProductsPage && !pathname.startsWith("/auth");
+  const lowerPath = pathname.toLowerCase();
 
-  const isCheckoutRoute = pathname.toLowerCase().startsWith("/checkout") || pathname.toLowerCase().startsWith("/cart");
+  const isHome = pathname === "/";
+  const isToolsPage = lowerPath.startsWith("/tools");
+  const isDashboardPage = lowerPath.startsWith("/dashboard");
+  const isProductsPage = lowerPath.startsWith("/products");
+
+  // ✅ NEW: Catch Collections and dynamic Categories (e.g., /tops, /graphic-tees)
+  const isCollectionsPage = lowerPath.startsWith("/collections");
+  const isCategoryPage =
+    /^\/[^\/]+$/.test(pathname) &&
+    !isToolsPage &&
+    !isDashboardPage &&
+    !isProductsPage &&
+    !lowerPath.startsWith("/auth");
+
+  // ✅ App-header routes (cleaner flows)
+  const isCheckoutRoute = lowerPath.startsWith("/checkout") || lowerPath.startsWith("/cart");
+  const isProfileMeRoute = lowerPath.startsWith("/profile/me");
+
   const isShopRoute = isHome || isProductsPage || isCollectionsPage || isCategoryPage;
 
   useEffect(() => {
@@ -121,21 +131,18 @@ export default function ClientLayoutWrapper({
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const isAuthPage =
-        pathname === "/sign-in" || pathname === "/sign-up" || pathname.startsWith("/auth");
+      const isAuthPage = pathname === "/sign-in" || pathname === "/sign-up" || lowerPath.startsWith("/auth");
 
       if (!isAuthPage) {
         setCookie("lastPage", pathname, { path: "/" });
       }
     }
-  }, [pathname]);
+  }, [pathname, lowerPath]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const isAuthPage =
-      pathname === "/sign-in" || pathname === "/sign-up" || pathname.startsWith("/auth");
-
+    const isAuthPage = pathname === "/sign-in" || pathname === "/sign-up" || lowerPath.startsWith("/auth");
     if (isAuthPage) return;
 
     if (isFirstLoad) {
@@ -163,7 +170,7 @@ export default function ClientLayoutWrapper({
         },
       });
     }, 100);
-  }, [pathname, isHome, isToolsPage, isDashboardPage, isFirstLoad]);
+  }, [pathname, lowerPath, isHome, isToolsPage, isDashboardPage, isFirstLoad]);
 
   useEffect(() => {
     if (typeof window !== "undefined" && process.env.NODE_ENV === "development") {
@@ -191,15 +198,19 @@ export default function ClientLayoutWrapper({
   const showFooter = isShopRoute;
   const showAccessibility = isShopRoute;
 
+  const useAppHeader = isCheckoutRoute || isProfileMeRoute;
+
   return (
     <>
       {/* ✅ Runs once when a session exists; sets profiles.region if missing */}
       <RegionBootstrap />
 
-      {isCheckoutRoute ? <AppHeader /> : showNav && <ShopHeader />}
+      {useAppHeader ? <AppHeader /> : showNav && <ShopHeader />}
       {children}
-      {!isCheckoutRoute && showFooter && <Footer />}
-      {showAccessibility && <AccessibilityOverlay />}
+      {!useAppHeader && showFooter && <Footer />}
+
+      {/* Optional: keep “clean” flows clean */}
+      {!useAppHeader && showAccessibility && <AccessibilityOverlay />}
 
       <CookieConsent
         variant={cookieVariant}
@@ -208,8 +219,8 @@ export default function ClientLayoutWrapper({
           screenSize === "mobile"
             ? "We use cookies to enhance your experience. Essential cookies are required for functionality."
             : screenSize === "tablet"
-            ? "We use cookies to enhance your experience and analyze usage. Essential cookies required."
-            : "We use cookies to enhance your experience, analyze site usage, and improve our services. Essential cookies are required for basic functionality."
+              ? "We use cookies to enhance your experience and analyze usage. Essential cookies required."
+              : "We use cookies to enhance your experience, analyze site usage, and improve our services. Essential cookies are required for basic functionality."
         }
         learnMoreHref="/privacy-policy"
         onAcceptCallback={(preferences) => {
