@@ -3,7 +3,6 @@
 @import "@/style/nav.css";
 @import "@/style/switch-to-dark-mode.css";
 @import "@/style/TSC.css";
-@import "@/style/home.css";
 @import "@/style/layout-tokens.css";
 
 @tailwind base;

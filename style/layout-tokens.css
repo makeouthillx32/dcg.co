@@ -1,3 +1,4 @@
+
 /*
  * layout-tokens.css
  * ─────────────────────────────────────────────────────────
@@ -11,8 +12,6 @@
  * NESTING RULE:
  *   Each layout block includes a high-specificity nested
  *   selector so inner layouts always override outer ones.
- *   e.g. the shop header inside the app layout still gets
- *   its own tokens, not the app's.
  *
  * TOKENS:
  *   --lt-bg            main surface background
@@ -21,28 +20,96 @@
  *   --lt-shadow        box-shadow token
  *   --lt-status-bar    iOS/browser status bar color
  *
+ * GLOBAL PALETTE (GP):
+ *   Set --gp-* once to control all layouts at once.
+ *   Individual layout blocks reference var(--gp-*) by default.
+ *   Override any single token in a layout block to break from group.
+ *
  * IMPORT in globals.css (before @tailwind directives):
  *   @import "@/style/layout-tokens.css";
  * ─────────────────────────────────────────────────────────
  */
 
+/* ─── GLOBAL PALETTE (GP) ─────────────────────────────── */
+/*
+ * Change these to update ALL layouts simultaneously.
+ * To override a single layout, edit that layout's block below.
+ *
+ * EXAMPLE - make everything primary-based in light mode:
+ *   --gp-bg: hsl(var(--primary));
+ *   --gp-fg: hsl(var(--primary-foreground));
+ *
+ * EXAMPLE - make everything muted in dark mode:
+ *   --gp-bg: hsl(var(--muted));
+ *   --gp-fg: hsl(var(--muted-foreground));
+ *//*
+ * ─── GLOBAL PALETTE (GP) ──────────────────────────────────
+ * Set these once to control all layouts simultaneously.
+ * Individual layout blocks below can override per-layout.
+ *
+ * USAGE IN LAYOUT BLOCKS:
+ *   --lt-bg: var(--gp-bg);        ← inherits group color
+ *   --lt-bg: hsl(var(--primary)); ← overrides individually
+ * ─────────────────────────────────────────────────────────
+ */
+
+:root {
+  /* Light mode group defaults */
+  --gp-bg:         hsl(var(--primary-foreground));
+  --gp-fg:         hsl(var(--foreground));
+  --gp-border:     hsl(var(--border));
+  --gp-shadow:     var(--shadow-sm);
+  --gp-status-bar: hsl(var(--primary-foreground));
+}
+
+.dark {
+  /* Dark mode group defaults */
+  --gp-bg:         hsl(var(--primary-foreground));
+  --gp-fg:         hsl(var(--foreground));
+  --gp-border:     hsl(var(--border));
+  --gp-shadow:     var(--shadow-sm);
+  --gp-status-bar: hsl(var(--primary-foreground));
+}
 /* ─── SHOP HEADER ─────────────────────────────────────── */
-[data-layout="shop"],
+/* [data-layout="shop"],
 :is([data-layout]) [data-layout="shop"] {
   --lt-bg:         hsl(var(--primary-foreground));
   --lt-fg:         hsl(var(--foreground));
   --lt-border:     hsl(var(--border));
   --lt-shadow:     var(--shadow-sm);
-  --lt-status-bar: hsl(var(--background));
+  --lt-status-bar: hsl(var(--primary-foreground));
 }
 
 .dark [data-layout="shop"],
 .dark :is([data-layout]) [data-layout="shop"] {
-  --lt-status-bar: hsl(var(--background));
+  --lt-bg:         hsl(var(--muted));
+  --lt-fg:         hsl(var(--muted-foreground));
+  --lt-border:     hsl(var(--border));
+  --lt-shadow:     var(--shadow-sm);
+  --lt-status-bar: hsl(var(--muted));
+} */
+
+/* ─── APP HEADER ──────────────────────────────────────── */
+/* [data-layout="app"],
+:is([data-layout]) [data-layout="app"] {
+  --lt-bg:         hsl(var(--primary));
+  --lt-fg:         hsl(var(--primary-foreground));
+  --lt-border:     hsl(var(--primary) / 0.2);
+  --lt-shadow:     var(--shadow-sm);
+  --lt-status-bar: hsl(var(--primary));
 }
 
+.dark [data-layout="app"],
+.dark :is([data-layout]) [data-layout="app"] {
+  --lt-bg:         hsl(var(--muted));
+  --lt-fg:         hsl(var(--muted-foreground));
+  --lt-border:     hsl(var(--muted) / 0.2);
+  --lt-shadow:     var(--shadow-sm);
+  --lt-status-bar: hsl(var(--muted));
+} */
+
 /* ─── DASHBOARD HEADER ────────────────────────────────── */
-[data-layout="dashboard"],
+/* [data-layout="dashboard"],
 :is([data-layout]) [data-layout="dashboard"] {
   --lt-bg:         hsl(var(--background));
   --lt-fg:         hsl(var(--foreground));
@@ -54,8 +121,68 @@
 .dark [data-layout="dashboard"],
 .dark :is([data-layout]) [data-layout="dashboard"] {
   --lt-bg:         hsl(var(--card));
+  --lt-fg:         hsl(var(--card-foreground));
   --lt-border:     hsl(var(--sidebar-border));
+  --lt-shadow:     var(--shadow-sm);
   --lt-status-bar: hsl(var(--sidebar));
+} */
+
+/* ─── SIDEBAR ─────────────────────────────────────────── */
+/* [data-layout="sidebar"],
+:is([data-layout]) [data-layout="sidebar"] {
+  --lt-bg:         hsl(var(--sidebar));
+  --lt-fg:         hsl(var(--sidebar-foreground));
+  --lt-border:     hsl(var(--sidebar-border));
+  --lt-shadow:     none;
+  --lt-status-bar: hsl(var(--sidebar));
+}
+
+.dark [data-layout="sidebar"],
+.dark :is([data-layout]) [data-layout="sidebar"] {
+  --lt-bg:         hsl(var(--sidebar));
+  --lt-fg:         hsl(var(--sidebar-foreground));
+  --lt-border:     hsl(var(--sidebar-border));
+  --lt-shadow:     none;
+  --lt-status-bar: hsl(var(--sidebar));
+} */
+
+/* ─── FOOTER ──────────────────────────────────────────── */
+/* [data-layout="footer"],
+:is([data-layout]) [data-layout="footer"] {
+  --lt-bg:         hsl(var(--background));
+  --lt-fg:         hsl(var(--foreground));
+  --lt-border:     hsl(var(--border));
+  --lt-shadow:     none;
+  --lt-status-bar: hsl(var(--background));
+}
+
+.dark [data-layout="footer"],
+.dark :is([data-layout]) [data-layout="footer"] {
+  --lt-bg:         hsl(var(--card));
+  --lt-fg:         hsl(var(--card-foreground));
+  --lt-border:     hsl(var(--border));
+  --lt-shadow:     none;
+  --lt-status-bar: hsl(var(--card));
+} */
+
+
+/* ─── SHOP HEADER ─────────────────────────────────────── */
+[data-layout="shop"],
+:is([data-layout]) [data-layout="shop"] {
+  --lt-bg:         var(--gp-bg);
+  --lt-fg:         var(--gp-fg);
+  --lt-border:     var(--gp-border);
+  --lt-shadow:     var(--gp-shadow);
+  --lt-status-bar: var(--gp-status-bar);
+}
+
+.dark [data-layout="shop"],
+.dark :is([data-layout]) [data-layout="shop"] {
+  --lt-bg:         var(--gp-bg);
+  --lt-fg:         var(--gp-fg);
+  --lt-border:     var(--gp-border);
+  --lt-shadow:     var(--gp-shadow);
+  --lt-status-bar: var(--gp-status-bar);
 }
 
 /* ─── APP HEADER ──────────────────────────────────────── */
@@ -64,13 +191,36 @@
   --lt-bg:         hsl(var(--primary));
   --lt-fg:         hsl(var(--primary-foreground));
   --lt-border:     hsl(var(--primary) / 0.2);
-  --lt-shadow:     var(--shadow-sm);
+  --lt-shadow:     var(--gp-shadow);
   --lt-status-bar: hsl(var(--primary));
 }
 
 .dark [data-layout="app"],
 .dark :is([data-layout]) [data-layout="app"] {
-  --lt-status-bar: hsl(var(--primary));
+  --lt-bg:         hsl(var(--muted));
+  --lt-fg:         hsl(var(--muted-foreground));
+  --lt-border:     hsl(var(--muted) / 0.2);
+  --lt-shadow:     var(--gp-shadow);
+  --lt-status-bar: hsl(var(--muted));
+}
+
+/* ─── DASHBOARD HEADER ────────────────────────────────── */
+[data-layout="dashboard"],
+:is([data-layout]) [data-layout="dashboard"] {
+  --lt-bg:         hsl(var(--background));
+  --lt-fg:         var(--gp-fg);
+  --lt-border:     var(--gp-border);
+  --lt-shadow:     var(--gp-shadow);
+  --lt-status-bar: hsl(var(--background));
+}
+
+.dark [data-layout="dashboard"],
+.dark :is([data-layout]) [data-layout="dashboard"] {
+  --lt-bg:         hsl(var(--card));
+  --lt-fg:         hsl(var(--card-foreground));
+  --lt-border:     hsl(var(--sidebar-border));
+  --lt-shadow:     var(--gp-shadow);
+  --lt-status-bar: hsl(var(--sidebar));
 }
 
 /* ─── SIDEBAR ─────────────────────────────────────────── */
@@ -83,12 +233,30 @@
   --lt-status-bar: hsl(var(--sidebar));
 }
 
+.dark [data-layout="sidebar"],
+.dark :is([data-layout]) [data-layout="sidebar"] {
+  --lt-bg:         hsl(var(--sidebar));
+  --lt-fg:         hsl(var(--sidebar-foreground));
+  --lt-border:     hsl(var(--sidebar-border));
+  --lt-shadow:     none;
+  --lt-status-bar: hsl(var(--sidebar));
+}
+
 /* ─── FOOTER ──────────────────────────────────────────── */
 [data-layout="footer"],
 :is([data-layout]) [data-layout="footer"] {
-  --lt-bg:         hsl(var(--background));
-  --lt-fg:         hsl(var(--foreground));
-  --lt-border:     hsl(var(--border));
+  --lt-bg:         var(--gp-bg);
+  --lt-fg:         var(--gp-fg);
+  --lt-border:     var(--gp-border);
   --lt-shadow:     none;
-  --lt-status-bar: hsl(var(--background));
+  --lt-status-bar: var(--gp-status-bar);
+}
+
+.dark [data-layout="footer"],
+.dark :is([data-layout]) [data-layout="footer"] {
+  --lt-bg:         var(--gp-bg);
+  --lt-fg:         var(--gp-fg);
+  --lt-border:     var(--gp-border);
+  --lt-shadow:     none;
+  --lt-status-bar: var(--gp-status-bar);
 }
