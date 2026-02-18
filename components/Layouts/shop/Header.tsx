@@ -63,13 +63,13 @@ const Header: React.FC = () => {
   }, []);
 
   return (
-    <div className="relative">
-      <header className="header-container bg-primary-foreground text-foreground border-border">
+    <div className="relative" data-layout="shop">
+      <header className="header-container bg-[var(--lt-bg)] text-[var(--lt-fg)] border-[var(--lt-border)]">
         <div className="header-content">
           {/* LEFT (Mobile): Hamburger */}
           <div className="header-left">
             <button
-              className={`mobile-hamburger text-foreground focus:ring-primary ${
+              className={`mobile-hamburger text-[var(--lt-fg)] focus:ring-primary ${
                 mobileMenuOpen ? "menu-open" : ""
               }`}
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -111,7 +111,7 @@ const Header: React.FC = () => {
               {!session ? (
                 <Link
                   href="/sign-in"
-                  className="auth-button text-accent hover:text-accent focus:ring-accent"
+                  className="auth-button text-[var(--lt-fg)] hover:text-[var(--lt-fg)] focus:ring-primary"
                   aria-label="Sign in"
                 >
                   {/* Mobile: text */}
@@ -125,7 +125,7 @@ const Header: React.FC = () => {
               ) : (
                 <button
                   onClick={handleAccountClick}
-                  className="auth-button text-accent hover:text-accent focus:ring-accent"
+                  className="auth-button text-[var(--lt-fg)] hover:text-[var(--lt-fg)] focus:ring-primary"
                   type="button"
                   aria-label="Account"
                 >
@@ -133,7 +133,7 @@ const Header: React.FC = () => {
                   <span className="md:hidden">Account</span>
 
                   {/* Desktop: icon */}
-                  <span className="hidden md:inline-flex items-center text-foreground hover:text-primary transition-colors">
+                  <span className="hidden md:inline-flex items-center text-[var(--lt-fg)] hover:text-primary transition-colors">
                     <User className="w-5 h-5" aria-hidden="true" />
                   </span>
                 </button>
@@ -141,7 +141,7 @@ const Header: React.FC = () => {
             </div>
 
             {/* Theme Switcher */}
-            <div className="theme-switcher text-foreground hover:text-primary transition-colors">
+            <div className="theme-switcher text-[var(--lt-fg)] hover:text-primary transition-colors">
               <SwitchtoDarkMode />
             </div>
           </div>

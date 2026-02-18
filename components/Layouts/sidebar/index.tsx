@@ -53,8 +53,9 @@ export function Sidebar() {
       )}
 
       <aside
+        data-layout="sidebar"
         className={cn(
-          "max-w-[290px] overflow-hidden border-r border-[hsl(var(--border))] bg-[hsl(var(--sidebar))] transition-[width] duration-200 ease-linear dark:border-[hsl(var(--sidebar-border))] dark:bg-[hsl(var(--card))]",
+          "max-w-[290px] overflow-hidden border-r border-[var(--lt-border)] bg-[var(--lt-bg)] transition-[width] duration-200 ease-linear",
           isMobile ? "fixed bottom-0 top-0 z-50" : "sticky top-0 h-screen",
           isOpen ? "w-full" : "w-0"
         )}
@@ -75,7 +76,7 @@ export function Sidebar() {
             {isMobile && (
               <button
                 onClick={toggleSidebar}
-                className="absolute left-3/4 right-4.5 top-1/2 -translate-y-1/2 text-right text-[hsl(var(--sidebar-foreground))]"
+                className="absolute left-3/4 right-4.5 top-1/2 -translate-y-1/2 text-right text-[var(--lt-fg)]"
               >
                 <span className="sr-only">Close Menu</span>
                 <ArrowLeftIcon className="ml-auto size-7" />
@@ -87,7 +88,7 @@ export function Sidebar() {
           <div className="custom-scrollbar mt-6 flex-1 overflow-y-auto pr-3 min-[850px]:mt-10">
             {NAV_DATA.map((section) => (
               <div key={section.label} className="mb-6">
-                <h2 className="mb-5 text-sm font-medium text-[hsl(var(--sidebar-foreground))] dark:text-[hsl(var(--muted-foreground))]">
+                <h2 className="mb-5 text-sm font-medium text-[var(--lt-fg)]">
                   {section.label}
                 </h2>
 

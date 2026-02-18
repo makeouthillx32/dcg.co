@@ -10,6 +10,7 @@ import { Theme } from "@/types/theme";
 import { defaultThemeId, getThemeById, getAvailableThemeIds } from "@/themes";
 import { dynamicFontManager } from "@/lib/dynamicFontManager";
 import { transitionTheme, smoothThemeToggle } from "@/utils/themeTransitions";
+import MetaThemeColor from "@/components/Layouts/meta-theme-color";
 
 interface EnhancedThemeContextType {
   themeType: "light" | "dark";
@@ -286,43 +287,7 @@ export const Providers: React.FC<{
         localStorage.setItem("theme", themeType);
         setCookie("theme", themeType, { path: "/", maxAge: 31536000 });
         
-        // Update meta theme-color for iOS
-        const isHome = window.location.pathname === "/";
-        let themeColor = themeType === "dark" 
-          ? (isHome ? getComputedStyle(html).getPropertyValue("--sidebar").trim() : getComputedStyle(html).getPropertyValue("--primary").trim())
-          : getComputedStyle(html).getPropertyValue("--primary").trim();
-          
-        if (themeColor.startsWith("var(--")) {
-          themeColor = getComputedStyle(html).getPropertyValue(themeColor.slice(4, -1)).trim();
-        }
-        
-        // Convert HSL to hex for iOS compatibility
-        if (themeColor && !themeColor.startsWith("#")) {
-          const tempDiv = document.createElement('div');
-          tempDiv.style.color = themeColor.includes("hsl") ? themeColor : `hsl(${themeColor})`;
-          document.body.appendChild(tempDiv);
-          const computedColor = getComputedStyle(tempDiv).color;
-          document.body.removeChild(tempDiv);
-          
-          const rgbMatch = computedColor.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
-          if (rgbMatch) {
-            const r = parseInt(rgbMatch[1]);
-            const g = parseInt(rgbMatch[2]);
-            const b = parseInt(rgbMatch[3]);
-            themeColor = `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
-          }
-        }
-        
-        // Update theme-color meta tag
-        let metaTag = document.querySelector("meta[name='theme-color']") as HTMLMetaElement;
-        if (!metaTag) {
-          metaTag = document.createElement("meta");
-          metaTag.setAttribute("name", "theme-color");
-          document.head.appendChild(metaTag);
-        }
-        metaTag.setAttribute("content", themeColor);
-        
-        console.log(`✅ Theme applied: ${theme.name} (${themeType}) - iOS color: ${themeColor}`);
+        console.log(`✅ Theme applied: ${theme.name} (${themeType})`);
         
       } catch (error) {
         console.error("❌ Error applying theme:", error);

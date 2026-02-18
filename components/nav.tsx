@@ -18,11 +18,8 @@ const Nav: React.FC<NavProps> = ({ pageTitle }) => {
 
   return (
     <nav
-      className={`flex justify-between items-center p-4 transition-colors ${
-        isDark 
-          ? "bg-[hsl(var(--sidebar))] text-[hsl(var(--sidebar-foreground))]" 
-          : "bg-[hsl(var(--sidebar))] text-[hsl(var(--sidebar-foreground))]"
-      } shadow-[var(--shadow-sm)]`}
+      data-layout="app"
+      className="flex justify-between items-center p-4 transition-colors bg-[var(--lt-bg)] text-[var(--lt-fg)] shadow-[var(--lt-shadow)]"
     >
       <div className="flex items-center gap-3">
         {/* Logo - Now clickable and takes you to home */}

@@ -117,7 +117,10 @@ export default function Footer() {
   }, [isMember, isOwnerOrAdmin]);
 
   return (
-    <footer className="bg-[var(--background)] text-[var(--foreground)] border-t border-[var(--border)]">
+    <footer 
+      data-layout="footer" 
+      className="bg-[var(--lt-bg)] text-[var(--lt-fg)] border-t border-[var(--lt-border)]"
+    >
       <div className="mx-auto max-w-7xl px-6 sm:px-8 md:px-12 lg:px-16 xl:px-20 py-14">
         <div className="grid gap-10 lg:grid-cols-[1.2fr_2fr] lg:gap-14">
           {/* Brand */}
@@ -130,17 +133,17 @@ export default function Footer() {
               />
             </div>
 
-            <p className="max-w-[32rem] text-sm text-[var(--muted-foreground)]">
+            <p className="max-w-[32rem] text-sm text-[var(--lt-fg)] opacity-80">
               Desert Cowgirl™ — western essentials, everyday staples, and drops worth waiting for.
             </p>
 
             {/* Member shoutout */}
             {isMember ? (
-              <div className="inline-flex w-fit items-center rounded-full border border-[var(--border)] px-3 py-1 text-xs text-[var(--muted-foreground)]">
+              <div className="inline-flex w-fit items-center rounded-full border border-[var(--lt-border)] px-3 py-1 text-xs text-[var(--lt-fg)] opacity-70">
                 Thanks for joining the Barn.
               </div>
             ) : (
-              <div className="inline-flex w-fit items-center rounded-full border border-[var(--border)] px-3 py-1 text-xs text-[var(--muted-foreground)]">
+              <div className="inline-flex w-fit items-center rounded-full border border-[var(--lt-border)] px-3 py-1 text-xs text-[var(--lt-fg)] opacity-70">
                 New here?{" "}
                 <Link className="ml-1 underline underline-offset-2" href="/sign-up">
                   Join the Barn
@@ -148,7 +151,7 @@ export default function Footer() {
               </div>
             )}
 
-            <ul className="flex items-center gap-4 text-[var(--muted-foreground)]">
+            <ul className="flex items-center gap-4 text-[var(--lt-fg)] opacity-70">
               {socialLinks.map((s) => (
                 <li key={s.label}>
                   <a
@@ -156,7 +159,7 @@ export default function Footer() {
                     aria-label={s.label}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center justify-center rounded-full border border-[var(--border)] p-2 hover:bg-[var(--card)] transition-colors"
+                    className="inline-flex items-center justify-center rounded-full border border-[var(--lt-border)] p-2 hover:bg-[var(--lt-bg)] hover:opacity-80 transition-colors"
                   >
                     {s.icon}
                   </a>
@@ -169,12 +172,12 @@ export default function Footer() {
           <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {sections.map((section) => (
               <div key={section.title}>
-                <h3 className="mb-4 text-sm font-semibold tracking-wide text-[var(--foreground)]">
+                <h3 className="mb-4 text-sm font-semibold tracking-wide text-[var(--lt-fg)]">
                   {section.title}
                 </h3>
-                <ul className="space-y-3 text-sm text-[var(--muted-foreground)]">
+                <ul className="space-y-3 text-sm text-[var(--lt-fg)] opacity-70">
                   {section.links.map((link) => (
-                    <li key={link.name} className="hover:text-[var(--foreground)] transition-colors">
+                    <li key={link.name} className="hover:text-[var(--lt-fg)] transition-colors">
                       {link.external ? (
                         <a href={link.href} target="_blank" rel="noopener noreferrer" className="hover:underline">
                           {link.name}
@@ -192,7 +195,7 @@ export default function Footer() {
           </div>
         </div>
 
-        <div className="mt-12 flex flex-col gap-4 border-t border-[var(--border)] pt-8 text-xs text-[var(--muted-foreground)] md:flex-row md:items-center md:justify-between">
+        <div className="mt-12 flex flex-col gap-4 border-t border-[var(--lt-border)] pt-8 text-xs text-[var(--lt-fg)] opacity-60 md:flex-row md:items-center md:justify-between">
           <p>© {new Date().getFullYear()} Desert Cowgirl™. All rights reserved.</p>
           <div className="flex flex-wrap gap-x-6 gap-y-2">
             <Link className="hover:underline" href="/legal/privacy-policy">

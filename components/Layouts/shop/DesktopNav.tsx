@@ -259,7 +259,7 @@ export default function DesktopNav() {
                   ref={(el) => {
                     navRefs.current[index] = el;
                   }}
-                  className="nav-top-link text-foreground hover:text-primary bg-transparent border-none cursor-pointer transition-colors duration-200 px-4 py-2 rounded-md hover:bg-muted/50"
+                  className="nav-top-link text-[var(--lt-fg)] hover:text-primary bg-transparent border-none cursor-pointer transition-colors duration-200 px-4 py-2 rounded-md hover:bg-muted/50"
                   onClick={handleNavClick(true)}
                   onKeyDown={(e) => handleKeyDown(e, index, node.key)}
                   aria-expanded={openKey === node.key}
@@ -331,7 +331,7 @@ export default function DesktopNav() {
                     }}
                     href={node.href}
                     onClick={handleNavClick(false)}
-                    className="nav-top-link text-foreground hover:text-primary no-underline transition-colors duration-200 px-4 py-2 rounded-md hover:bg-muted/50 inline-block"
+                    className="nav-top-link text-[var(--lt-fg)] hover:text-primary no-underline transition-colors duration-200 px-4 py-2 rounded-md hover:bg-muted/50 inline-block"
                     onKeyDown={(e) => handleKeyDown(e, index, node.key)}
                     tabIndex={0}
                   >
@@ -344,7 +344,7 @@ export default function DesktopNav() {
                     }}
                     href={node.href}
                     onClick={handleNavClick(false)}
-                    className="nav-top-link text-foreground hover:text-primary no-underline transition-colors duration-200 px-4 py-2 rounded-md hover:bg-muted/50 inline-block"
+                    className="nav-top-link text-[var(--lt-fg)] hover:text-primary no-underline transition-colors duration-200 px-4 py-2 rounded-md hover:bg-muted/50 inline-block"
                     onKeyDown={(e) => handleKeyDown(e, index, node.key)}
                     tabIndex={0}
                   >

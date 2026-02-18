@@ -13,7 +13,7 @@ export function Header() {
   const { toggleSidebar, isMobile } = useSidebarContext();
 
   return (
-    <header className="sticky top-0 z-30 flex items-center justify-between border-b border-[hsl(var(--border))] bg-[hsl(var(--background))] px-4 py-5 shadow-[var(--shadow-sm)] dark:border-[hsl(var(--sidebar-border))] dark:bg-[hsl(var(--card))] md:px-5 2xl:px-10">
+    <header data-layout="dashboard" className="sticky top-0 z-30 flex items-center justify-between border-b border-[var(--lt-border)] bg-[var(--lt-bg)] px-4 py-5 shadow-[var(--lt-shadow)] md:px-5 2xl:px-10">
       <button
         onClick={toggleSidebar}
         className="rounded-[var(--radius)] border border-[hsl(var(--border))] px-1.5 py-1 dark:border-[hsl(var(--sidebar-border))] dark:bg-[hsl(var(--background))] hover:dark:bg-[hsla(var(--background),0.1)] lg:hidden"

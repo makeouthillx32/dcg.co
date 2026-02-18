@@ -1,7 +1,6 @@
 // app/layout.tsx - UPDATED WITH CONDITIONAL OVERLAYS
 import { Providers } from "./provider";
-import Nav from "@/components/nav";
-import Footer from "@/components/Layouts/footer";
+import MetaThemeColor from "@/components/Layouts/meta-theme-color";
 import ConditionalOverlays from "@/components/Layouts/overlays/ConditionalOverlays";
 import { CartProvider } from "@/components/Layouts/overlays/cart/cart-context";
 import "./globals.css";
@@ -103,8 +102,8 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* ✅ Theme color matches your light palette background */}
-        <meta name="theme-color" content="#faf8f5" />
+        {/* ✅ Fallback theme color (matches --background light: #f8f5f0) */}
+        <meta name="theme-color" content="#f8f5f0" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="format-detection" content="telephone=no" />
 
@@ -143,6 +142,9 @@ export default function RootLayout({
       </head>
       <body className="min-h-screen font-[var(--font-sans)]">
         <Providers>
+          {/* 🎨 Dynamic Meta Theme Color (defaults to shop for root) */}
+          <MetaThemeColor layout="shop" />
+          
           {/* 🛒 Wrap with CartProvider for global cart state */}
           <CartProvider>
             <ClientLayoutWrapper>{children}</ClientLayoutWrapper>

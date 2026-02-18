@@ -1,0 +1,94 @@
+/*
+ * layout-tokens.css
+ * ─────────────────────────────────────────────────────────
+ * Single source of truth for layout-specific color tokens.
+ *
+ * HOW IT WORKS:
+ *   Each layout wrapper gets a data-layout="x" attribute.
+ *   Components inside use --lt-* tokens instead of direct
+ *   CSS variables so colors are controlled from one place.
+ *
+ * NESTING RULE:
+ *   Each layout block includes a high-specificity nested
+ *   selector so inner layouts always override outer ones.
+ *   e.g. the shop header inside the app layout still gets
+ *   its own tokens, not the app's.
+ *
+ * TOKENS:
+ *   --lt-bg            main surface background
+ *   --lt-fg            primary text color
+ *   --lt-border        border color
+ *   --lt-shadow        box-shadow token
+ *   --lt-status-bar    iOS/browser status bar color
+ *
+ * IMPORT in globals.css (before @tailwind directives):
+ *   @import "@/style/layout-tokens.css";
+ * ─────────────────────────────────────────────────────────
+ */
+
+/* ─── SHOP HEADER ─────────────────────────────────────── */
+[data-layout="shop"],
+:is([data-layout]) [data-layout="shop"] {
+  --lt-bg:         hsl(var(--primary-foreground));
+  --lt-fg:         hsl(var(--foreground));
+  --lt-border:     hsl(var(--border));
+  --lt-shadow:     var(--shadow-sm);
+  --lt-status-bar: hsl(var(--background));
+}
+
+.dark [data-layout="shop"],
+.dark :is([data-layout]) [data-layout="shop"] {
+  --lt-status-bar: hsl(var(--background));
+}
+
+/* ─── DASHBOARD HEADER ────────────────────────────────── */
+[data-layout="dashboard"],
+:is([data-layout]) [data-layout="dashboard"] {
+  --lt-bg:         hsl(var(--background));
+  --lt-fg:         hsl(var(--foreground));
+  --lt-border:     hsl(var(--border));
+  --lt-shadow:     var(--shadow-sm);
+  --lt-status-bar: hsl(var(--background));
+}
+
+.dark [data-layout="dashboard"],
+.dark :is([data-layout]) [data-layout="dashboard"] {
+  --lt-bg:         hsl(var(--card));
+  --lt-border:     hsl(var(--sidebar-border));
+  --lt-status-bar: hsl(var(--sidebar));
+}
+
+/* ─── APP HEADER ──────────────────────────────────────── */
+[data-layout="app"],
+:is([data-layout]) [data-layout="app"] {
+  --lt-bg:         hsl(var(--primary));
+  --lt-fg:         hsl(var(--primary-foreground));
+  --lt-border:     hsl(var(--primary) / 0.2);
+  --lt-shadow:     var(--shadow-sm);
+  --lt-status-bar: hsl(var(--primary));
+}
+
+.dark [data-layout="app"],
+.dark :is([data-layout]) [data-layout="app"] {
+  --lt-status-bar: hsl(var(--primary));
+}
+
+/* ─── SIDEBAR ─────────────────────────────────────────── */
+[data-layout="sidebar"],
+:is([data-layout]) [data-layout="sidebar"] {
+  --lt-bg:         hsl(var(--sidebar));
+  --lt-fg:         hsl(var(--sidebar-foreground));
+  --lt-border:     hsl(var(--sidebar-border));
+  --lt-shadow:     none;
+  --lt-status-bar: hsl(var(--sidebar));
+}
+
+/* ─── FOOTER ──────────────────────────────────────────── */
+[data-layout="footer"],
+:is([data-layout]) [data-layout="footer"] {
+  --lt-bg:         hsl(var(--background));
+  --lt-fg:         hsl(var(--foreground));
+  --lt-border:     hsl(var(--border));
+  --lt-shadow:     none;
+  --lt-status-bar: hsl(var(--background));
+}

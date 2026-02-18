@@ -1,14 +1,14 @@
 /* app/globals.css (or globals.css) - UPDATED DEFAULT THEME FOR desertcowgirl.co */
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-/* your component imports… */
 @import "@/style/nav.css";
 @import "@/style/switch-to-dark-mode.css";
 @import "@/style/TSC.css";
 @import "@/style/home.css";
+@import "@/style/layout-tokens.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 @layer base {
   /* ——— App theme (DEFAULTS) ——— */

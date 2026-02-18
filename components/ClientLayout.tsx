@@ -68,6 +68,13 @@ export default function ClientLayoutWrapper({
   const isHome = pathname === "/";
   const isToolsPage = pathname.toLowerCase().startsWith("/tools");
   const isDashboardPage = pathname.toLowerCase().startsWith("/dashboard");
+  const isProductsPage = pathname.toLowerCase().startsWith("/products");
+  
+  // ✅ NEW: Catch Collections and dynamic Categories (e.g., /tops, /graphic-tees)
+  const isCollectionsPage = pathname.toLowerCase().startsWith("/collections");
+  const isCategoryPage = /^\/[^\/]+$/.test(pathname) && !isToolsPage && !isDashboardPage && !isProductsPage && !pathname.startsWith("/auth");
+
+  const isShopRoute = isHome || isProductsPage || isCollectionsPage || isCategoryPage;
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -177,10 +184,10 @@ export default function ClientLayoutWrapper({
     }
   }, [isDarkMode]);
 
-  const showNav = !isHome && !isToolsPage && !isDashboardPage;
-  const showFooter = !isHome && !isDashboardPage && !isToolsPage;
-  const showAccessibility =
-    !pathname.startsWith("/auth") && pathname !== "/sign-in" && pathname !== "/sign-up";
+  // ✅ FIX: Show the wrapper's Nav/Footer FOR shop routes
+  const showNav = false; // Shop header is rendered inside each page component
+  const showFooter = false; // Footer is rendered inside each page component  
+  const showAccessibility = isShopRoute;
 
   return (
     <>

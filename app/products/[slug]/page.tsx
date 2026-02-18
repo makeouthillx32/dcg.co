@@ -1,8 +1,6 @@
-// app/products/[slug]/page.tsx - CORRECTED VERSION
 import { createServerClient, createServiceClient } from "@/utils/supabase/server";
 import { notFound } from "next/navigation";
 import ProductDetailClient from "./_components/ProductDetailClient";
-import StorefrontLayout from "@/components/storefront/StorefrontLayout";
 
 // Generate static params for all active products at build time
 export async function generateStaticParams() {
@@ -130,11 +128,11 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
   };
 
   return (
-    <StorefrontLayout>
+    <div className="flex min-h-screen flex-col bg-background text-foreground">
       <ProductDetailClient product={formattedProduct} />
-    </StorefrontLayout>
+    </div>
   );
 }
 
-// Revalidate every hour (products change less often than collections)
+// Revalidate every hour
 export const revalidate = 3600;

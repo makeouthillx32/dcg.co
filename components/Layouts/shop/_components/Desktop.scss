@@ -2,10 +2,12 @@
 
 /* Header Component */
 .header-container {
-  border-bottom: 1px solid;
+  border-bottom: 1px solid var(--lt-border);
+  background: var(--lt-bg);
+  color: var(--lt-fg);
   padding: 0.5rem 1rem;
   position: relative;
-  z-index: 20; /* --z-header */
+  z-index: 100;
   
   /* Smooth transitions for theme changes */
   transition: background-color 0.2s ease, border-color 0.2s ease;
@@ -99,7 +101,7 @@
 
 /* Navigation container - Child of header-nav */
 .nav-container {
-  @apply hidden md:flex items-center relative z-20; /* --z-header */
+  @apply hidden md:flex items-center relative z-50;
   
   /* Ensure container doesn't overflow */
   overflow: visible;
@@ -266,7 +268,7 @@
   transition: background-color 0.15s ease, opacity 0.15s ease;
 
   &:hover {
-    background-color: rgba(0, 0, 0, 0.04); /* subtle like the reference */
+    background-color: hsl(var(--muted) / 0.4);
   }
 
   &:focus {
@@ -278,7 +280,7 @@
 /* Dropdown panel - Enhanced positioning */
 .nav-dropdown {
   position: absolute;
-  z-index: 30; /* --z-dropdown */
+  z-index: 1000;
 
   /* ✅ give it a little breathing room (not too close) */
   top: calc(100% + 0.6rem);
@@ -439,7 +441,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 60; /* --z-drawer backdrop */
+  z-index: 999;
   pointer-events: auto;
   
   /* Backdrop blur effect */
@@ -477,7 +479,7 @@
 /* Dark mode adjustments */
 @media (prefers-color-scheme: dark) {
   .mobile-hamburger:hover {
-    background-color: rgba(255, 255, 255, 0.05);
+    background-color: hsl(var(--muted) / 0.1);
   }
   
   .mobile-drawer-overlay {

@@ -151,7 +151,7 @@ export default function MobileDrawer({ session, onClose }: MobileDrawerProps) {
       <div className="drawer-topbar">
         <button
           type="button"
-          className="drawer-close-button text-foreground"
+          className="drawer-close-button text-[var(--lt-fg)]"
           onClick={handleClose}
           aria-label="Close menu"
         >
@@ -162,7 +162,7 @@ export default function MobileDrawer({ session, onClose }: MobileDrawerProps) {
       {/* ===== Top Divider ===== */}
       <div className="drawer-divider-horizontal" />
 
-      <div className="mobile-menu-container bg-background">
+      <div className="mobile-menu-container bg-[var(--lt-bg)]">
         {loading ? (
           // Loading skeleton
           <div className="px-4 py-6 text-center text-sm text-muted-foreground">
@@ -180,13 +180,13 @@ export default function MobileDrawer({ session, onClose }: MobileDrawerProps) {
               {/* Section top divider */}
               <div className="drawer-divider-horizontal" />
 
-              <div className="mobile-menu-item text-foreground">
+              <div className="mobile-menu-item text-[var(--lt-fg)]">
                 {node.routeType === "hash" ? (
                   // Hash navigation (static pages)
                   <a
                     href={node.href}
                     onClick={(e) => handleNavClick(e, node.routeType)}
-                    className="menu-link text-foreground no-underline"
+                    className="menu-link text-[var(--lt-fg)] no-underline"
                   >
                     {node.label}
                   </a>
@@ -195,7 +195,7 @@ export default function MobileDrawer({ session, onClose }: MobileDrawerProps) {
                   <Link
                     href={node.href}
                     onClick={(e) => handleNavClick(e, node.routeType)}
-                    className="menu-link text-foreground no-underline"
+                    className="menu-link text-[var(--lt-fg)] no-underline"
                   >
                     {node.label}
                   </Link>
@@ -207,7 +207,7 @@ export default function MobileDrawer({ session, onClose }: MobileDrawerProps) {
                 {node.children?.length ? (
                   <button
                     onClick={() => toggleExpand(node.key)}
-                    className="menu-toggle text-foreground"
+                    className="menu-toggle text-[var(--lt-fg)]"
                     aria-label={`Toggle ${node.label}`}
                     type="button"
                   >
@@ -226,14 +226,14 @@ export default function MobileDrawer({ session, onClose }: MobileDrawerProps) {
 
               {/* Submenu */}
               {node.children?.length && expanded === node.key && (
-                <div className="mobile-submenu bg-background">
+                <div className="mobile-submenu bg-[var(--lt-bg)]">
                   {node.children.map((child) => (
                     <React.Fragment key={child.key}>
                       {child.routeType === "hash" ? (
                         <a
                           href={child.href}
                           onClick={(e) => handleNavClick(e, child.routeType)}
-                          className="submenu-link text-foreground no-underline"
+                          className="submenu-link text-[var(--lt-fg)] no-underline"
                         >
                           {child.label}
                         </a>
@@ -241,7 +241,7 @@ export default function MobileDrawer({ session, onClose }: MobileDrawerProps) {
                         <Link
                           href={child.href}
                           onClick={(e) => handleNavClick(e, child.routeType)}
-                          className="submenu-link text-foreground no-underline"
+                          className="submenu-link text-[var(--lt-fg)] no-underline"
                         >
                           {child.label}
                         </Link>
