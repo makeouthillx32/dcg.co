@@ -298,7 +298,7 @@
   /* ONLY protect home page header - be very specific */
   .header-container {
     /* Force solid background */
-    background: hsl(var(--background)) !important;
+    background: var(--lt-bg) !important;
     
     /* No backdrop effects whatsoever */
     backdrop-filter: none !important;

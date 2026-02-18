@@ -29,7 +29,7 @@
 /* ─── SHOP HEADER ─────────────────────────────────────── */
 [data-layout="shop"],
 :is([data-layout]) [data-layout="shop"] {
-  --lt-bg:         hsl(var(--primary-foreground));
+  --lt-bg:         hsl(var(--destructive));
   --lt-fg:         hsl(var(--foreground));
   --lt-border:     hsl(var(--border));
   --lt-shadow:     var(--shadow-sm);
