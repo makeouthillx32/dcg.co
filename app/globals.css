@@ -1,4 +1,4 @@
-/* app/globals.css */
+/* app/globals.css (or globals.css) - UPDATED DEFAULT THEME FOR desertcowgirl.co */
 
 @import "@/style/nav.css";
 @import "@/style/switch-to-dark-mode.css";
@@ -10,7 +10,9 @@
 @tailwind utilities;
 
 @layer base {
+  /* ——— App theme (DEFAULTS) ——— */
   :root {
+    /* Z-INDEX LAYER SCALE */
     --z-page:       10;
     --z-header:     20;
     --z-dropdown:   30;
@@ -51,11 +53,13 @@
     --sidebar-border: 28 15% 85%;
     --sidebar-ring: 24 60% 45%;
 
+    /* Fonts / radius (keep consistent with your app) */
     --font-sans: Inter, sans-serif;
     --font-serif: Georgia, serif;
     --font-mono: JetBrains Mono, monospace;
     --radius: 0.5rem;
 
+    /* Shadows (kept from her theme) */
     --shadow-x: 0px;
     --shadow-y: 2px;
     --shadow-blur: 10px;
@@ -79,6 +83,7 @@
     --tracking-normal: -0.01em;
     --spacing: 0.25rem;
 
+    /* Animation origin variables */
     --x: 50%;
     --y: 50%;
   }
@@ -117,11 +122,13 @@
     --sidebar-border: 20 10% 20%;
     --sidebar-ring: 24 55% 55%;
 
+    /* Keep fonts/radius consistent */
     --font-sans: Inter, sans-serif;
     --font-serif: Georgia, serif;
     --font-mono: JetBrains Mono, monospace;
     --radius: 0.5rem;
 
+    /* Keep your existing dark shadows section (matches her theme) */
     --shadow-x: 0px;
     --shadow-y: 4px;
     --shadow-blur: 15px;
@@ -182,7 +189,7 @@
     left: 0;
     width: 100vw;
     height: 100vh;
-    z-index: 9000;
+    z-index: 9000; /* --z-transition */
     pointer-events: none;
     background: radial-gradient(
       circle at var(--x, 50%) var(--y, 50%),
@@ -244,6 +251,7 @@
 
 body {
   letter-spacing: var(--tracking-normal);
+  background-color: hsl(var(--background));
   color: hsl(var(--foreground));
   -webkit-font-smoothing: antialiased;
 }
@@ -255,6 +263,7 @@ body {
   padding: 0;
   width: 100%;
   height: 100%;
+  background-color: hsl(var(--background));
   color: hsl(var(--foreground));
 }
 
@@ -294,6 +303,7 @@ select:focus {
   box-shadow: 0 0 0 3px hsl(var(--ring) / 0.2);
 }
 
+/* Keep your existing Google button styles as-is */
 .login-with-google-btn {
   width: 100%;
   max-width: 300px;
