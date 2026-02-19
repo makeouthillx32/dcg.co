@@ -1,3 +1,4 @@
+//components/Layouts/ClientLayout.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -134,10 +135,15 @@ export default function ClientLayoutWrapper({
     <>
       <RegionBootstrap />
 
-      {/* 🎨 iOS/browser status bar — tracks active layout token */}
+      {/* 
+        ✅ CRITICAL FIX: Render headers FIRST, then MetaThemeColor
+        This ensures [data-layout] elements exist before reading CSS variables
+      */}
+      {useAppHeader ? <AppHeader /> : showNav && <ShopHeader />}
+      
+      {/* 🎨 iOS/browser status bar — now runs AFTER headers are mounted */}
       <MetaThemeColor layout={metaLayout} />
 
-      {useAppHeader ? <AppHeader /> : showNav && <ShopHeader />}
       {children}
       {!useAppHeader && showFooter && <Footer />}
       {!useAppHeader && showAccessibility && <AccessibilityOverlay />}
@@ -152,28 +158,31 @@ export default function ClientLayoutWrapper({
               ? "We use cookies to enhance your experience and analyze usage. Essential cookies required."
               : "We use cookies to enhance your experience, analyze site usage, and improve our services. Essential cookies are required for basic functionality."
         }
-        learnMoreHref="/privacy-policy"
-        onAcceptCallback={(preferences) => {
-          console.log("✅ Cookies accepted:", preferences);
-        }}
-        onDeclineCallback={(preferences) => {
-          console.log("🚫 Non-essential cookies declined:", preferences);
-        }}
-        onCustomizeCallback={(preferences) => {
-          console.log("⚙️ Custom preferences saved:", preferences);
-        }}
       />
 
       <Toaster
-        position="bottom-center"
-        toastOptions={{ duration: 4000 }}
+        position="top-right"
+        toastOptions={{
+          duration: 3000,
+          style: {
+            background: "hsl(var(--background))",
+            color: "hsl(var(--foreground))",
+            border: "1px solid hsl(var(--border))",
+          },
+          success: {
+            iconTheme: {
+              primary: "hsl(var(--primary))",
+              secondary: "hsl(var(--primary-foreground))",
+            },
+          },
+          error: {
+            iconTheme: {
+              primary: "hsl(var(--destructive))",
+              secondary: "hsl(var(--destructive-foreground))",
+            },
+          },
+        }}
       />
-
-      {process.env.NODE_ENV === "development" && (
-        <div className="fixed top-4 right-4 bg-black/80 text-white text-xs p-2 rounded z-[60] pointer-events-none">
-          Screen: {screenSize} | Variant: {cookieVariant}
-        </div>
-      )}
     </>
   );
 }
