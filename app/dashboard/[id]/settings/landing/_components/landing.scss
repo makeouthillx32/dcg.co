@@ -702,6 +702,31 @@
   background: hsl(var(--muted) / 0.1);
 }
 
+/* Config summary preview box */
+.config-summary {
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  border-radius: var(--radius);
+  border: 1px solid hsl(var(--primary) / 0.3);
+  background: hsl(var(--primary) / 0.05);
+}
+
+.config-summary-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: hsl(var(--primary));
+  margin: 0 0 4px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.config-summary-text {
+  font-size: 14px;
+  color: hsl(var(--foreground));
+  margin: 0;
+  line-height: 1.5;
+}
+
 /* Button disabled state */
 .btn:disabled {
   opacity: 0.5;

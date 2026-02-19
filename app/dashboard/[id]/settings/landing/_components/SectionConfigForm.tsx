@@ -10,9 +10,23 @@ interface SectionConfigFormProps {
   onChange: (config: Record<string, any>) => void;
 }
 
+interface CollectionOption {
+  id: string;
+  name: string;
+  slug: string;
+  product_count?: number;
+}
+
+interface CategoryOption {
+  id: string;
+  name: string;
+  slug: string;
+  product_count?: number;
+}
+
 export function SectionConfigForm({ type, config, onChange }: SectionConfigFormProps) {
-  const [collections, setCollections] = useState<Array<{ id: string; name: string; slug: string }>>([]);
-  const [categories, setCategories] = useState<Array<{ id: string; name: string; slug: string }>>([]);
+  const [collections, setCollections] = useState<CollectionOption[]>([]);
+  const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Fetch collections and categories on mount
@@ -163,8 +177,8 @@ export function SectionConfigForm({ type, config, onChange }: SectionConfigFormP
         </div>
 
         <div className="form-field">
-          <label className="form-label">Specific Categories (leave empty for all)</label>
-          <p className="form-hint">Hold Ctrl/Cmd to select multiple</p>
+          <label className="form-label">Specific Categories (optional)</label>
+          <p className="form-hint">Leave empty to show all categories, or select specific ones (Hold Ctrl/Cmd for multiple)</p>
           <select
             multiple
             value={config.categoryIds || []}
@@ -181,6 +195,11 @@ export function SectionConfigForm({ type, config, onChange }: SectionConfigFormP
               </option>
             ))}
           </select>
+          {config.categoryIds && config.categoryIds.length > 0 && (
+            <p className="form-hint">
+              Selected: {config.categoryIds.length} {config.categoryIds.length === 1 ? 'category' : 'categories'}
+            </p>
+          )}
         </div>
       </>
     );
@@ -232,8 +251,30 @@ export function SectionConfigForm({ type, config, onChange }: SectionConfigFormP
 
   // PRODUCTS GRID FORM
   if (type === 'products_grid') {
+    const selectedCollection = collections.find(c => c.slug === config.collection);
+    const selectedCategory = categories.find(c => c.slug === config.category);
+    
     return (
       <>
+        {/* Summary Box */}
+        {(config.collection || config.category || config.featured) && (
+          <div className="config-summary">
+            <p className="config-summary-title">Section Preview:</p>
+            <p className="config-summary-text">
+              Showing {config.limit || 8} products
+              {config.featured && ' (featured only)'}
+              {selectedCollection && ` from collection "${selectedCollection.name}"`}
+              {selectedCategory && ` in category "${selectedCategory.name}"`}
+              {' sorted by '}
+              {config.sortBy === 'newest' && 'newest first'}
+              {config.sortBy === 'featured' && 'featured first'}
+              {config.sortBy === 'price-asc' && 'price (low to high)'}
+              {config.sortBy === 'price-desc' && 'price (high to low)'}
+              {!config.sortBy && 'newest first'}
+            </p>
+          </div>
+        )}
+        
         <div className="form-field">
           <label className="form-label">Section Title</label>
           <input
@@ -263,14 +304,17 @@ export function SectionConfigForm({ type, config, onChange }: SectionConfigFormP
             onChange={(e) => updateField('collection', e.target.value)}
             className="form-select"
           >
-            <option value="">All Products</option>
+            <option value="">All Products - No Filter</option>
             {collections.map(col => (
               <option key={col.id} value={col.slug}>
                 {col.name}
+                {col.product_count !== undefined && ` (${col.product_count} products)`}
               </option>
             ))}
           </select>
-          <p className="form-hint">Leave as "All Products" to show from all collections</p>
+          <p className="form-hint">
+            {config.collection ? `Using collection: "${config.collection}"` : 'No collection filter applied'}
+          </p>
         </div>
 
         <div className="form-field">
@@ -280,13 +324,17 @@ export function SectionConfigForm({ type, config, onChange }: SectionConfigFormP
             onChange={(e) => updateField('category', e.target.value)}
             className="form-select"
           >
-            <option value="">All Categories</option>
+            <option value="">All Categories - No Filter</option>
             {categories.map(cat => (
               <option key={cat.id} value={cat.slug}>
                 {cat.name}
+                {cat.product_count !== undefined && ` (${cat.product_count} products)`}
               </option>
             ))}
           </select>
+          <p className="form-hint">
+            {config.category ? `Using category: "${config.category}"` : 'No category filter applied'}
+          </p>
         </div>
 
         <div className="form-field">
