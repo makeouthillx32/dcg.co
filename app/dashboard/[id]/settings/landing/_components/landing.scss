@@ -452,6 +452,12 @@
 
 /* ===== MODAL STYLES ===== */
 
+/* 
+  MOBILE HEADER SUPPORT:
+  Admin dashboard header is ~70px (defined in components/Layouts/dashboard/index.tsx)
+  Modals need to account for this on mobile to prevent content being hidden
+*/
+
 .modal-backdrop {
   position: fixed;
   top: 0;
@@ -475,6 +481,18 @@
   padding: 16px;
   pointer-events: none;
   z-index: 9999;
+  
+  /* Mobile: Account for admin header */
+  @media (max-width: 768px) {
+    padding-top: calc(70px + 16px); /* header height + spacing */
+    align-items: flex-start; /* Start from top on mobile */
+    overflow-y: auto; /* Allow scrolling if modal is tall */
+  }
+  
+  /* Tablet: Slight adjustment */
+  @media (min-width: 769px) and (max-width: 1024px) {
+    padding-top: 32px;
+  }
 }
 
 .modal {
@@ -485,6 +503,18 @@
   border: 1px solid hsl(var(--border));
   border-radius: var(--radius);
   box-shadow: var(--shadow-2xl);
+  
+  /* Mobile: Ensure modal doesn't get cut off */
+  @media (max-width: 768px) {
+    max-height: calc(100vh - 70px - 32px); /* viewport - header - padding */
+    display: flex;
+    flex-direction: column;
+  }
+  
+  /* Tablet: More breathing room */
+  @media (min-width: 769px) and (max-width: 1024px) {
+    max-height: calc(100vh - 64px);
+  }
 }
 
 .modal-header {
@@ -524,6 +554,12 @@
 
 .modal-body {
   padding: 24px;
+  
+  /* Mobile: Make body scrollable if content is tall */
+  @media (max-width: 768px) {
+    overflow-y: auto;
+    max-height: calc(100vh - 70px - 180px); /* viewport - header - modal header/footer */
+  }
 }
 
 .modal-error {
