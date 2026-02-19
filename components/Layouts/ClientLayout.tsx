@@ -15,6 +15,7 @@ import { Toaster } from "react-hot-toast";
 
 // ✅ ADD: region bootstrap (client-only)
 import RegionBootstrap from "@/components/Auth/RegionBootstrap";
+import MetaThemeColor from "@/components/Layouts/meta-theme-color";
 
 // ✅ ADD: Hook to detect screen size
 function useScreenSize() {
@@ -60,7 +61,7 @@ export default function ClientLayoutWrapper({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  
   const [isFirstLoad, setIsFirstLoad] = useState(true);
 
   const screenSize = useScreenSize();
@@ -88,46 +89,7 @@ export default function ClientLayoutWrapper({
 
   const isShopRoute = isHome || isProductsPage || isCollectionsPage || isCategoryPage;
 
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const theme = localStorage.getItem("theme") || "light";
-      setIsDarkMode(theme === "dark");
-
-      const updateThemeColor = () => {
-        const root = document.documentElement;
-        const backgroundColor = getComputedStyle(root).getPropertyValue("--background").trim();
-
-        let themeColor = "#ffffff";
-
-        if (backgroundColor) {
-          const hslMatch = backgroundColor.match(/(\d+\.?\d*)\s+(\d+\.?\d*)%\s+(\d+\.?\d*)%/);
-
-          if (hslMatch) {
-            const [, h, s, l] = hslMatch;
-            themeColor = hslToHex(parseFloat(h), parseFloat(s), parseFloat(l));
-          } else {
-            const bodyBg = getComputedStyle(document.body).backgroundColor;
-            if (bodyBg && bodyBg !== "rgba(0, 0, 0, 0)" && bodyBg !== "transparent") {
-              themeColor = rgbToHex(bodyBg);
-            }
-          }
-        }
-
-        let metaTag = document.querySelector("meta[name='theme-color']") as HTMLMetaElement;
-        if (metaTag) {
-          metaTag.setAttribute("content", themeColor);
-        } else {
-          metaTag = document.createElement("meta");
-          metaTag.name = "theme-color";
-          metaTag.content = themeColor;
-          document.head.appendChild(metaTag);
-        }
-      };
-
-      setTimeout(updateThemeColor, 100);
-      setTimeout(updateThemeColor, 500);
-    }
-  }, [pathname, isHome, isDarkMode]);
+  
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -183,15 +145,7 @@ export default function ClientLayoutWrapper({
     }
   }, []);
 
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      document.body.className = `min-h-screen font-[var(--font-sans)] bg-[hsl(var(--background))] text-[hsl(var(--foreground))]`;
-
-      const html = document.documentElement;
-      if (isDarkMode) html.classList.add("dark");
-      else html.classList.remove("dark");
-    }
-  }, [isDarkMode]);
+  
 
   // ✅ FIX: Show the wrapper's Nav/Footer FOR shop routes
   const showNav = isShopRoute;
@@ -205,6 +159,7 @@ export default function ClientLayoutWrapper({
       {/* ✅ Runs once when a session exists; sets profiles.region if missing */}
       <RegionBootstrap />
 
+      <MetaThemeColor layout={isDashboardPage ? "dashboard" : useAppHeader ? "app" : "shop"} />
       {useAppHeader ? <AppHeader /> : showNav && <ShopHeader />}
       {children}
       {!useAppHeader && showFooter && <Footer />}
@@ -250,7 +205,7 @@ export default function ClientLayoutWrapper({
   );
 }
 
-function hslToHex(h: number, s: number, l: number): string {
+
   s /= 100;
   l /= 100;
 

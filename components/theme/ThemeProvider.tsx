@@ -99,38 +99,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     updateThemeColorMeta(themeType, theme, html);
   }, [themeId, themeType, mounted]);
 
-  // Update theme-color meta tag for browser UI
-  const updateThemeColorMeta = (
-    mode: "light" | "dark", 
-    theme: Theme,
-    root: HTMLElement
-  ) => {
-    const variables = mode === "dark" ? theme.dark : theme.light;
-    
-    // Get appropriate color based on the current page
-    const isHome = window.location.pathname === "/";
-    let colorVariable = isHome 
-      ? (mode === "dark" ? "--sidebar" : "--background")
-      : "--background";
-    
-    // Get the color value
-    let themeColor = variables[colorVariable] || "";
-    if (themeColor.startsWith("hsl")) {
-      themeColor = themeColor; // Use as is
-    } else {
-      // Convert HSL components to actual color
-      themeColor = `hsl(${themeColor})`;
-    }
-    
-    // Set meta tag
-    let metaTag = document.querySelector("meta[name='theme-color']");
-    if (!metaTag) {
-      metaTag = document.createElement("meta");
-      metaTag.setAttribute("name", "theme-color");
-      document.head.appendChild(metaTag);
-    }
-    metaTag.setAttribute("content", themeColor);
-  };
+  
 
   // Context value
   const contextValue: ThemeContextType = {
