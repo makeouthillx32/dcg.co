@@ -7,36 +7,40 @@
   .nav-top-link {
     @apply relative z-10 px-3 py-1 text-sm font-medium whitespace-nowrap
            transition-colors focus:outline-none
-           hover:bg-transparent hover:text-[var(--foreground)];
+           hover:bg-transparent;
+    color: var(--lt-fg);
     margin-top: -2px;
   }
 
   .nav-top-link[data-state="open"] {
-    @apply bg-transparent text-[var(--foreground)] rounded-t-md;
+    @apply bg-transparent rounded-t-md;
+    color: var(--lt-fg);
   }
 
   /* Submenu links */
   .nav-sub-link {
     @apply block px-3 py-1 text-sm whitespace-nowrap rounded-md
-           hover:bg-transparent hover:text-[var(--foreground)];
+           hover:bg-transparent;
+    color: var(--lt-fg);
   }
 
   /* Dropdown panel */
   .nav-dropdown {
     @apply absolute top-full mt-2 z-50 rounded-b-xl shadow-lg p-3
-           bg-[var(--background)] dark:bg-[var(--background)]
            left-1/2 -translate-x-1/2 max-w-[90vw] w-max;
+    background: var(--lt-bg);
     opacity: 0;
     visibility: hidden;
     transition: opacity 150ms ease-in-out, visibility 150ms ease-in-out;
   }
 
   .nav-dropdown[data-state="open"] {
-    @apply block ring-1 ring-[var(--background)] ring-opacity-30;
+    @apply block;
+    ring: 1px solid var(--lt-border);
     opacity: 1;
     visibility: visible;
   }
-  
+
   /* Hover effect for dropdown */
   .nav-group:hover .nav-dropdown {
     opacity: 1;
@@ -45,8 +49,8 @@
 
   /* Desktop auth buttons */
   .auth-link {
-    @apply text-sm font-medium text-[var(--foreground)]
-           hover:underline whitespace-nowrap;
+    @apply text-sm font-medium hover:underline whitespace-nowrap;
+    color: var(--lt-fg);
   }
 
   /* Navigation (Mobile) */
@@ -55,14 +59,20 @@
   }
 
   .drawer-content {
-    @apply absolute top-16 left-0 right-0 z-50 border-b border-gray-200
-           bg-[var(--background)] shadow-md rounded-b-xl overflow-hidden
-           max-h-fit;
+    @apply absolute top-16 left-0 right-0 z-50 border-b
+           shadow-md rounded-b-xl overflow-hidden max-h-fit;
+    background: var(--lt-bg);
+    border-color: var(--lt-border);
   }
 
   .drawer-link {
-    @apply block px-4 py-2 text-sm font-medium hover:bg-[var(--background)]
-           text-[var(--foreground)];
+    @apply block px-4 py-2 text-sm font-medium;
+    color: var(--lt-fg);
+  }
+
+  .drawer-link:hover {
+    background: var(--lt-bg);
+    opacity: 0.85;
   }
 
   /* Animations */
