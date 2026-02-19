@@ -6,18 +6,12 @@ import { useTheme } from "@/app/provider";
 // ─────────────────────────────────────────────────────────
 // MetaThemeColor
 // ─────────────────────────────────────────────────────────
-// Reads --lt-status-bar from the nearest [data-layout] element
-// defined in style/layout-tokens.css and writes it to
-// meta[name="theme-color"] so the iOS/browser chrome matches
-// the active layout header.
+// Reads --lt-status-bar from the scoped [data-layout] element.
+// If the element doesn't exist in the DOM (e.g. shop header on
+// dashboard route), reads the token directly from :root by
+// temporarily setting a scoped attribute on a detached element.
 //
 // Status bar colors are configured in layout-tokens.css only.
-// This file never needs to change when you update colors.
-//
-// Usage:
-//   <MetaThemeColor layout="shop" />
-//   <MetaThemeColor layout="dashboard" />
-//   <MetaThemeColor layout="app" />
 // ─────────────────────────────────────────────────────────
 
 type Layout = "shop" | "dashboard" | "app" | "sidebar" | "footer";
@@ -28,14 +22,34 @@ interface MetaThemeColorProps {
 
 // ─── Helpers ─────────────────────────────────────────────
 
-/** Read --lt-status-bar from the scoped [data-layout] element. */
+/** Read --lt-status-bar for a layout by finding its element,
+ *  or by creating a temporary scoped element to resolve the
+ *  correct CSS value without relying on document.documentElement
+ *  which may have stale values from a previous layout. */
 function getStatusBarColor(layout: Layout): string {
+  // First try to find the actual rendered element
   const el = document.querySelector<HTMLElement>(`[data-layout="${layout}"]`);
-  const source = el ?? document.documentElement;
-  const raw = getComputedStyle(source)
-    .getPropertyValue("--lt-status-bar")
-    .trim();
-  if (!raw) return "";
+
+  if (el) {
+    const raw = getComputedStyle(el).getPropertyValue("--lt-status-bar").trim();
+    if (raw) return normalizeColor(raw);
+  }
+
+  // Element not in DOM — resolve via a temporary scoped div
+  // This avoids reading stale tokens from documentElement
+  const temp = document.createElement("div");
+  temp.setAttribute("data-layout", layout);
+  temp.style.position = "absolute";
+  temp.style.visibility = "hidden";
+  temp.style.pointerEvents = "none";
+  document.body.appendChild(temp);
+  const raw = getComputedStyle(temp).getPropertyValue("--lt-status-bar").trim();
+  document.body.removeChild(temp);
+
+  return raw ? normalizeColor(raw) : "";
+}
+
+function normalizeColor(raw: string): string {
   if (raw.startsWith("#") || raw.startsWith("rgb") || raw.startsWith("hsl(")) {
     return raw;
   }
@@ -70,9 +84,6 @@ function writeMetaColor(color: string) {
 }
 
 // ─── iOS Chromium sync ───────────────────────────────────
-// Mirrors meta[name="theme-color"] to meta[name="theme-color-ios"]
-// and sets apple-mobile-web-app-* tags. Only runs on iOS Chromium.
-
 function setupIOSChromiumSync(): (() => void) | void {
   const ua = navigator.userAgent;
   const isIOS =
@@ -82,9 +93,7 @@ function setupIOSChromiumSync(): (() => void) | void {
   if (!isIOS || !isChromium) return;
 
   const sync = () => {
-    const main = document.querySelector<HTMLMetaElement>(
-      'meta[name="theme-color"]'
-    );
+    const main = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
     if (!main) return;
     const color = main.getAttribute("content") ?? "";
     const apply = (name: string, content: string) => {
@@ -115,8 +124,6 @@ function setupIOSChromiumSync(): (() => void) | void {
 export default function MetaThemeColor({ layout }: MetaThemeColorProps) {
   const { themeType } = useTheme();
 
-  // Update status bar whenever theme or layout changes.
-  // requestAnimationFrame ensures layout-tokens CSS is computed first.
   useEffect(() => {
     const id = requestAnimationFrame(() => {
       const color = toHex(getStatusBarColor(layout));
@@ -125,7 +132,6 @@ export default function MetaThemeColor({ layout }: MetaThemeColorProps) {
     return () => cancelAnimationFrame(id);
   }, [layout, themeType]);
 
-  // iOS Chromium sync — mount once
   useEffect(() => {
     const cleanup = setupIOSChromiumSync();
     return () => { cleanup?.(); };
