@@ -4,6 +4,7 @@
 import React, { useState, useEffect } from "react";
 import { X } from "lucide-react";
 import type { LandingSectionRow } from "./types";
+import "./landing.scss";
 
 interface EditSectionModalProps {
   open: boolean;
@@ -70,119 +71,107 @@ export function EditSectionModal({ open, section, onClose, onSuccess }: EditSect
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={onClose}>
-      <div
-        className="w-full max-w-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow-2xl"
-        style={{
-          backgroundColor: 'var(--card)',
-          borderColor: 'var(--border)'
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-800" style={{ borderColor: 'var(--border)' }}>
-          <div>
-            <h2 className="text-xl font-bold" style={{ color: 'var(--foreground)' }}>Edit Section</h2>
-            <p className="text-sm mt-1" style={{ color: 'var(--muted-foreground)' }}>
-              Update section configuration
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Content */}
-        <div className="p-6 space-y-4">
-          {error && (
-            <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-600 text-sm">
-              {error}
+    <>
+      {/* Backdrop */}
+      <div className="modal-backdrop" onClick={onClose} />
+      
+      {/* Modal Container */}
+      <div className="modal-overlay">
+        <div className="modal" onClick={(e) => e.stopPropagation()}>
+          {/* Header */}
+          <div className="modal-header">
+            <div>
+              <h2 className="modal-title">Edit Section</h2>
+              <p className="modal-subtitle">
+                Update section configuration
+              </p>
             </div>
-          )}
-
-          <div>
-            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--foreground)' }}>
-              Section Type
-            </label>
-            <input
-              type="text"
-              value={type}
-              onChange={(e) => setType(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg border bg-gray-100 dark:bg-gray-950"
-              style={{
-                borderColor: 'var(--border)',
-                backgroundColor: 'var(--background)',
-                color: 'var(--foreground)',
-                opacity: 0.6
-              }}
-              disabled
-            />
-            <p className="text-xs mt-1" style={{ color: 'var(--muted-foreground)' }}>
-              Type cannot be changed after creation
-            </p>
+            <button onClick={onClose} className="modal-close">
+              <X className="w-5 h-5" />
+            </button>
           </div>
 
-          <div>
-            <label className="flex items-center gap-2 text-sm font-medium" style={{ color: 'var(--foreground)' }}>
-              <input
-                type="checkbox"
-                checked={isActive}
-                onChange={(e) => setIsActive(e.target.checked)}
-                className="w-4 h-4 rounded"
-                style={{ borderColor: 'var(--border)' }}
+          {/* Content */}
+          <div className="modal-body">
+            {error && (
+              <div className="modal-error">
+                {error}
+              </div>
+            )}
+
+            <div className="form-field">
+              <label className="form-label">
+                Section Type
+              </label>
+              <div className="section-type-display">
+                <span className={`type-badge type-${type}`}>
+                  {type}
+                </span>
+                <span className="section-type-label">
+                  {type === 'top_banner' && 'Announcement bar at the very top of the page'}
+                  {type === 'hero_carousel' && 'Large rotating image slider with call-to-action buttons'}
+                  {type === 'categories_grid' && 'Display product categories in a grid layout'}
+                  {type === 'static_html' && 'Embed a custom static page by its slug'}
+                  {type === 'products_grid' && 'Display products in a grid with filtering options'}
+                </span>
+              </div>
+              <p className="form-hint">
+                Type cannot be changed after creation
+              </p>
+            </div>
+
+            <div className="form-field">
+              <label className="form-checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={isActive}
+                  onChange={(e) => setIsActive(e.target.checked)}
+                  className="form-checkbox"
+                />
+                Active (show on landing page)
+              </label>
+            </div>
+
+            <div className="form-field">
+              <label className="form-label">
+                Configuration (JSON)
+              </label>
+              <textarea
+                value={configText}
+                onChange={(e) => setConfigText(e.target.value)}
+                className="form-textarea mono"
+                spellCheck={false}
               />
-              Active (show on landing page)
-            </label>
+              <p className="form-hint">
+                {type === 'top_banner' && 'Configure message, link, background color, and dismissibility'}
+                {type === 'hero_carousel' && 'Configure slides with images, titles, subtitles, and CTA buttons'}
+                {type === 'categories_grid' && 'Configure title, number of columns, and which categories to display'}
+                {type === 'static_html' && 'Specify the slug of your static page to embed'}
+                {type === 'products_grid' && 'Configure title, filters (collection/category), limit, and sorting'}
+                {!type && 'Edit the JSON configuration for this section'}
+              </p>
+            </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--foreground)' }}>
-              Configuration (JSON)
-            </label>
-            <textarea
-              value={configText}
-              onChange={(e) => setConfigText(e.target.value)}
-              className="w-full h-64 px-3 py-2 rounded-lg border bg-white dark:bg-gray-950 font-mono text-sm"
-              style={{
-                borderColor: 'var(--border)',
-                backgroundColor: 'var(--background)',
-                color: 'var(--foreground)'
-              }}
-              spellCheck={false}
-            />
+          {/* Footer */}
+          <div className="modal-footer">
+            <button
+              onClick={onClose}
+              disabled={saving}
+              className="btn"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="btn btn-primary"
+            >
+              {saving ? 'Saving...' : 'Save Changes'}
+            </button>
           </div>
-        </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200 dark:border-gray-800" style={{ borderColor: 'var(--border)' }}>
-          <button
-            onClick={onClose}
-            disabled={saving}
-            className="px-4 py-2 rounded-lg border bg-white dark:bg-gray-950 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-            style={{
-              borderColor: 'var(--border)',
-              backgroundColor: 'var(--background)',
-              color: 'var(--foreground)'
-            }}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="px-4 py-2 rounded-lg hover:opacity-90 transition-opacity font-medium"
-            style={{
-              backgroundColor: 'var(--primary)',
-              color: 'var(--primary-foreground)'
-            }}
-          >
-            {saving ? 'Saving...' : 'Save Changes'}
-          </button>
         </div>
       </div>
-    </div>
+    </>
   );
 }

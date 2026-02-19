@@ -3,6 +3,7 @@
 
 import React, { useState } from "react";
 import { X } from "lucide-react";
+import "./landing.scss";
 
 interface CreateSectionModalProps {
   open: boolean;
@@ -11,11 +12,80 @@ interface CreateSectionModalProps {
 }
 
 const SECTION_TYPES = [
-  { value: "top_banner", label: "Top Banner", config: {} },
-  { value: "hero_carousel", label: "Hero Carousel", config: {} },
-  { value: "categories_grid", label: "Categories Grid", config: { title: "Shop by Category", columns: 3 } },
-  { value: "static_html", label: "Static HTML", config: { slug: "landing-qr-download" } },
-  { value: "products_grid", label: "Products Grid", config: { title: "Shop Bestsellers", limit: 4, startIndex: 0, viewAllHref: "/shop" } },
+  { 
+    value: "top_banner", 
+    label: "Top Banner", 
+    description: "Announcement bar at the very top of the page",
+    config: {
+      message: "Free Shipping on Orders Over $75",
+      link: "/shop",
+      linkText: "Shop Now",
+      backgroundColor: "accent",
+      dismissible: true
+    }
+  },
+  { 
+    value: "hero_carousel", 
+    label: "Hero Carousel", 
+    description: "Large rotating image slider with call-to-action buttons",
+    config: {
+      slides: [
+        {
+          image: "/hero-1.jpg",
+          title: "New Western Collection",
+          subtitle: "Authentic cowgirl style for modern women",
+          buttonText: "Shop Collection",
+          buttonLink: "/new-releases"
+        },
+        {
+          image: "/hero-2.jpg",
+          title: "Desert Girl Exclusives",
+          subtitle: "Limited edition pieces you won't find anywhere else",
+          buttonText: "Explore Exclusives",
+          buttonLink: "/desert-girl-exclusives"
+        }
+      ],
+      autoplay: true,
+      interval: 5000
+    }
+  },
+  { 
+    value: "categories_grid", 
+    label: "Categories Grid", 
+    description: "Display product categories in a grid layout",
+    config: { 
+      title: "Shop by Category", 
+      columns: 3,
+      showImages: true,
+      categoryIds: [] // Leave empty to show all categories
+    } 
+  },
+  { 
+    value: "static_html", 
+    label: "Static HTML Page", 
+    description: "Embed a custom static page by its slug",
+    config: { 
+      slug: "landing-qr-download",
+      showTitle: false,
+      containerWidth: "full" // "full" | "contained" | "narrow"
+    } 
+  },
+  { 
+    value: "products_grid", 
+    label: "Products Grid", 
+    description: "Display products in a grid with filtering options",
+    config: { 
+      title: "Shop Bestsellers", 
+      description: "Our most-loved Western wear pieces",
+      limit: 8, 
+      startIndex: 0, 
+      viewAllHref: "/shop",
+      collection: "", // Optional: filter by collection slug
+      category: "", // Optional: filter by category slug
+      featured: false, // Show only featured products
+      sortBy: "newest" // "newest" | "featured" | "price-asc" | "price-desc"
+    } 
+  },
 ];
 
 export function CreateSectionModal({ open, onClose, onSuccess }: CreateSectionModalProps) {
@@ -79,212 +149,101 @@ export function CreateSectionModal({ open, onClose, onSuccess }: CreateSectionMo
 
   return (
     <>
-      {/* Backdrop - separate element for proper layering */}
-      <div 
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.6)',
-          backdropFilter: 'blur(4px)',
-          zIndex: 9998,
-        }}
-        onClick={onClose}
-      />
+      {/* Backdrop */}
+      <div className="modal-backdrop" onClick={onClose} />
       
       {/* Modal Container */}
-      <div 
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '16px',
-          pointerEvents: 'none',
-          zIndex: 9999,
-        }}
-      >
-        <div
-          style={{
-            pointerEvents: 'auto',
-            width: '100%',
-            maxWidth: '672px',
-            backgroundColor: '#ffffff',
-            border: '1px solid #e5e7eb',
-            borderRadius: '12px',
-            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-          }}
-          onClick={(e) => e.stopPropagation()}
-        >
+      <div className="modal-overlay">
+        <div className="modal" onClick={(e) => e.stopPropagation()}>
           {/* Header */}
-          <div 
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '24px',
-              borderBottom: '1px solid #e5e7eb',
-            }}
-          >
+          <div className="modal-header">
             <div>
-              <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#111827', marginBottom: '4px' }}>
-                Add Section
-              </h2>
-              <p style={{ fontSize: '14px', color: '#6b7280' }}>
+              <h2 className="modal-title">Add Section</h2>
+              <p className="modal-subtitle">
                 Create a new section for your landing page
               </p>
             </div>
-            <button
-              onClick={onClose}
-              style={{
-                padding: '8px',
-                borderRadius: '8px',
-                border: 'none',
-                background: 'transparent',
-                cursor: 'pointer',
-                color: '#6b7280',
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
-              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-            >
+            <button onClick={onClose} className="modal-close">
               <X size={20} />
             </button>
           </div>
 
           {/* Content */}
-          <div style={{ padding: '24px', backgroundColor: '#ffffff' }}>
+          <div className="modal-body">
             {error && (
-              <div style={{
-                padding: '12px',
-                borderRadius: '8px',
-                backgroundColor: '#fef2f2',
-                border: '1px solid #fecaca',
-                color: '#991b1b',
-                fontSize: '14px',
-                marginBottom: '16px',
-              }}>
+              <div className="modal-error">
                 {error}
               </div>
             )}
 
             {/* Section Type */}
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', fontSize: '14px', fontWeight: 500, color: '#111827', marginBottom: '8px' }}>
+            <div className="form-field">
+              <label className="form-label">
                 Section Type
               </label>
               <select
                 value={type}
                 onChange={(e) => handleTypeChange(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  borderRadius: '8px',
-                  border: '1px solid #d1d5db',
-                  backgroundColor: '#ffffff',
-                  color: '#111827',
-                  fontSize: '14px',
-                }}
+                className="form-select"
               >
                 {SECTION_TYPES.map(t => (
                   <option key={t.value} value={t.value}>{t.label}</option>
                 ))}
               </select>
+              {SECTION_TYPES.find(t => t.value === type)?.description && (
+                <p className="form-hint">
+                  {SECTION_TYPES.find(t => t.value === type)?.description}
+                </p>
+              )}
             </div>
 
             {/* Active Checkbox */}
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 500, color: '#111827' }}>
+            <div className="form-field">
+              <label className="form-checkbox-label">
                 <input
                   type="checkbox"
                   checked={isActive}
                   onChange={(e) => setIsActive(e.target.checked)}
-                  style={{ width: '16px', height: '16px', borderRadius: '4px' }}
+                  className="form-checkbox"
                 />
                 Active (show on landing page)
               </label>
             </div>
 
             {/* Config Textarea */}
-            <div>
-              <label style={{ display: 'block', fontSize: '14px', fontWeight: 500, color: '#111827', marginBottom: '8px' }}>
+            <div className="form-field">
+              <label className="form-label">
                 Configuration (JSON)
               </label>
               <textarea
                 value={configText}
                 onChange={(e) => setConfigText(e.target.value)}
-                style={{
-                  width: '100%',
-                  height: '256px',
-                  padding: '8px 12px',
-                  borderRadius: '8px',
-                  border: '1px solid #d1d5db',
-                  backgroundColor: '#ffffff',
-                  color: '#111827',
-                  fontFamily: 'ui-monospace, monospace',
-                  fontSize: '13px',
-                  resize: 'vertical',
-                }}
+                className="form-textarea mono"
                 spellCheck={false}
               />
-              <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
-                Configure section-specific options like title, slug, limit, etc.
+              <p className="form-hint">
+                {type === 'top_banner' && 'Configure message, link, background color, and dismissibility'}
+                {type === 'hero_carousel' && 'Configure slides with images, titles, subtitles, and CTA buttons'}
+                {type === 'categories_grid' && 'Configure title, number of columns, and which categories to display'}
+                {type === 'static_html' && 'Specify the slug of your static page to embed'}
+                {type === 'products_grid' && 'Configure title, filters (collection/category), limit, and sorting'}
               </p>
             </div>
           </div>
 
           {/* Footer */}
-          <div 
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'flex-end',
-              gap: '12px',
-              padding: '24px',
-              borderTop: '1px solid #e5e7eb',
-              backgroundColor: '#ffffff',
-            }}
-          >
+          <div className="modal-footer">
             <button
               onClick={onClose}
               disabled={saving}
-              style={{
-                padding: '8px 16px',
-                borderRadius: '8px',
-                border: '1px solid #d1d5db',
-                backgroundColor: '#ffffff',
-                color: '#374151',
-                fontSize: '14px',
-                fontWeight: 500,
-                cursor: saving ? 'not-allowed' : 'pointer',
-                opacity: saving ? 0.5 : 1,
-              }}
-              onMouseEnter={(e) => !saving && (e.currentTarget.style.backgroundColor = '#f9fafb')}
-              onMouseLeave={(e) => !saving && (e.currentTarget.style.backgroundColor = '#ffffff')}
+              className="btn"
             >
               Cancel
             </button>
             <button
               onClick={handleSave}
               disabled={saving}
-              style={{
-                padding: '8px 16px',
-                borderRadius: '8px',
-                border: 'none',
-                backgroundColor: '#3b82f6',
-                color: '#ffffff',
-                fontSize: '14px',
-                fontWeight: 500,
-                cursor: saving ? 'not-allowed' : 'pointer',
-                opacity: saving ? 0.7 : 1,
-              }}
-              onMouseEnter={(e) => !saving && (e.currentTarget.style.backgroundColor = '#2563eb')}
-              onMouseLeave={(e) => !saving && (e.currentTarget.style.backgroundColor = '#3b82f6')}
+              className="btn btn-primary"
             >
               {saving ? 'Creating...' : 'Create Section'}
             </button>

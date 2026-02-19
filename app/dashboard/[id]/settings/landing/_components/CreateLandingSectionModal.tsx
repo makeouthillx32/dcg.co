@@ -4,6 +4,7 @@
 import React from "react";
 import LandingSectionModal from "./LandingSectionModal";
 import type { LandingSectionRow } from "./types";
+import "./landing.scss";
 
 export default function CreateLandingSectionModal({
   open,

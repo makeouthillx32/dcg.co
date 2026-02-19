@@ -5,6 +5,7 @@ import React, { useMemo, useState } from "react";
 import type { LandingSectionRow } from "./types";
 import LandingSectionModal from "./LandingSectionModal";
 import DeleteConfirmModal from "./DeleteConfirmModal";
+import "./landing.scss";
 
 async function apiPatch(payload: any) {
   const res = await fetch("/api/landing/sections", {
