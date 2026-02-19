@@ -1,3 +1,4 @@
+// components/Layouts/shop/Header.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -63,8 +64,12 @@ const Header: React.FC = () => {
   }, []);
 
   return (
-    <div className="relative" data-layout="shop">
-      <header className="header-container bg-[var(--lt-bg)] text-[var(--lt-fg)] border-[var(--lt-border)]">
+    <div className="relative">
+      {/* ✅ MOVED data-layout="shop" TO THE HEADER ELEMENT */}
+      <header 
+        data-layout="shop"
+        className="header-container bg-[var(--lt-bg)] text-[var(--lt-fg)] border-[var(--lt-border)]"
+      >
         <div className="header-content">
           {/* LEFT (Mobile): Hamburger */}
           <div className="header-left">
