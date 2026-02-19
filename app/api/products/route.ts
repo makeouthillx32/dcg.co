@@ -1,162 +1,152 @@
-import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@/utils/supabase/server";
+// app/api/products/route.ts
+import { NextResponse, type NextRequest } from 'next/server';
+import { createServerClient } from '@/utils/supabase/server';
 
-/**
- * GET /api/products
- * Public product listing (active products only)
- *
- * Query:
- * - q
- * - limit
- * - offset
- * - featured=1 (optional)
- */
 export async function GET(req: NextRequest) {
-  const supabase = await createServerClient();
+  try {
+    const supabase = await createServerClient();
+    const { searchParams } = new URL(req.url);
 
-  const { searchParams } = new URL(req.url);
-  const q = searchParams.get("q");
-  const limit = Math.min(100, Math.max(1, Number(searchParams.get("limit") ?? 20)));
-  const offset = Math.max(0, Number(searchParams.get("offset") ?? 0));
-  const featured = searchParams.get("featured");
+    // Get query parameters
+    const collection = searchParams.get('collection');
+    const featured = searchParams.get('featured') === 'true';
+    const limit = parseInt(searchParams.get('limit') || '20');
+    const sort = searchParams.get('sort') || 'newest';
+    const q = searchParams.get('q');
 
-  let query = supabase
-    .from("products")
-    .select(
-      `
-      id,
-      slug,
-      title,
-      description,
-      price_cents,
-      compare_at_price_cents,
-      currency,
-      badge,
-      is_featured,
-      status,
-      created_at,
-      product_images (
-        bucket_name,
-        object_path,
-        alt_text,
-        sort_order,
-        position,
-        is_primary,
-        is_public,
-        width,
-        height,
-        blurhash,
-        mime_type,
-        size_bytes
-      )
-    `
-    )
-    .eq("status", "active")
-    .order("created_at", { ascending: false })
-    .range(offset, offset + limit - 1);
+    // Start building query
+    let query = supabase
+      .from('products')
+      .select(`
+        id,
+        slug,
+        title,
+        price_cents,
+        compare_at_price_cents,
+        currency,
+        badge,
+        is_featured,
+        status,
+        created_at,
+        product_images!inner (
+          id,
+          object_path,
+          bucket_name,
+          alt_text,
+          position,
+          is_primary
+        )
+      `)
+      .eq('status', 'active');
 
-  if (featured === "1" || featured === "true") {
-    query = query.eq("is_featured", true);
-  }
+    // Filter by collection if specified
+    if (collection) {
+      // Get collection ID from slug
+      const { data: collectionData } = await supabase
+        .from('collections')
+        .select('id')
+        .eq('slug', collection)
+        .single();
 
-  if (q) {
-    // if you have search_text, this is fine. if not, switch to title/description.
-    query = query.ilike("search_text", `%${q}%`);
-  }
+      if (collectionData) {
+        // Get product IDs in this collection
+        const { data: productCollections } = await supabase
+          .from('product_collections')
+          .select('product_id')
+          .eq('collection_id', collectionData.id);
 
-  const { data, error } = await query;
+        if (productCollections && productCollections.length > 0) {
+          const productIds = productCollections.map(pc => pc.product_id);
+          query = query.in('id', productIds);
+        } else {
+          // Collection has no products
+          return NextResponse.json({
+            ok: true,
+            data: [],
+            meta: { count: 0, collection }
+          });
+        }
+      } else {
+        // Collection doesn't exist
+        return NextResponse.json({
+          ok: true,
+          data: [],
+          meta: { count: 0, collection, error: 'Collection not found' }
+        });
+      }
+    }
 
-  if (error) {
+    // Filter by featured if specified
+    if (featured) {
+      query = query.eq('is_featured', true);
+    }
+
+    // Search by title if query provided
+    if (q) {
+      query = query.ilike('title', `%${q}%`);
+    }
+
+    // Apply sorting
+    switch (sort) {
+      case 'featured':
+        query = query.order('is_featured', { ascending: false });
+        break;
+      case 'price-asc':
+        query = query.order('price_cents', { ascending: true });
+        break;
+      case 'price-desc':
+        query = query.order('price_cents', { ascending: false });
+        break;
+      case 'newest':
+      default:
+        query = query.order('created_at', { ascending: false });
+        break;
+    }
+
+    // Apply limit
+    query = query.limit(limit);
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('[GET /api/products] Database error:', error);
+      return NextResponse.json(
+        { ok: false, error: { message: error.message } },
+        { status: 500 }
+      );
+    }
+
+    // Process products to organize images
+    const products = (data || []).map(product => {
+      const images = (product.product_images || [])
+        .sort((a, b) => a.position - b.position);
+      
+      const primary_image = images.find(img => img.is_primary) || images[0] || null;
+
+      return {
+        ...product,
+        images,
+        primary_image,
+        product_images: undefined // Remove from response
+      };
+    });
+
+    return NextResponse.json({
+      ok: true,
+      data: products,
+      meta: {
+        count: products.length,
+        collection: collection || null,
+        featured: featured || false,
+        sort
+      }
+    });
+
+  } catch (error: any) {
+    console.error('[GET /api/products] Unexpected error:', error);
     return NextResponse.json(
-      {
-        ok: false,
-        error: {
-          code: "PRODUCT_LIST_FAILED",
-          message: error.message,
-        },
-      },
+      { ok: false, error: { message: error?.message || 'Failed to fetch products' } },
       { status: 500 }
     );
   }
-
-  return NextResponse.json({
-    ok: true,
-    data: data ?? [],
-    meta: { limit, offset },
-  });
-}
-
-/**
- * POST /api/products
- * Create a new product (admin only)
- */
-export async function POST(req: NextRequest) {
-  const supabase = await createServerClient();
-
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-
-  if (authError) {
-    return NextResponse.json(
-      { ok: false, error: { code: "AUTH_ERROR", message: authError.message } },
-      { status: 401 }
-    );
-  }
-
-  if (!user) {
-    return NextResponse.json(
-      { ok: false, error: { code: "UNAUTHORIZED", message: "Authentication required" } },
-      { status: 401 }
-    );
-  }
-
-  const body = await req.json();
-
-  const {
-    slug,
-    title,
-    description = null,
-    price_cents,
-    compare_at_price_cents = null,
-    currency = "USD",
-    badge = null,
-    is_featured = false,
-  } = body;
-
-  if (!slug || !title || typeof price_cents !== "number") {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: { code: "INVALID_INPUT", message: "slug, title, and price_cents are required" },
-      },
-      { status: 400 }
-    );
-  }
-
-  const { data, error } = await supabase
-    .from("products")
-    .insert({
-      slug,
-      title,
-      description,
-      price_cents,
-      compare_at_price_cents,
-      currency,
-      badge,
-      is_featured,
-      status: "draft",
-    })
-    .select()
-    .single();
-
-  if (error) {
-    return NextResponse.json(
-      { ok: false, error: { code: "PRODUCT_CREATE_FAILED", message: error.message } },
-      { status: 500 }
-    );
-  }
-
-  return NextResponse.json({ ok: true, data });
 }
