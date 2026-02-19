@@ -4,7 +4,7 @@ import { createServerClient } from "@/utils/supabase/server";
 
 /**
  * GET /api/collections
- * Public collections list
+ * Public collections list (+ product_count via product_collections join)
  *
  * Query params:
  * - limit (number, optional, default 50)
@@ -28,7 +28,8 @@ export async function GET(req: NextRequest) {
       slug,
       description,
       position,
-      is_home_section
+      is_home_section,
+      product_collections(count)
     `
     )
     .order("position", { ascending: true })
@@ -49,9 +50,21 @@ export async function GET(req: NextRequest) {
     );
   }
 
+  // Flatten Supabase count shape:
+  // product_collections: [{ count: number }] -> product_count: number
+  const collections = (data ?? []).map((c: any) => ({
+    id: c.id,
+    name: c.name,
+    slug: c.slug,
+    description: c.description,
+    position: c.position,
+    is_home_section: c.is_home_section,
+    product_count: c.product_collections?.[0]?.count ?? 0,
+  }));
+
   return NextResponse.json({
     ok: true,
-    data: data ?? [],
+    data: collections,
     meta: { limit, offset },
   });
 }

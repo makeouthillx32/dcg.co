@@ -10,7 +10,7 @@ import { LoadingState } from "./_components/LoadingState";
 import { ErrorAlert } from "./_components/ErrorAlert";
 import { CollectionsActionBar } from "./_components/CollectionsActionBar";
 import { CollectionsTable, type CollectionRow } from "./_components/CollectionsTable";
-import CreateCollectionModal from "./_components/CreateCollectionModal"; // ✅ Changed to default import
+import CreateCollectionModal from "./_components/CreateCollectionModal";
 import { EditCollectionForm } from "./_components/EditCollectionForm";
 import { DeleteConfirmModal } from "./_components/DeleteConfirmModal";
 
@@ -38,11 +38,31 @@ export default function CollectionsPage() {
     setErr(null);
     setLoading(true);
 
-    const { data, error } = await supabase
+    let query = supabase
       .from("collections")
-      .select("id,name,slug,description,position,is_home_section,cover_image_bucket,cover_image_path,cover_image_alt") // ✅ Added cover image fields
+      .select(
+        `
+        id,
+        name,
+        slug,
+        description,
+        position,
+        is_home_section,
+        cover_image_bucket,
+        cover_image_path,
+        cover_image_alt,
+        product_collections(count)
+      `
+      )
       .order("position", { ascending: true })
       .order("name", { ascending: true });
+
+    const q = search.trim();
+    if (q) {
+      query = query.or(`name.ilike.%${q}%,slug.ilike.%${q}%,description.ilike.%${q}%`);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       setErr(error.message);
@@ -51,7 +71,21 @@ export default function CollectionsPage() {
       return;
     }
 
-    setRows((data as CollectionRow[]) ?? []);
+    // Flatten: product_collections: [{ count }] -> product_count
+    const normalized: CollectionRow[] = ((data ?? []) as any[]).map((c) => ({
+      id: c.id,
+      name: c.name,
+      slug: c.slug,
+      description: c.description,
+      position: c.position,
+      is_home_section: c.is_home_section,
+      cover_image_bucket: c.cover_image_bucket,
+      cover_image_path: c.cover_image_path,
+      cover_image_alt: c.cover_image_alt,
+      product_count: c.product_collections?.[0]?.count ?? 0,
+    }));
+
+    setRows(normalized);
     setLoading(false);
   };
 
@@ -60,47 +94,25 @@ export default function CollectionsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return rows;
-
-    return rows.filter((r) => {
-      return (
-        r.name.toLowerCase().includes(q) ||
-        r.slug.toLowerCase().includes(q) ||
-        (r.description ?? "").toLowerCase().includes(q)
-      );
-    });
-  }, [rows, search]);
+  // Re-load when search changes (so counts + results match)
+  useEffect(() => {
+    const t = setTimeout(() => load(), 150);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search]);
 
   // ✅ Create
-  const handleCreate = async (data: {
+  // IMPORTANT: your CreateCollectionModal already inserts into Supabase (and uploads cover),
+  // so do NOT insert here again. Just refresh.
+  const handleCreate = async (_data: {
     name: string;
     slug: string;
     description: string | null;
     is_home_section: boolean;
   }) => {
     setErr(null);
-
-    // Put new collection at end
-    const maxPos = Math.max(-1, ...rows.map((r) => r.position ?? 0));
-    const nextPos = maxPos + 1;
-
-    const { error } = await supabase.from("collections").insert({
-      name: data.name,
-      slug: data.slug,
-      description: data.description,
-      is_home_section: data.is_home_section,
-      position: nextPos,
-    });
-
-    if (error) {
-      setErr(error.message);
-      return;
-    }
-
     await load();
-    setCreateOpen(false); // ✅ Close modal after success
+    setCreateOpen(false);
   };
 
   // ✅ Edit
@@ -134,7 +146,7 @@ export default function CollectionsPage() {
     }
 
     await load();
-    setEditOpen(false); // ✅ Close modal after success
+    setEditOpen(false);
   };
 
   // ✅ Delete
@@ -154,7 +166,7 @@ export default function CollectionsPage() {
     }
 
     await load();
-    setDeleteOpen(false); // ✅ Close modal after success
+    setDeleteOpen(false);
   };
 
   return (
@@ -180,7 +192,7 @@ export default function CollectionsPage() {
         <LoadingState />
       ) : (
         <div className="collections-table">
-          <CollectionsTable collections={filtered} onEdit={handleEdit} onDelete={handleDelete} />
+          <CollectionsTable collections={rows} onEdit={handleEdit} onDelete={handleDelete} />
         </div>
       )}
 

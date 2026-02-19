@@ -16,6 +16,9 @@ export type CollectionRow = {
   cover_image_bucket?: string | null;
   cover_image_path?: string | null;
   cover_image_alt?: string | null;
+
+  // ✅ NEW: provided by /api/collections
+  product_count?: number | null;
 };
 
 type Props = {
@@ -43,6 +46,8 @@ export function CollectionsTable({ collections, onEdit, onDelete }: Props) {
     <div className="space-y-2">
       {collections.map((col) => {
         const coverUrl = getCoverImageUrl(col);
+        const count =
+          typeof col.product_count === "number" ? col.product_count : null;
 
         return (
           <div
@@ -70,12 +75,27 @@ export function CollectionsTable({ collections, onEdit, onDelete }: Props) {
 
             {/* Collection Info */}
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-[hsl(var(--foreground))]">
-                {col.name}
-              </p>
+              <div className="flex items-center gap-2 min-w-0">
+                <p className="truncate text-sm font-medium text-[hsl(var(--foreground))]">
+                  {col.name}
+                </p>
+
+                {/* ✅ Product count badge */}
+                {count !== null && (
+                  <span
+                    className="flex-shrink-0 inline-flex items-center justify-center rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--muted))] px-2 py-0.5 text-[11px] font-medium text-[hsl(var(--muted-foreground))]"
+                    title="Products in this collection"
+                    aria-label={`${count} products in this collection`}
+                  >
+                    {count}
+                  </span>
+                )}
+              </div>
+
               <p className="truncate text-xs text-[hsl(var(--muted-foreground))]">
                 /collections/{col.slug}
               </p>
+
               {col.is_home_section && (
                 <p className="mt-1 text-xs text-[hsl(var(--primary))]">
                   ✓ Shown on homepage
