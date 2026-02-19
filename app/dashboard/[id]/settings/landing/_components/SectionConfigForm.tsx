@@ -83,65 +83,19 @@ export function SectionConfigForm({ type, config, onChange }: SectionConfigFormP
   // TOP BANNER FORM
   if (type === 'top_banner') {
     return (
-      <>
-        <div className="form-field">
-          <label className="form-label">Banner Message</label>
-          <input
-            type="text"
-            value={config.message || ''}
-            onChange={(e) => updateField('message', e.target.value)}
-            className="form-input"
-            placeholder="Free Shipping on Orders Over $75"
-          />
+      <div className="custom-component-notice">
+        <div className="notice-icon">ℹ️</div>
+        <div className="notice-content">
+          <h4>Custom Component by unenter</h4>
+          <p>
+            This section uses a custom-built component that doesn't require configuration. 
+            The announcement banner is managed directly in the component code.
+          </p>
+          <p className="notice-hint">
+            Simply add this section to your landing page - it will work automatically.
+          </p>
         </div>
-
-        <div className="form-field">
-          <label className="form-label">Link URL</label>
-          <input
-            type="text"
-            value={config.link || ''}
-            onChange={(e) => updateField('link', e.target.value)}
-            className="form-input"
-            placeholder="/shop"
-          />
-        </div>
-
-        <div className="form-field">
-          <label className="form-label">Link Text</label>
-          <input
-            type="text"
-            value={config.linkText || ''}
-            onChange={(e) => updateField('linkText', e.target.value)}
-            className="form-input"
-            placeholder="Shop Now"
-          />
-        </div>
-
-        <div className="form-field">
-          <label className="form-label">Background Color</label>
-          <select
-            value={config.backgroundColor || 'accent'}
-            onChange={(e) => updateField('backgroundColor', e.target.value)}
-            className="form-select"
-          >
-            <option value="accent">Accent</option>
-            <option value="primary">Primary</option>
-            <option value="muted">Muted</option>
-          </select>
-        </div>
-
-        <div className="form-field">
-          <label className="form-checkbox-label">
-            <input
-              type="checkbox"
-              checked={config.dismissible !== false}
-              onChange={(e) => updateField('dismissible', e.target.checked)}
-              className="form-checkbox"
-            />
-            User can dismiss banner
-          </label>
-        </div>
-      </>
+      </div>
     );
   }
 
@@ -262,20 +216,17 @@ export function SectionConfigForm({ type, config, onChange }: SectionConfigFormP
   // PRODUCTS GRID FORM
   if (type === 'products_grid') {
     const selectedCollection = collections.find(c => c.slug === config.collection);
-    const selectedCategory = categories.find(c => c.slug === config.category);
     
     return (
       <>
-        {/* Summary Box - Only show if filters are active */}
-        {(config.collection || config.category || config.featured) && (
+        {/* Summary Box - Only show if collection is selected */}
+        {config.collection && (
           <div className="config-summary">
             <p className="config-summary-title">Section Preview:</p>
             <p className="config-summary-text">
-              Showing {config.limit || 8} products
+              Showing {config.limit || 8} products from collection "{selectedCollection?.name || config.collection}"
               {config.featured && ' (featured only)'}
-              {selectedCollection && ` from collection "${selectedCollection.name}"`}
-              {selectedCategory && ` in category "${selectedCategory.name}"`}
-              {' sorted by '}
+              {' - sorted by '}
               {config.sortBy === 'newest' && 'newest first'}
               {config.sortBy === 'featured' && 'featured first'}
               {config.sortBy === 'price-asc' && 'price (low to high)'}
@@ -308,13 +259,20 @@ export function SectionConfigForm({ type, config, onChange }: SectionConfigFormP
         </div>
 
         <div className="form-field">
-          <label className="form-label">Filter by Collection (Primary Filter)</label>
+          <label className="form-label">Collection (Required)</label>
           <select
             value={config.collection || ''}
-            onChange={(e) => updateField('collection', e.target.value || null)}
+            onChange={(e) => {
+              const newCollection = e.target.value;
+              updateField('collection', newCollection || null);
+              // Auto-update viewAllHref when collection changes
+              if (newCollection && !config.viewAllHref) {
+                updateField('viewAllHref', `/collections/${newCollection}`);
+              }
+            }}
             className="form-select"
           >
-            <option value="">None - All Products from All Collections</option>
+            <option value="">-- Select a Collection --</option>
             {collections.map(col => (
               <option key={col.id} value={col.slug}>
                 {col.name}
@@ -324,30 +282,8 @@ export function SectionConfigForm({ type, config, onChange }: SectionConfigFormP
           </select>
           <p className="form-hint">
             {config.collection 
-              ? `Showing products from "${selectedCollection?.name || config.collection}" collection` 
-              : 'No collection filter - showing all products'}
-          </p>
-        </div>
-
-        <div className="form-field">
-          <label className="form-label">Filter by Category (Optional)</label>
-          <select
-            value={config.category || ''}
-            onChange={(e) => updateField('category', e.target.value || null)}
-            className="form-select"
-          >
-            <option value="">None - All Categories</option>
-            {categories.map(cat => (
-              <option key={cat.id} value={cat.slug}>
-                {cat.name}
-                {cat.product_count !== undefined && ` (${cat.product_count} products)`}
-              </option>
-            ))}
-          </select>
-          <p className="form-hint">
-            {config.category 
-              ? `Additionally filtering by "${selectedCategory?.name || config.category}" category` 
-              : 'No category filter applied'}
+              ? `Displaying products from "${selectedCollection?.name || config.collection}" collection` 
+              : 'Please select a collection to display products from'}
           </p>
         </div>
 
@@ -426,15 +362,21 @@ export function SectionConfigForm({ type, config, onChange }: SectionConfigFormP
     );
   }
 
-  // HERO CAROUSEL FORM (simplified - users would manage slides elsewhere)
+  // HERO CAROUSEL FORM (Category Carousel)
   if (type === 'hero_carousel') {
     return (
-      <div className="form-field">
-        <label className="form-label">Configuration</label>
-        <p className="form-hint">
-          Hero carousel configuration is complex and should be edited in JSON format.
-          Use the advanced JSON editor below.
-        </p>
+      <div className="custom-component-notice">
+        <div className="notice-icon">ℹ️</div>
+        <div className="notice-content">
+          <h4>Custom Component by unenter</h4>
+          <p>
+            This section displays a carousel of category images. It's a custom-built component 
+            that automatically pulls category images from your database.
+          </p>
+          <p className="notice-hint">
+            No configuration needed - the component handles everything automatically.
+          </p>
+        </div>
       </div>
     );
   }

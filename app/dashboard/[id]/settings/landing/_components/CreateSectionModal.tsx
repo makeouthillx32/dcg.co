@@ -15,40 +15,15 @@ interface CreateSectionModalProps {
 const SECTION_TYPES = [
   { 
     value: "top_banner", 
-    label: "Top Banner", 
-    description: "Announcement bar at the very top of the page",
-    config: {
-      message: "Free Shipping on Orders Over $75",
-      link: "/shop",
-      linkText: "Shop Now",
-      backgroundColor: "accent",
-      dismissible: true
-    }
+    label: "Top Banner (Custom by unenter)", 
+    description: "Announcement bar - Custom component, no configuration needed",
+    config: {} // No config - custom component handles everything
   },
   { 
     value: "hero_carousel", 
-    label: "Hero Carousel", 
-    description: "Large rotating image slider with call-to-action buttons",
-    config: {
-      slides: [
-        {
-          image: "/hero-1.jpg",
-          title: "New Western Collection",
-          subtitle: "Authentic cowgirl style for modern women",
-          buttonText: "Shop Collection",
-          buttonLink: "/new-releases"
-        },
-        {
-          image: "/hero-2.jpg",
-          title: "Desert Girl Exclusives",
-          subtitle: "Limited edition pieces you won't find anywhere else",
-          buttonText: "Explore Exclusives",
-          buttonLink: "/desert-girl-exclusives"
-        }
-      ],
-      autoplay: true,
-      interval: 5000
-    }
+    label: "Category Carousel (Custom by unenter)", 
+    description: "Category image carousel - Custom component, no configuration needed",
+    config: {} // No config - custom component handles everything
   },
   { 
     value: "categories_grid", 
@@ -63,8 +38,8 @@ const SECTION_TYPES = [
   },
   { 
     value: "static_html", 
-    label: "Static HTML Page", 
-    description: "Embed a custom static page by its slug",
+    label: "Static Page Embed", 
+    description: "Embed a pre-made static page by slug (managed in separate upload flow)",
     config: { 
       slug: "landing-qr-download",
       showTitle: false,
@@ -73,15 +48,15 @@ const SECTION_TYPES = [
   },
   { 
     value: "products_grid", 
-    label: "Collection Grid", 
-    description: "Display products from a collection or all products",
+    label: "Collection Products Grid", 
+    description: "Display products from a specific collection",
     config: { 
       title: "Featured Collection",
       description: "Shop our curated selection",
-      collection: "", // Empty = all products, or set to a collection slug
+      collection: "best-sellers", // Collection slug - shows products in this collection
       limit: 8, 
       sortBy: "featured",
-      viewAllHref: "/shop"
+      viewAllHref: "/collections/best-sellers" // Link to full collection page
     } 
   },
 ];
