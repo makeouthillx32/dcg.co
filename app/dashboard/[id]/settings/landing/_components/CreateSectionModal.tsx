@@ -3,6 +3,7 @@
 
 import React, { useState } from "react";
 import { X } from "lucide-react";
+import { SectionConfigForm } from "./SectionConfigForm";
 import "./landing.scss";
 
 interface CreateSectionModalProps {
@@ -91,7 +92,9 @@ const SECTION_TYPES = [
 export function CreateSectionModal({ open, onClose, onSuccess }: CreateSectionModalProps) {
   const [type, setType] = useState("static_html");
   const [isActive, setIsActive] = useState(true);
+  const [config, setConfig] = useState(SECTION_TYPES.find(t => t.value === "static_html")?.config || {});
   const [configText, setConfigText] = useState(JSON.stringify(SECTION_TYPES.find(t => t.value === "static_html")?.config, null, 2));
+  const [showJsonEditor, setShowJsonEditor] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -100,18 +103,41 @@ export function CreateSectionModal({ open, onClose, onSuccess }: CreateSectionMo
   function handleTypeChange(newType: string) {
     setType(newType);
     const preset = SECTION_TYPES.find(t => t.value === newType);
-    setConfigText(JSON.stringify(preset?.config || {}, null, 2));
+    const newConfig = preset?.config || {};
+    setConfig(newConfig);
+    setConfigText(JSON.stringify(newConfig, null, 2));
+  }
+
+  function handleConfigChange(newConfig: Record<string, any>) {
+    setConfig(newConfig);
+    setConfigText(JSON.stringify(newConfig, null, 2));
+  }
+
+  function handleJsonTextChange(text: string) {
+    setConfigText(text);
+    try {
+      const parsed = JSON.parse(text);
+      setConfig(parsed);
+      setError(null);
+    } catch {
+      // Don't update config object if JSON is invalid
+      // Error will be shown when they try to save
+    }
   }
 
   async function handleSave() {
     setError(null);
     
-    let config;
-    try {
-      config = JSON.parse(configText);
-    } catch {
-      setError("Invalid JSON in config");
-      return;
+    let finalConfig = config;
+    
+    // If using JSON editor, validate and parse
+    if (showJsonEditor) {
+      try {
+        finalConfig = JSON.parse(configText);
+      } catch {
+        setError("Invalid JSON in config");
+        return;
+      }
     }
 
     setSaving(true);
@@ -123,7 +149,7 @@ export function CreateSectionModal({ open, onClose, onSuccess }: CreateSectionMo
           position: 999,
           type,
           is_active: isActive,
-          config,
+          config: finalConfig,
         }),
       });
 
@@ -137,9 +163,12 @@ export function CreateSectionModal({ open, onClose, onSuccess }: CreateSectionMo
       onClose();
       
       // Reset form
+      const defaultPreset = SECTION_TYPES[3];
       setType("static_html");
       setIsActive(true);
-      setConfigText(JSON.stringify(SECTION_TYPES[3].config, null, 2));
+      setConfig(defaultPreset.config);
+      setConfigText(JSON.stringify(defaultPreset.config, null, 2));
+      setShowJsonEditor(false);
     } catch (err: any) {
       setError(err.message || 'Failed to create section');
     } finally {
@@ -210,24 +239,44 @@ export function CreateSectionModal({ open, onClose, onSuccess }: CreateSectionMo
               </label>
             </div>
 
-            {/* Config Textarea */}
+            {/* Config Section with Toggle */}
             <div className="form-field">
-              <label className="form-label">
-                Configuration (JSON)
-              </label>
-              <textarea
-                value={configText}
-                onChange={(e) => setConfigText(e.target.value)}
-                className="form-textarea mono"
-                spellCheck={false}
-              />
-              <p className="form-hint">
-                {type === 'top_banner' && 'Configure message, link, background color, and dismissibility'}
-                {type === 'hero_carousel' && 'Configure slides with images, titles, subtitles, and CTA buttons'}
-                {type === 'categories_grid' && 'Configure title, number of columns, and which categories to display'}
-                {type === 'static_html' && 'Specify the slug of your static page to embed'}
-                {type === 'products_grid' && 'Configure title, filters (collection/category), limit, and sorting'}
-              </p>
+              <div className="config-header">
+                <label className="form-label">Configuration</label>
+                <button
+                  type="button"
+                  onClick={() => setShowJsonEditor(!showJsonEditor)}
+                  className="toggle-editor-btn"
+                >
+                  {showJsonEditor ? '📝 Switch to Simple Form' : '⚙️ Advanced JSON Editor'}
+                </button>
+              </div>
+
+              {showJsonEditor ? (
+                <>
+                  <textarea
+                    value={configText}
+                    onChange={(e) => handleJsonTextChange(e.target.value)}
+                    className="form-textarea mono"
+                    spellCheck={false}
+                  />
+                  <p className="form-hint">
+                    {type === 'top_banner' && 'Configure message, link, background color, and dismissibility'}
+                    {type === 'hero_carousel' && 'Configure slides with images, titles, subtitles, and CTA buttons'}
+                    {type === 'categories_grid' && 'Configure title, number of columns, and which categories to display'}
+                    {type === 'static_html' && 'Specify the slug of your static page to embed'}
+                    {type === 'products_grid' && 'Configure title, filters (collection/category), limit, and sorting'}
+                  </p>
+                </>
+              ) : (
+                <div className="simple-form">
+                  <SectionConfigForm 
+                    type={type}
+                    config={config}
+                    onChange={handleConfigChange}
+                  />
+                </div>
+              )}
             </div>
           </div>
 
