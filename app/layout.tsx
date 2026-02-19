@@ -83,8 +83,17 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* Fallback static color — ClientLayout's MetaThemeColor takes over immediately */}
-        <meta name="theme-color" content="#f8f5f0" />
+        {/* 
+          REMOVED: Static fallback theme-color meta tag
+          Reason: iOS Safari caches the initial server-rendered value,
+          so we need MetaThemeColor to control it from the start.
+          The meta tag will be created dynamically by MetaThemeColor component.
+        */}
+        
+        {/* iOS-specific status bar configuration */}
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="format-detection" content="telephone=no" />
 
