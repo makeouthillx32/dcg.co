@@ -26,17 +26,14 @@ interface ThemeProviderProps {
 }
 
 export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
-  // Theme state
   const [themeId, setThemeIdState] = useState<string>(defaultThemeId);
   const [themeType, setThemeType] = useState<"light" | "dark">("light");
   const [mounted, setMounted] = useState(false);
 
-  // Get current theme object
   const getTheme = (): Theme => {
     return themeMap[themeId] || themeMap[defaultThemeId];
   };
 
-  // Set theme ID and save to cookies
   const setThemeId = (id: string) => {
     if (themeMap[id]) {
       setThemeIdState(id);
@@ -44,30 +41,25 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     }
   };
 
-  // Toggle between light and dark mode
   const toggleTheme = () => {
     const newThemeType = themeType === "light" ? "dark" : "light";
     setThemeType(newThemeType);
     setCookie("themeType", newThemeType, { path: "/", maxAge: 31536000 });
   };
 
-  // Initialize theme from cookies or system preference
   useEffect(() => {
     if (typeof window !== "undefined") {
       setMounted(true);
       
-      // Get theme ID from cookie or use default
       const savedThemeId = getCookie("themeId") || localStorage.getItem("themeId");
       if (savedThemeId && themeMap[savedThemeId]) {
         setThemeIdState(savedThemeId);
       }
       
-      // Get theme type from cookie or system preference
       const savedThemeType = getCookie("themeType") || localStorage.getItem("themeType");
       if (savedThemeType === "light" || savedThemeType === "dark") {
         setThemeType(savedThemeType);
       } else {
-        // Use system preference as fallback
         const systemPrefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
         setThemeType(systemPrefersDark ? "dark" : "light");
       }
@@ -82,26 +74,17 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     const theme = getTheme();
     const variables = themeType === "dark" ? theme.dark : theme.light;
     
-    // Apply theme CSS variables
     for (const [key, value] of Object.entries(variables)) {
       html.style.setProperty(key, value);
     }
     
-    // Apply dark class for tailwind
     html.classList.remove("light", "dark");
     html.classList.add(themeType);
     
-    // Save preferences
     localStorage.setItem("themeId", themeId);
     localStorage.setItem("themeType", themeType);
-    
-    // Update theme-color meta tag
-    updateThemeColorMeta(themeType, theme, html);
   }, [themeId, themeType, mounted]);
 
-  
-
-  // Context value
   const contextValue: ThemeContextType = {
     themeId,
     setThemeId,

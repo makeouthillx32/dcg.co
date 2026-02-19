@@ -1,13 +1,11 @@
-// app/layout.tsx - UPDATED WITH CONDITIONAL OVERLAYS
+// app/layout.tsx
 import { Providers } from "./provider";
-import MetaThemeColor from "@/components/Layouts/meta-theme-color";
 import ConditionalOverlays from "@/components/Layouts/overlays/ConditionalOverlays";
 import { CartProvider } from "@/components/Layouts/overlays/cart/cart-context";
 import "./globals.css";
 import type { Metadata } from "next";
 import ClientLayoutWrapper from "@/components/Layouts/ClientLayout";
 
-// ✅ UPDATED: Metadata for Desert Cowgirl (western-inspired clothing storefront)
 export const metadata: Metadata = {
   title: {
     template: "%s | Desert Cowgirl",
@@ -15,11 +13,7 @@ export const metadata: Metadata = {
   },
   description:
     "Desert Cowgirl offers western-inspired pants and shirts with a warm, modern rustic aesthetic—quality staples made for everyday wear.",
-
-  // ✅ Update when domain is live (recommended): https://desertcowgirl.co
   metadataBase: new URL("https://desertcowgirl.co"),
-
-  // ✅ Keywords for SEO
   keywords: [
     "Desert Cowgirl",
     "western inspired clothing",
@@ -35,13 +29,9 @@ export const metadata: Metadata = {
     "women's western clothing",
     "men's western clothing",
   ],
-
-  // ✅ Authors and creator info
   authors: [{ name: "Desert Cowgirl" }],
   creator: "Desert Cowgirl",
   publisher: "Desert Cowgirl",
-
-  // ✅ Open Graph Meta Tags
   openGraph: {
     type: "website",
     locale: "en_US",
@@ -52,24 +42,20 @@ export const metadata: Metadata = {
       "Shop western-inspired pants and shirts with a warm, modern rustic look—quality staples made for everyday wear.",
     images: [
       {
-        url: "/og-image.jpg", // TODO: replace with your actual OG image
+        url: "/og-image.jpg",
         width: 1200,
         height: 630,
         alt: "Desert Cowgirl storefront preview",
       },
     ],
   },
-
-  // ✅ Twitter Meta Tags
   twitter: {
     card: "summary_large_image",
     title: "Desert Cowgirl | Western-Inspired Pants & Shirts",
     description:
       "Shop western-inspired pants and shirts with a warm, modern rustic look—quality staples made for everyday wear.",
-    images: ["/og-image.jpg"], // TODO: replace with your actual image
+    images: ["/og-image.jpg"],
   },
-
-  // ✅ Robots
   robots: {
     index: true,
     follow: true,
@@ -81,19 +67,14 @@ export const metadata: Metadata = {
       "max-snippet": -1,
     },
   },
-
-  // ✅ App-specific metadata
   applicationName: "Desert Cowgirl",
   referrer: "origin-when-cross-origin",
   category: "Apparel",
-
-  // ✅ Contact info placeholders (fill when ready)
   other: {
     "contact:email": "support@desertcowgirl.co",
   },
 };
 
-// ✅ Keep the HTML structure server-side, move client logic to wrapper
 export default function RootLayout({
   children,
 }: {
@@ -102,24 +83,20 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* ✅ Fallback theme color (matches --background light: #f8f5f0) */}
+        {/* Fallback static color — ClientLayout's MetaThemeColor takes over immediately */}
         <meta name="theme-color" content="#f8f5f0" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="format-detection" content="telephone=no" />
 
-        {/* ✅ Favicon and app icons */}
         <link rel="icon" href="/favicon.ico" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <link rel="manifest" href="/manifest.json" />
 
-        {/* ✅ Preconnect for performance (keep only if you actually use Google Fonts) */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
 
-        {/* ✅ Canonical URL */}
         <link rel="canonical" href="https://desertcowgirl.co/" />
 
-        {/* ✅ Store schema (helps SEO for ecommerce) */}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
@@ -131,25 +108,18 @@ export default function RootLayout({
                 "Western-inspired pants and shirts with a warm, modern rustic aesthetic.",
               url: "https://desertcowgirl.co/",
               logo: "https://desertcowgirl.co/logo.png",
-              sameAs: [
-                // Add socials when ready:
-                // "https://instagram.com/your-handle",
-                // "https://tiktok.com/@your-handle"
-              ],
+              sameAs: [],
             }),
           }}
         />
       </head>
       <body className="min-h-screen font-[var(--font-sans)]">
         <Providers>
-          {/* 🎨 Dynamic Meta Theme Color (defaults to shop for root) */}
-          <MetaThemeColor layout="shop" />
-          
           {/* 🛒 Wrap with CartProvider for global cart state */}
           <CartProvider>
             <ClientLayoutWrapper>{children}</ClientLayoutWrapper>
-            
-            {/* 🎯 Conditional Overlays - only show on storefront pages (excludes /app and /dashboard) */}
+
+            {/* 🎯 Conditional Overlays - excluded from /app and /dashboard */}
             <ConditionalOverlays />
           </CartProvider>
         </Providers>
