@@ -72,20 +72,24 @@ export function EditSectionModal({ open, section, onClose, onSuccess }: EditSect
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={onClose}>
       <div
-        className="w-full max-w-2xl bg-[var(--card)] border border-[var(--border)] rounded-lg shadow-lg"
+        className="w-full max-w-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow-2xl"
+        style={{
+          backgroundColor: 'var(--card)',
+          borderColor: 'var(--border)'
+        }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-[var(--border)]">
+        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-800" style={{ borderColor: 'var(--border)' }}>
           <div>
-            <h2 className="text-xl font-bold text-[var(--foreground)]">Edit Section</h2>
-            <p className="text-sm text-[var(--muted-foreground)] mt-1">
+            <h2 className="text-xl font-bold" style={{ color: 'var(--foreground)' }}>Edit Section</h2>
+            <p className="text-sm mt-1" style={{ color: 'var(--muted-foreground)' }}>
               Update section configuration
             </p>
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-lg hover:bg-[var(--accent)] transition-colors"
+            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -100,59 +104,80 @@ export function EditSectionModal({ open, section, onClose, onSuccess }: EditSect
           )}
 
           <div>
-            <label className="block text-sm font-medium text-[var(--foreground)] mb-2">
+            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--foreground)' }}>
               Section Type
             </label>
             <input
               type="text"
               value={type}
               onChange={(e) => setType(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-[var(--foreground)]"
+              className="w-full px-3 py-2 rounded-lg border bg-gray-100 dark:bg-gray-950"
+              style={{
+                borderColor: 'var(--border)',
+                backgroundColor: 'var(--background)',
+                color: 'var(--foreground)',
+                opacity: 0.6
+              }}
               disabled
             />
-            <p className="text-xs text-[var(--muted-foreground)] mt-1">
+            <p className="text-xs mt-1" style={{ color: 'var(--muted-foreground)' }}>
               Type cannot be changed after creation
             </p>
           </div>
 
           <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-[var(--foreground)]">
+            <label className="flex items-center gap-2 text-sm font-medium" style={{ color: 'var(--foreground)' }}>
               <input
                 type="checkbox"
                 checked={isActive}
                 onChange={(e) => setIsActive(e.target.checked)}
-                className="w-4 h-4 rounded border-[var(--border)]"
+                className="w-4 h-4 rounded"
+                style={{ borderColor: 'var(--border)' }}
               />
               Active (show on landing page)
             </label>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-[var(--foreground)] mb-2">
+            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--foreground)' }}>
               Configuration (JSON)
             </label>
             <textarea
               value={configText}
               onChange={(e) => setConfigText(e.target.value)}
-              className="w-full h-64 px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-[var(--foreground)] font-mono text-sm"
+              className="w-full h-64 px-3 py-2 rounded-lg border bg-white dark:bg-gray-950 font-mono text-sm"
+              style={{
+                borderColor: 'var(--border)',
+                backgroundColor: 'var(--background)',
+                color: 'var(--foreground)'
+              }}
               spellCheck={false}
             />
           </div>
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 p-6 border-t border-[var(--border)]">
+        <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200 dark:border-gray-800" style={{ borderColor: 'var(--border)' }}>
           <button
             onClick={onClose}
             disabled={saving}
-            className="px-4 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-[var(--foreground)] hover:bg-[var(--accent)] transition-colors"
+            className="px-4 py-2 rounded-lg border bg-white dark:bg-gray-950 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            style={{
+              borderColor: 'var(--border)',
+              backgroundColor: 'var(--background)',
+              color: 'var(--foreground)'
+            }}
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
             disabled={saving}
-            className="px-4 py-2 rounded-lg bg-[var(--primary)] text-[var(--primary-foreground)] hover:opacity-90 transition-opacity font-medium"
+            className="px-4 py-2 rounded-lg hover:opacity-90 transition-opacity font-medium"
+            style={{
+              backgroundColor: 'var(--primary)',
+              color: 'var(--primary-foreground)'
+            }}
           >
             {saving ? 'Saving...' : 'Save Changes'}
           </button>

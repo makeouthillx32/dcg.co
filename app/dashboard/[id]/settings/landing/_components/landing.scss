@@ -1,4 +1,10 @@
 /* settings/landing/_components/landing.scss */
+/* Uses app theme tokens from globals.css:
+   - colors: hsl(var(--background|foreground|card|border|muted-foreground|primary|ring|input|accent|destructive))
+   - radius: var(--radius)
+   - shadows: var(--shadow-*)
+   - z-index: --z-modal / --z-overlay
+*/
 
 .settings-page {
   padding: 18px;
@@ -20,13 +26,13 @@
 .settings-title {
   font-size: 22px;
   font-weight: 800;
-  color: var(--foreground);
+  color: hsl(var(--foreground));
 }
 
 .settings-subtitle {
   margin-top: 6px;
   font-size: 13px;
-  color: var(--muted-foreground);
+  color: hsl(var(--muted-foreground));
 }
 
 .actionbar {
@@ -35,33 +41,41 @@
   justify-content: space-between;
   gap: 10px;
   padding: 10px;
-  border: 1px solid var(--border);
-  background: var(--card);
-  border-radius: 12px;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--card));
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-xs);
 }
 
 .searchbar {
-  border: 1px solid var(--border);
-  background: var(--card);
-  border-radius: 12px;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--card));
+  border-radius: var(--radius);
   padding: 10px;
+  box-shadow: var(--shadow-2xs);
 }
 
 .search-input {
   width: 100%;
-  border: 1px solid var(--border);
-  background: var(--background);
-  color: var(--foreground);
-  border-radius: 10px;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--input));
+  color: hsl(var(--foreground));
+  border-radius: var(--radius);
   padding: 10px 12px;
   outline: none;
 }
 
+.search-input:focus {
+  border-color: hsl(var(--ring));
+  box-shadow: 0 0 0 3px hsl(var(--ring) / 0.2);
+}
+
 .table-wrap {
-  border: 1px solid var(--border);
-  background: var(--card);
-  border-radius: 12px;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--card));
+  border-radius: var(--radius);
   overflow: hidden;
+  box-shadow: var(--shadow-sm);
 }
 
 .table {
@@ -72,25 +86,25 @@
 .table th,
 .table td {
   padding: 10px 12px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid hsl(var(--border));
   vertical-align: top;
 }
 
 .table th {
   font-size: 12px;
-  color: var(--muted-foreground);
+  color: hsl(var(--muted-foreground));
   text-align: left;
-  background: color-mix(in oklab, var(--card) 88%, black 12%);
+  background: hsl(var(--accent));
 }
 
 .empty {
   padding: 20px;
   text-align: center;
-  color: var(--muted-foreground);
+  color: hsl(var(--muted-foreground));
 }
 
 .mono {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
 }
 
@@ -117,18 +131,18 @@
   font-size: 12px;
   padding: 3px 8px;
   border-radius: 999px;
-  border: 1px solid var(--border);
-  color: var(--muted-foreground);
-  background: var(--background);
+  border: 1px solid hsl(var(--border));
+  color: hsl(var(--muted-foreground));
+  background: hsl(var(--background));
 }
 
 .config-pre {
   margin: 0;
   padding: 10px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  background: var(--background);
-  color: var(--foreground);
+  border-radius: var(--radius);
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
   overflow: auto;
   max-height: 140px;
   font-size: 12px;
@@ -142,84 +156,98 @@
 
 .btn {
   padding: 9px 12px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  background: var(--background);
-  color: var(--foreground);
+  border-radius: var(--radius);
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
   font-weight: 700;
   font-size: 13px;
   cursor: pointer;
+  box-shadow: var(--shadow-2xs);
 }
 
 .btn:hover {
-  opacity: 0.9;
+  filter: brightness(0.98);
+}
+
+.btn:focus {
+  outline: none;
+  border-color: hsl(var(--ring));
+  box-shadow: 0 0 0 3px hsl(var(--ring) / 0.2);
 }
 
 .btn-primary {
-  background: var(--primary);
-  color: var(--primary-foreground);
-  border-color: color-mix(in oklab, var(--primary) 70%, var(--border) 30%);
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border-color: hsl(var(--primary));
 }
 
 .btn-danger {
-  background: color-mix(in oklab, #ff3b30 80%, var(--card) 20%);
-  border-color: color-mix(in oklab, #ff3b30 70%, var(--border) 30%);
-  color: white;
+  background: hsl(var(--destructive));
+  color: hsl(var(--destructive-foreground));
+  border-color: hsl(var(--destructive));
 }
 
 .iconbtn {
   width: 34px;
   height: 34px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  background: var(--background);
-  color: var(--foreground);
+  border-radius: var(--radius);
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
   cursor: pointer;
+  box-shadow: var(--shadow-2xs);
+}
+
+.iconbtn:hover {
+  filter: brightness(0.98);
 }
 
 .pillbtn {
   padding: 6px 10px;
   border-radius: 999px;
-  border: 1px solid var(--border);
-  background: var(--background);
-  color: var(--muted-foreground);
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--background));
+  color: hsl(var(--muted-foreground));
   font-weight: 800;
   cursor: pointer;
 }
 
 .pillbtn.on {
-  background: color-mix(in oklab, var(--primary) 22%, var(--card) 78%);
-  color: var(--foreground);
+  background: hsl(var(--accent));
+  color: hsl(var(--foreground));
+  border-color: hsl(var(--border));
 }
 
 .inline-error,
 .error-alert {
   margin: 10px;
   padding: 10px;
-  border-radius: 10px;
-  border: 1px solid color-mix(in oklab, #ff3b30 45%, var(--border) 55%);
-  background: color-mix(in oklab, #ff3b30 12%, var(--card) 88%);
-  color: var(--foreground);
+  border-radius: var(--radius);
+  border: 1px solid hsl(var(--destructive) / 0.45);
+  background: hsl(var(--destructive) / 0.12);
+  color: hsl(var(--foreground));
   font-size: 13px;
 }
 
 .loading {
   padding: 14px;
-  border: 1px solid var(--border);
-  background: var(--card);
-  border-radius: 12px;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--card));
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-2xs);
 }
 
 .loading-bar {
   height: 8px;
   border-radius: 999px;
-  background: color-mix(in oklab, var(--primary) 28%, var(--card) 72%);
+  background: hsl(var(--primary) / 0.28);
 }
 
 .loading-text {
   margin-top: 10px;
   font-size: 13px;
-  color: var(--muted-foreground);
+  color: hsl(var(--muted-foreground));
 }
 
 /* -------- Modal -------- */
@@ -227,20 +255,22 @@
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.55);
+  background: rgba(0, 0, 0, 0.55);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 50;
+  z-index: var(--z-overlay);
   padding: 16px;
 }
 
 .modal {
   width: min(900px, 100%);
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 14px;
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
   overflow: hidden;
+  box-shadow: var(--shadow-lg);
+  z-index: var(--z-modal);
 }
 
 .modal-sm {
@@ -258,21 +288,22 @@
 .modal-title {
   font-size: 18px;
   font-weight: 900;
-  color: var(--foreground);
+  color: hsl(var(--foreground));
 }
 
 .modal-subtitle {
   margin-top: 6px;
   font-size: 13px;
-  color: var(--muted-foreground);
+  color: hsl(var(--muted-foreground));
 }
 
 .modal-error {
   margin: 12px 14px 0 14px;
   padding: 10px;
-  border-radius: 10px;
-  border: 1px solid color-mix(in oklab, #ff3b30 45%, var(--border) 55%);
-  background: color-mix(in oklab, #ff3b30 12%, var(--card) 88%);
+  border-radius: var(--radius);
+  border: 1px solid hsl(var(--destructive) / 0.45);
+  background: hsl(var(--destructive) / 0.12);
+  color: hsl(var(--foreground));
 }
 
 .modal-grid {
@@ -299,36 +330,42 @@
 .field span {
   font-size: 12px;
   font-weight: 800;
-  color: var(--muted-foreground);
+  color: hsl(var(--muted-foreground));
 }
 
 .input,
 .textarea {
   width: 100%;
-  border: 1px solid var(--border);
-  background: var(--background);
-  color: var(--foreground);
-  border-radius: 10px;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--input));
+  color: hsl(var(--foreground));
+  border-radius: var(--radius);
   padding: 10px 12px;
   outline: none;
 }
 
+.input:focus,
+.textarea:focus {
+  border-color: hsl(var(--ring));
+  box-shadow: 0 0 0 3px hsl(var(--ring) / 0.2);
+}
+
 .textarea {
   min-height: 220px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
 }
 
 .hint {
   margin-top: 8px;
   font-size: 12px;
-  color: var(--muted-foreground);
+  color: hsl(var(--muted-foreground));
 }
 
 .hint-error {
   margin-top: 8px;
   font-size: 12px;
-  color: #ff3b30;
+  color: hsl(var(--destructive));
 }
 
 .modal-footer {
@@ -336,4 +373,10 @@
   justify-content: flex-end;
   gap: 10px;
   padding: 0 14px 14px 14px;
+}
+
+@media (max-width: 900px) {
+  .modal-grid {
+    grid-template-columns: 1fr;
+  }
 }
