@@ -124,8 +124,8 @@ export const NAV_DATA = [
 
           // ───────── Dev / Seed (optional) ─────────
           {
-            title: "Seed Data",
-            url: "/settings/seed",
+            title: "Storage",
+            url: "/Documents",
             icon: Icons.Alphabet,
           },
         ],
