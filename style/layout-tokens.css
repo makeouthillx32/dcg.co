@@ -17,45 +17,30 @@
  *   --lt-fg            primary text color
  *   --lt-border        border color
  *   --lt-shadow        box-shadow token
- *   --lt-status-bar    iOS/browser status bar color
+ *   --lt-status-bar    iOS/browser status bar color (ALWAYS matches --lt-bg)
  *
  * GLOBAL PALETTE (GP):
  *   Set --gp-* once to control all layouts at once.
  *   Individual layout blocks reference var(--gp-*) by default.
  *   Override any single token in a layout block to break from group.
  *
+ * CRITICAL RULE:
+ *   --gp-status-bar ALWAYS equals --gp-bg (they must match)
+ *
  * IMPORT in globals.css (before @tailwind directives):
  *   @import "@/style/layout-tokens.css";
  * ─────────────────────────────────────────────────────────
  */
 
-/* ─── GLOBAL PALETTE (GP) ─────────────────────────────── */
-/*
- * Change these to update ALL layouts simultaneously.
- * To override a single layout, edit that layout's block below.
- *
- * EXAMPLE - make everything primary-based in light mode:
- *   --gp-bg: hsl(var(--primary));
- *   --gp-fg: hsl(var(--primary-foreground));
- *
- * EXAMPLE - make everything muted in dark mode:
- *   --gp-bg: hsl(var(--muted));
- *   --gp-fg: hsl(var(--muted-foreground));
- *//*
- * ─── GLOBAL PALETTE (GP) ──────────────────────────────────
+/* ─── GLOBAL PALETTE (GP) ──────────────────────────────────
  * Set these once to control all layouts simultaneously.
  * Individual layout blocks below can override per-layout.
  *
  * USAGE IN LAYOUT BLOCKS:
  *   --lt-bg: var(--gp-bg);        ← inherits group color
  *   --lt-bg: hsl(var(--primary)); ← overrides individually
- * 
- * CRITICAL FIX FOR iOS STATUS BAR:
- *   --gp-status-bar must be a RESOLVED color value (no var() references)
- *   because it gets read by JavaScript for meta tags.
- *   
- *   ✅ CORRECT: hsl(0 84.2% 60.2%)
- *   ❌ WRONG:   hsl(var(--destructive))
+ *
+ * RULE: --gp-status-bar ALWAYS matches --gp-bg
  * ─────────────────────────────────────────────────────────
  */
 
@@ -64,7 +49,7 @@
   --gp-fg:         hsl(var(--destructive-foreground));
   --gp-border:     hsl(var(--destructive) / 0.4);
   --gp-shadow:     var(--shadow-sm);
-  --gp-status-bar: hsl(0 84.2% 60.2%); /* RESOLVED destructive color for iOS */
+  --gp-status-bar: var(--gp-bg); /* ✅ Always matches background */
 }
 
 .dark {
@@ -72,8 +57,9 @@
   --gp-fg:         hsl(var(--destructive-foreground));
   --gp-border:     hsl(var(--destructive) / 0.4);
   --gp-shadow:     var(--shadow-md);
-  --gp-status-bar: hsl(0 62.8% 30.6%); /* RESOLVED dark destructive color for iOS */
+  --gp-status-bar: var(--gp-bg); /* ✅ Always matches background */
 }
+
 /* ─── SHOP HEADER ─────────────────────────────────────── */
 [data-layout="shop"],
 :is([data-layout]) [data-layout="shop"] {
@@ -81,7 +67,7 @@
   --lt-fg:         var(--gp-fg);
   --lt-border:     var(--gp-border);
   --lt-shadow:     var(--gp-shadow);
-  --lt-status-bar: var(--gp-status-bar);
+  --lt-status-bar: var(--lt-bg); /* ✅ Always matches this layout's background */
 }
 
 .dark [data-layout="shop"],
@@ -90,8 +76,9 @@
   --lt-fg:         var(--gp-fg);
   --lt-border:     var(--gp-border);
   --lt-shadow:     var(--gp-shadow);
-  --lt-status-bar: var(--gp-status-bar);
+  --lt-status-bar: var(--lt-bg); /* ✅ Always matches this layout's background */
 }
+
 /* ─── APP HEADER ──────────────────────────────────────── */
 [data-layout="app"],
 :is([data-layout]) [data-layout="app"] {
@@ -99,7 +86,7 @@
   --lt-fg:         var(--gp-fg);
   --lt-border:     hsl(var(--primary) / 0.2);
   --lt-shadow:     var(--gp-shadow);
-  --lt-status-bar: var(--gp-status-bar);
+  --lt-status-bar: var(--lt-bg); /* ✅ Always matches this layout's background */
 }
 
 .dark [data-layout="app"],
@@ -108,7 +95,7 @@
   --lt-fg:         var(--gp-fg);
   --lt-border:     hsl(var(--primary) / 0.2);
   --lt-shadow:     var(--gp-shadow);
-  --lt-status-bar: var(--gp-status-bar);
+  --lt-status-bar: var(--lt-bg); /* ✅ Always matches this layout's background */
 }
 
 /* ─── DASHBOARD HEADER ────────────────────────────────── */
@@ -118,7 +105,7 @@
   --lt-fg:         var(--gp-fg);
   --lt-border:     var(--gp-border);
   --lt-shadow:     var(--gp-shadow);
-  --lt-status-bar: var(--gp-status-bar);
+  --lt-status-bar: var(--lt-bg); /* ✅ Always matches this layout's background */
 }
 
 .dark [data-layout="dashboard"],
@@ -127,8 +114,9 @@
   --lt-fg:         var(--gp-fg);
   --lt-border:     var(--gp-border);
   --lt-shadow:     var(--gp-shadow);
-  --lt-status-bar: var(--gp-status-bar);
+  --lt-status-bar: var(--lt-bg); /* ✅ Always matches this layout's background */
 }
+
 /* ─── SIDEBAR ─────────────────────────────────────────── */
 [data-layout="sidebar"],
 :is([data-layout]) [data-layout="sidebar"] {
@@ -136,7 +124,7 @@
   --lt-fg:         var(--gp-fg);
   --lt-border:     var(--gp-border);
   --lt-shadow:     var(--gp-shadow);
-  --lt-status-bar: var(--gp-status-bar);
+  --lt-status-bar: var(--lt-bg); /* ✅ Always matches this layout's background */
 }
 
 .dark [data-layout="sidebar"],
@@ -145,7 +133,7 @@
   --lt-fg:         var(--gp-fg);
   --lt-border:     var(--gp-border);
   --lt-shadow:     var(--gp-shadow);
-  --lt-status-bar: var(--gp-status-bar);
+  --lt-status-bar: var(--lt-bg); /* ✅ Always matches this layout's background */
 }
 
 /* ─── FOOTER ──────────────────────────────────────────── */
@@ -155,7 +143,7 @@
   --lt-fg:         var(--gp-fg);
   --lt-border:     var(--gp-border);
   --lt-shadow:     var(--gp-shadow);
-  --lt-status-bar: var(--gp-status-bar);
+  --lt-status-bar: var(--lt-bg); /* ✅ Always matches this layout's background */
 }
 
 .dark [data-layout="footer"],
@@ -164,5 +152,5 @@
   --lt-fg:         var(--gp-fg);
   --lt-border:     var(--gp-border);
   --lt-shadow:     var(--gp-shadow);
-  --lt-status-bar: var(--gp-status-bar);
+  --lt-status-bar: var(--lt-bg); /* ✅ Always matches this layout's background */
 }

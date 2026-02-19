@@ -1,16 +1,16 @@
 //components/Layouts/meta-theme-color.tsx
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useTheme } from "@/app/provider";
 
 // ─────────────────────────────────────────────────────────
 // MetaThemeColor
 // ─────────────────────────────────────────────────────────
 // Reads --lt-status-bar from the scoped [data-layout] element.
-// If the element doesn't exist in the DOM (e.g. shop header on
-// dashboard route), reads the token directly from :root by
-// temporarily setting a scoped attribute on a detached element.
+// CRITICAL FIX: Now waits for the layout element to exist in DOM
+// before attempting to read the color, ensuring CSS variables
+// are fully resolved by the browser.
 //
 // Status bar colors are configured in layout-tokens.css only.
 // ─────────────────────────────────────────────────────────
@@ -23,35 +23,76 @@ interface MetaThemeColorProps {
 
 // ─── Helpers ─────────────────────────────────────────────
 
-/** Read --lt-status-bar for a layout by finding its element,
- *  or by creating a temporary scoped element to resolve the
- *  correct CSS value without relying on document.documentElement
- *  which may have stale values from a previous layout. */
-function getStatusBarColor(layout: Layout): string {
-  // First try to find the actual rendered element
-  const el = document.querySelector<HTMLElement>(`[data-layout="${layout}"]`);
+/** Wait for layout element to exist in DOM, with timeout */
+function waitForLayoutElement(layout: Layout, maxWaitMs: number = 500): Promise<HTMLElement | null> {
+  return new Promise((resolve) => {
+    const startTime = Date.now();
+    
+    const check = () => {
+      const el = document.querySelector<HTMLElement>(`[data-layout="${layout}"]`);
+      
+      if (el) {
+        resolve(el);
+        return;
+      }
+      
+      if (Date.now() - startTime > maxWaitMs) {
+        console.warn(`⚠️ Layout element [data-layout="${layout}"] not found after ${maxWaitMs}ms`);
+        resolve(null);
+        return;
+      }
+      
+      requestAnimationFrame(check);
+    };
+    
+    check();
+  });
+}
+
+/** Read --lt-status-bar for a layout by finding its element */
+async function getStatusBarColor(layout: Layout): Promise<string> {
+  // Wait for the actual rendered element
+  const el = await waitForLayoutElement(layout);
 
   if (el) {
     const raw = getComputedStyle(el).getPropertyValue("--lt-status-bar").trim();
-    if (raw) return normalizeColor(raw);
+    if (raw) {
+      console.log(`✅ Found status bar color for ${layout}:`, raw);
+      return normalizeColor(raw);
+    }
   }
 
-  // Element not in DOM — resolve via a temporary scoped div
-  // This avoids reading stale tokens from documentElement
+  // Fallback: Element not in DOM even after waiting
+  console.warn(`⚠️ Could not read status bar color for layout: ${layout}`);
+  
+  // Last resort: try creating temporary element (may not work for nested vars)
   const temp = document.createElement("div");
   temp.setAttribute("data-layout", layout);
   temp.style.position = "absolute";
   temp.style.visibility = "hidden";
   temp.style.pointerEvents = "none";
   document.body.appendChild(temp);
+  
+  // Force a reflow to ensure styles are computed
+  temp.offsetHeight;
+  
   const raw = getComputedStyle(temp).getPropertyValue("--lt-status-bar").trim();
   document.body.removeChild(temp);
 
-  return raw ? normalizeColor(raw) : "";
+  if (raw) {
+    console.log(`⚠️ Fallback status bar color for ${layout}:`, raw);
+    return normalizeColor(raw);
+  }
+
+  return "";
 }
 
 function normalizeColor(raw: string): string {
-  if (raw.startsWith("#") || raw.startsWith("rgb") || raw.startsWith("hsl(")) {
+  if (raw.startsWith("#") || raw.startsWith("rgb")) {
+    return raw;
+  }
+  // HSL values might come back as "0 84.2% 60.2%" or "hsl(0 84.2% 60.2%)"
+  if (raw.startsWith("hsl(")) {
     return raw;
   }
   return `hsl(${raw})`;
@@ -124,14 +165,31 @@ function setupIOSChromiumSync(): (() => void) | void {
 
 export default function MetaThemeColor({ layout }: MetaThemeColorProps) {
   const { themeType } = useTheme();
+  const [isReady, setIsReady] = useState(false);
+
+  // Wait for component to mount before reading colors
+  useEffect(() => {
+    setIsReady(true);
+  }, []);
 
   useEffect(() => {
-    const id = requestAnimationFrame(() => {
-      const color = toHex(getStatusBarColor(layout));
-      writeMetaColor(color);
-    });
-    return () => cancelAnimationFrame(id);
-  }, [layout, themeType]);
+    if (!isReady) return;
+
+    let cancelled = false;
+
+    const updateColor = async () => {
+      const color = await getStatusBarColor(layout);
+      if (cancelled) return;
+      const hexColor = toHex(color);
+      writeMetaColor(hexColor);
+    };
+
+    updateColor();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [layout, themeType, isReady]);
 
   useEffect(() => {
     const cleanup = setupIOSChromiumSync();
