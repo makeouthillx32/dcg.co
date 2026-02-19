@@ -1,4 +1,3 @@
-
 /*
  * layout-tokens.css
  * ─────────────────────────────────────────────────────────
@@ -50,6 +49,13 @@
  * USAGE IN LAYOUT BLOCKS:
  *   --lt-bg: var(--gp-bg);        ← inherits group color
  *   --lt-bg: hsl(var(--primary)); ← overrides individually
+ * 
+ * CRITICAL FIX FOR iOS STATUS BAR:
+ *   --gp-status-bar must be a RESOLVED color value (no var() references)
+ *   because it gets read by JavaScript for meta tags.
+ *   
+ *   ✅ CORRECT: hsl(0 84.2% 60.2%)
+ *   ❌ WRONG:   hsl(var(--destructive))
  * ─────────────────────────────────────────────────────────
  */
 
@@ -58,7 +64,7 @@
   --gp-fg:         hsl(var(--destructive-foreground));
   --gp-border:     hsl(var(--destructive) / 0.4);
   --gp-shadow:     var(--shadow-sm);
-  --gp-status-bar: hsl(var(--destructive));
+  --gp-status-bar: hsl(0 84.2% 60.2%); /* RESOLVED destructive color for iOS */
 }
 
 .dark {
@@ -66,104 +72,8 @@
   --gp-fg:         hsl(var(--destructive-foreground));
   --gp-border:     hsl(var(--destructive) / 0.4);
   --gp-shadow:     var(--shadow-md);
-  --gp-status-bar: hsl(var(--destructive));
+  --gp-status-bar: hsl(0 62.8% 30.6%); /* RESOLVED dark destructive color for iOS */
 }
-/* ─── SHOP HEADER ─────────────────────────────────────── */
-/* [data-layout="shop"],
-:is([data-layout]) [data-layout="shop"] {
-  --lt-bg:         hsl(var(--primary-foreground));
-  --lt-fg:         hsl(var(--foreground));
-  --lt-border:     hsl(var(--border));
-  --lt-shadow:     var(--shadow-sm);
-  --lt-status-bar: hsl(var(--primary-foreground));
-}
-
-.dark [data-layout="shop"],
-.dark :is([data-layout]) [data-layout="shop"] {
-  --lt-bg:         hsl(var(--muted));
-  --lt-fg:         hsl(var(--muted-foreground));
-  --lt-border:     hsl(var(--border));
-  --lt-shadow:     var(--shadow-sm);
-  --lt-status-bar: hsl(var(--muted));
-} */
-
-/* ─── APP HEADER ──────────────────────────────────────── */
-/* [data-layout="app"],
-:is([data-layout]) [data-layout="app"] {
-  --lt-bg:         hsl(var(--primary));
-  --lt-fg:         hsl(var(--primary-foreground));
-  --lt-border:     hsl(var(--primary) / 0.2);
-  --lt-shadow:     var(--shadow-sm);
-  --lt-status-bar: hsl(var(--primary));
-}
-
-.dark [data-layout="app"],
-.dark :is([data-layout]) [data-layout="app"] {
-  --lt-bg:         hsl(var(--muted));
-  --lt-fg:         hsl(var(--muted-foreground));
-  --lt-border:     hsl(var(--muted) / 0.2);
-  --lt-shadow:     var(--shadow-sm);
-  --lt-status-bar: hsl(var(--muted));
-} */
-
-/* ─── DASHBOARD HEADER ────────────────────────────────── */
-/* [data-layout="dashboard"],
-:is([data-layout]) [data-layout="dashboard"] {
-  --lt-bg:         hsl(var(--background));
-  --lt-fg:         hsl(var(--foreground));
-  --lt-border:     hsl(var(--border));
-  --lt-shadow:     var(--shadow-sm);
-  --lt-status-bar: hsl(var(--background));
-}
-
-.dark [data-layout="dashboard"],
-.dark :is([data-layout]) [data-layout="dashboard"] {
-  --lt-bg:         hsl(var(--card));
-  --lt-fg:         hsl(var(--card-foreground));
-  --lt-border:     hsl(var(--sidebar-border));
-  --lt-shadow:     var(--shadow-sm);
-  --lt-status-bar: hsl(var(--sidebar));
-} */
-
-/* ─── SIDEBAR ─────────────────────────────────────────── */
-/* [data-layout="sidebar"],
-:is([data-layout]) [data-layout="sidebar"] {
-  --lt-bg:         hsl(var(--sidebar));
-  --lt-fg:         hsl(var(--sidebar-foreground));
-  --lt-border:     hsl(var(--sidebar-border));
-  --lt-shadow:     none;
-  --lt-status-bar: hsl(var(--sidebar));
-}
-
-.dark [data-layout="sidebar"],
-.dark :is([data-layout]) [data-layout="sidebar"] {
-  --lt-bg:         hsl(var(--sidebar));
-  --lt-fg:         hsl(var(--sidebar-foreground));
-  --lt-border:     hsl(var(--sidebar-border));
-  --lt-shadow:     none;
-  --lt-status-bar: hsl(var(--sidebar));
-} */
-
-/* ─── FOOTER ──────────────────────────────────────────── */
-/* [data-layout="footer"],
-:is([data-layout]) [data-layout="footer"] {
-  --lt-bg:         hsl(var(--background));
-  --lt-fg:         hsl(var(--foreground));
-  --lt-border:     hsl(var(--border));
-  --lt-shadow:     none;
-  --lt-status-bar: hsl(var(--background));
-}
-
-.dark [data-layout="footer"],
-.dark :is([data-layout]) [data-layout="footer"] {
-  --lt-bg:         hsl(var(--card));
-  --lt-fg:         hsl(var(--card-foreground));
-  --lt-border:     hsl(var(--border));
-  --lt-shadow:     none;
-  --lt-status-bar: hsl(var(--card));
-} */
-
-
 /* ─── SHOP HEADER ─────────────────────────────────────── */
 [data-layout="shop"],
 :is([data-layout]) [data-layout="shop"] {
@@ -187,7 +97,7 @@
 :is([data-layout]) [data-layout="app"] {
   --lt-bg:         var(--gp-bg);
   --lt-fg:         var(--gp-fg);
-  --lt-border:     var(--gp-border);
+  --lt-border:     hsl(var(--primary) / 0.2);
   --lt-shadow:     var(--gp-shadow);
   --lt-status-bar: var(--gp-status-bar);
 }
@@ -196,10 +106,11 @@
 .dark :is([data-layout]) [data-layout="app"] {
   --lt-bg:         var(--gp-bg);
   --lt-fg:         var(--gp-fg);
-  --lt-border:     var(--gp-border);
+  --lt-border:     hsl(var(--primary) / 0.2);
   --lt-shadow:     var(--gp-shadow);
   --lt-status-bar: var(--gp-status-bar);
 }
+
 /* ─── DASHBOARD HEADER ────────────────────────────────── */
 [data-layout="dashboard"],
 :is([data-layout]) [data-layout="dashboard"] {
