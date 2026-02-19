@@ -73,18 +73,15 @@ const SECTION_TYPES = [
   },
   { 
     value: "products_grid", 
-    label: "Products Grid", 
-    description: "Display products in a grid with filtering options",
+    label: "Collection Grid", 
+    description: "Display products from a collection or all products",
     config: { 
-      title: "Shop Bestsellers", 
-      description: "Our most-loved Western wear pieces",
+      title: "Featured Collection",
+      description: "Shop our curated selection",
+      collection: "", // Empty = all products, or set to a collection slug
       limit: 8, 
-      startIndex: 0, 
-      viewAllHref: "/shop",
-      collection: "", // Optional: filter by collection slug
-      category: "", // Optional: filter by category slug
-      featured: false, // Show only featured products
-      sortBy: "newest" // "newest" | "featured" | "price-asc" | "price-desc"
+      sortBy: "featured",
+      viewAllHref: "/shop"
     } 
   },
 ];

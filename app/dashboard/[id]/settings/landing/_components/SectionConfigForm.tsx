@@ -59,7 +59,17 @@ export function SectionConfigForm({ type, config, onChange }: SectionConfigFormP
   }, []);
 
   const updateField = (field: string, value: any) => {
-    onChange({ ...config, [field]: value });
+    // Handle empty strings as null for optional fields
+    const cleanValue = value === '' ? null : value;
+    
+    // Remove the field entirely if it's null/undefined
+    if (cleanValue === null || cleanValue === undefined) {
+      const newConfig = { ...config };
+      delete newConfig[field];
+      onChange(newConfig);
+    } else {
+      onChange({ ...config, [field]: cleanValue });
+    }
   };
 
   if (loading) {
@@ -256,7 +266,7 @@ export function SectionConfigForm({ type, config, onChange }: SectionConfigFormP
     
     return (
       <>
-        {/* Summary Box */}
+        {/* Summary Box - Only show if filters are active */}
         {(config.collection || config.category || config.featured) && (
           <div className="config-summary">
             <p className="config-summary-title">Section Preview:</p>
@@ -298,13 +308,13 @@ export function SectionConfigForm({ type, config, onChange }: SectionConfigFormP
         </div>
 
         <div className="form-field">
-          <label className="form-label">Filter by Collection</label>
+          <label className="form-label">Filter by Collection (Primary Filter)</label>
           <select
             value={config.collection || ''}
-            onChange={(e) => updateField('collection', e.target.value)}
+            onChange={(e) => updateField('collection', e.target.value || null)}
             className="form-select"
           >
-            <option value="">All Products - No Filter</option>
+            <option value="">None - All Products from All Collections</option>
             {collections.map(col => (
               <option key={col.id} value={col.slug}>
                 {col.name}
@@ -313,18 +323,20 @@ export function SectionConfigForm({ type, config, onChange }: SectionConfigFormP
             ))}
           </select>
           <p className="form-hint">
-            {config.collection ? `Using collection: "${config.collection}"` : 'No collection filter applied'}
+            {config.collection 
+              ? `Showing products from "${selectedCollection?.name || config.collection}" collection` 
+              : 'No collection filter - showing all products'}
           </p>
         </div>
 
         <div className="form-field">
-          <label className="form-label">Filter by Category</label>
+          <label className="form-label">Filter by Category (Optional)</label>
           <select
             value={config.category || ''}
-            onChange={(e) => updateField('category', e.target.value)}
+            onChange={(e) => updateField('category', e.target.value || null)}
             className="form-select"
           >
-            <option value="">All Categories - No Filter</option>
+            <option value="">None - All Categories</option>
             {categories.map(cat => (
               <option key={cat.id} value={cat.slug}>
                 {cat.name}
@@ -333,12 +345,14 @@ export function SectionConfigForm({ type, config, onChange }: SectionConfigFormP
             ))}
           </select>
           <p className="form-hint">
-            {config.category ? `Using category: "${config.category}"` : 'No category filter applied'}
+            {config.category 
+              ? `Additionally filtering by "${selectedCategory?.name || config.category}" category` 
+              : 'No category filter applied'}
           </p>
         </div>
 
         <div className="form-field">
-          <label className="form-label">Number of Products</label>
+          <label className="form-label">Number of Products to Show</label>
           <input
             type="number"
             min="1"
@@ -347,6 +361,7 @@ export function SectionConfigForm({ type, config, onChange }: SectionConfigFormP
             onChange={(e) => updateField('limit', parseInt(e.target.value) || 8)}
             className="form-input"
           />
+          <p className="form-hint">Maximum number of products to display in this section</p>
         </div>
 
         <div className="form-field">
@@ -368,23 +383,44 @@ export function SectionConfigForm({ type, config, onChange }: SectionConfigFormP
             <input
               type="checkbox"
               checked={config.featured === true}
-              onChange={(e) => updateField('featured', e.target.checked)}
+              onChange={(e) => updateField('featured', e.target.checked || null)}
               className="form-checkbox"
             />
             Show only featured products
           </label>
+          <p className="form-hint">If checked, only products marked as "featured" will be shown</p>
         </div>
 
         <div className="form-field">
-          <label className="form-label">"View All" Link</label>
-          <input
-            type="text"
-            value={config.viewAllHref || ''}
-            onChange={(e) => updateField('viewAllHref', e.target.value)}
-            className="form-input"
-            placeholder="/shop"
-          />
-          <p className="form-hint">Leave empty to hide the "View All" button</p>
+          <label className="form-label">"View All" Link (Optional)</label>
+          <div className="input-with-button">
+            <input
+              type="text"
+              value={config.viewAllHref || ''}
+              onChange={(e) => updateField('viewAllHref', e.target.value || null)}
+              className="form-input"
+              placeholder={
+                config.collection 
+                  ? `/collections/${config.collection}` 
+                  : '/shop'
+              }
+            />
+            {config.collection && (
+              <button
+                type="button"
+                onClick={() => updateField('viewAllHref', `/collections/${config.collection}`)}
+                className="auto-fill-btn"
+                title="Auto-fill with collection link"
+              >
+                Auto-fill
+              </button>
+            )}
+          </div>
+          <p className="form-hint">
+            {config.collection 
+              ? `Suggested: /collections/${config.collection} (links to this collection's page)` 
+              : 'Suggested: /shop (links to main shop page). Leave empty to hide button.'}
+          </p>
         </div>
       </>
     );

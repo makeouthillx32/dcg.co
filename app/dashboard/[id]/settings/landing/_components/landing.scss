@@ -763,6 +763,39 @@
   line-height: 1.5;
 }
 
+/* Input with button combo */
+.input-with-button {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.input-with-button .form-input {
+  flex: 1;
+}
+
+.auto-fill-btn {
+  padding: 8px 16px;
+  border-radius: var(--radius);
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--accent));
+  color: hsl(var(--accent-foreground));
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.auto-fill-btn:hover {
+  background: hsl(var(--accent) / 0.8);
+  border-color: hsl(var(--ring));
+}
+
+.auto-fill-btn:active {
+  transform: translateY(1px);
+}
+
 /* Button disabled state */
 .btn:disabled {
   opacity: 0.5;
