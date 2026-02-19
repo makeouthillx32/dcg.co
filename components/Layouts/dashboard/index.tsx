@@ -13,13 +13,10 @@ export function Header() {
   const { toggleSidebar, isMobile } = useSidebarContext();
 
   return (
-    <header
-      data-layout="dashboard"
-      className="sticky top-0 z-30 flex items-center justify-between border-b border-[var(--lt-border)] bg-[var(--lt-bg)] px-4 py-5 shadow-[var(--lt-shadow)] md:px-5 2xl:px-10"
-    >
+    <header data-layout="dashboard" className="sticky top-0 z-30 flex items-center justify-between border-b border-[var(--lt-border)] bg-[var(--lt-bg)] px-4 py-5 shadow-[var(--lt-shadow)] md:px-5 2xl:px-10">
       <button
         onClick={toggleSidebar}
-        className="rounded-[var(--radius)] border border-[var(--lt-border)] px-1.5 py-1 lg:hidden"
+        className="rounded-[var(--radius)] border border-[hsl(var(--border))] px-1.5 py-1 dark:border-[hsl(var(--sidebar-border))] dark:bg-[hsl(var(--background))] hover:dark:bg-[hsla(var(--background),0.1)] lg:hidden"
       >
         <MenuIcon />
         <span className="sr-only">Toggle Sidebar</span>
@@ -38,10 +35,10 @@ export function Header() {
       )}
 
       <div className="max-xl:hidden">
-        <h1 className="mb-0.5 text-heading-5 font-bold text-[var(--lt-fg)]">
+        <h1 className="mb-0.5 text-heading-5 font-bold text-[hsl(var(--foreground))] dark:text-[hsl(var(--card-foreground))]">
           Dashboard
         </h1>
-        <p className="font-medium text-[var(--lt-fg)] opacity-60">
+        <p className="font-medium text-[hsl(var(--muted-foreground))] dark:text-[hsl(var(--muted-foreground))]">
           DART Dashboard
         </p>
       </div>
@@ -51,7 +48,7 @@ export function Header() {
           <input
             type="search"
             placeholder="Search"
-            className="flex w-full items-center gap-3.5 rounded-full border border-[var(--lt-border)] bg-[var(--lt-bg)] py-3 pl-[53px] pr-5 outline-none transition-colors focus-visible:border-[var(--lt-fg)] text-[var(--lt-fg)] placeholder:text-[var(--lt-fg)] placeholder:opacity-50"
+            className="flex w-full items-center gap-3.5 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--muted))] py-3 pl-[53px] pr-5 outline-none transition-colors focus-visible:border-[hsl(var(--sidebar-primary))] dark:border-[hsl(var(--border))] dark:bg-[hsl(var(--secondary))] dark:hover:border-[hsl(var(--border))] dark:hover:bg-[hsl(var(--secondary))] dark:hover:text-[hsl(var(--muted-foreground))] dark:focus-visible:border-[hsl(var(--sidebar-primary))]"
           />
           <SearchIcon className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 max-[1015px]:size-5" />
         </div>
