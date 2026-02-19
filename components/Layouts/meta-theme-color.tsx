@@ -1,7 +1,7 @@
 //components/Layouts/meta-theme-color.tsx
 "use client";
 
-import { useEffect, useLayoutEffect } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { useTheme } from "@/app/provider";
 
 // ─────────────────────────────────────────────────────────
@@ -10,10 +10,7 @@ import { useTheme } from "@/app/provider";
 // Sets browser and iOS status bar colors by reading --lt-status-bar
 // from the scoped [data-layout] element.
 //
-// CRITICAL iOS FIX:
-// - Uses useLayoutEffect to set meta tag BEFORE paint
-// - Sets apple-mobile-web-app-status-bar-style to "black-translucent"
-// - Removes any static fallback meta tags from layout.tsx
+// CRITICAL FIX: Waits for DOM element to exist before reading color
 // ─────────────────────────────────────────────────────────
 
 type Layout = "shop" | "dashboard" | "app" | "sidebar" | "footer";
@@ -29,21 +26,26 @@ function getStatusBarColor(layout: Layout): string {
   const el = document.querySelector<HTMLElement>(`[data-layout="${layout}"]`);
 
   if (el) {
+    console.log(`✅ Found [data-layout="${layout}"]`);
     const raw = getComputedStyle(el).getPropertyValue("--lt-status-bar").trim();
+    console.log(`  --lt-status-bar from element: "${raw}"`);
     if (raw) return normalizeColor(raw);
+  } else {
+    console.warn(`⚠️ Element [data-layout="${layout}"] NOT FOUND - using :root fallback`);
   }
 
-  // Element not in DOM — resolve via a temporary scoped div
-  const temp = document.createElement("div");
-  temp.setAttribute("data-layout", layout);
-  temp.style.position = "absolute";
-  temp.style.visibility = "hidden";
-  temp.style.pointerEvents = "none";
-  document.body.appendChild(temp);
-  const raw = getComputedStyle(temp).getPropertyValue("--lt-status-bar").trim();
-  document.body.removeChild(temp);
+  // FALLBACK: Read directly from :root if element doesn't exist yet
+  // This handles the timing issue where layout elements render after MetaThemeColor
+  const root = document.documentElement;
+  const gpStatusBar = getComputedStyle(root).getPropertyValue("--gp-status-bar").trim();
+  console.log(`  --gp-status-bar from :root: "${gpStatusBar}"`);
+  
+  if (gpStatusBar) {
+    return normalizeColor(gpStatusBar);
+  }
 
-  return raw ? normalizeColor(raw) : "";
+  console.error(`❌ Could not resolve status bar color for layout: ${layout}`);
+  return "";
 }
 
 function normalizeColor(raw: string): string {
@@ -84,21 +86,58 @@ function setMetaTag(name: string, content: string) {
 
 export default function MetaThemeColor({ layout }: MetaThemeColorProps) {
   const { themeType } = useTheme();
+  const [mounted, setMounted] = useState(false);
 
-  // Use useLayoutEffect to run BEFORE paint, critical for iOS
-  useLayoutEffect(() => {
-    const color = getStatusBarColor(layout);
-    const hexColor = toHex(color);
-    
-    if (hexColor) {
-      // Set standard theme-color for Chrome/Android
-      setMetaTag("theme-color", hexColor);
-      
-      // CRITICAL: iOS Safari needs black-translucent to respect theme-color
-      // This allows the status bar to use the theme-color value
-      setMetaTag("apple-mobile-web-app-status-bar-style", "black-translucent");
-    }
-  }, [layout, themeType]);
+  // Mark as mounted
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Wait for next frame to ensure DOM is ready
+  useEffect(() => {
+    if (!mounted) return;
+
+    console.log(`\n🚀 MetaThemeColor: layout="${layout}", theme="${themeType}"`);
+
+    // Use multiple attempts to find the element
+    let attempts = 0;
+    const maxAttempts = 10;
+
+    const updateColor = () => {
+      attempts++;
+      console.log(`  Attempt ${attempts}/${maxAttempts}`);
+
+      const color = getStatusBarColor(layout);
+      const hexColor = toHex(color);
+
+      if (hexColor) {
+        console.log(`  ✅ Final hex color: "${hexColor}"\n`);
+        setMetaTag("theme-color", hexColor);
+        setMetaTag("apple-mobile-web-app-status-bar-style", "black-translucent");
+        return true; // Success
+      }
+
+      console.warn(`  ⚠️ No color resolved yet`);
+      return false; // Failed
+    };
+
+    // Try immediately
+    if (updateColor()) return;
+
+    // If failed, keep trying with requestAnimationFrame
+    const tryAgain = () => {
+      if (attempts >= maxAttempts) {
+        console.error(`  ❌ Failed to resolve color after ${maxAttempts} attempts\n`);
+        return;
+      }
+
+      if (!updateColor()) {
+        requestAnimationFrame(tryAgain);
+      }
+    };
+
+    requestAnimationFrame(tryAgain);
+  }, [layout, themeType, mounted]);
 
   return null;
 }
