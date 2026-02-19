@@ -6,18 +6,25 @@ import type { SectionComponentProps } from "./SectionRegistry";
 import { LandingProductCard } from "@/components/shop/_components/ProductCard";
 import Link from "next/link";
 
+interface ProductImage {
+  id?: string;
+  bucket_name: string;
+  object_path: string;
+  alt_text?: string | null;
+  position?: number | null;
+  is_primary?: boolean | null;
+}
+
 interface Product {
   id: string;
   slug: string;
   title: string;
   price_cents: number;
   compare_at_price_cents?: number | null;
+  currency?: string;
   badge?: string | null;
   is_featured?: boolean;
-  primary_image?: {
-    object_path: string;
-    bucket_name: string;
-  } | null;
+  product_images?: ProductImage[];
 }
 
 export default function ProductsGridSection({ section }: SectionComponentProps) {

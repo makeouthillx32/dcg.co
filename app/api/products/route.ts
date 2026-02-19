@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
         is_featured,
         status,
         created_at,
-        product_images!inner (
+        product_images (
           id,
           object_path,
           bucket_name,
@@ -119,15 +119,13 @@ export async function GET(req: NextRequest) {
     // Process products to organize images
     const products = (data || []).map(product => {
       const images = (product.product_images || [])
-        .sort((a, b) => a.position - b.position);
+        .sort((a, b) => (a.position || 0) - (b.position || 0));
       
       const primary_image = images.find(img => img.is_primary) || images[0] || null;
 
       return {
         ...product,
-        images,
-        primary_image,
-        product_images: undefined // Remove from response
+        primary_image
       };
     });
 
