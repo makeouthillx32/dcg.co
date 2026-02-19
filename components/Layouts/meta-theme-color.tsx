@@ -1,3 +1,4 @@
+//components/Layouts/meta-theme-color.tsx
 "use client";
 
 import { useEffect } from "react";
