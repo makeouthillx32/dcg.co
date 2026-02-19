@@ -2,7 +2,7 @@
 "use client";
 
 import "@/css/satoshi.css";
-import "@/app/globals.css"; // Import the global CSS that contains your CSS variables
+import "@/app/globals.css";
 
 import { Sidebar } from "@/components/Layouts/sidebar";
 import { Header } from "@/components/Layouts/dashboard";
@@ -20,7 +20,7 @@ export default function DashboardLayout({ children }: PropsWithChildren) {
       <NextTopLoader color="hsl(var(--sidebar-primary))" showSpinner={false} />
       <div className="flex min-h-screen">
         <Sidebar />
-        <div className="w-full bg-[hsl(var(--muted))] dark:bg-[hsl(var(--background))]">
+        <div className="w-full bg-[var(--lt-bg)]">
           <Header />
           <main className="isolate mx-auto w-full max-w-screen-2xl overflow-hidden p-4 md:p-6 2xl:p-10">
             {children}
