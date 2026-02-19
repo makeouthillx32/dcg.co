@@ -54,21 +54,20 @@
  */
 
 :root {
-  --gp-bg:         hsl(var(--card));
-  --gp-fg:         hsl(var(--foreground));
-  --gp-border:     hsl(var(--border));
+  --gp-bg:         hsl(var(--destructive));
+  --gp-fg:         hsl(var(--destructive-foreground));
+  --gp-border:     hsl(var(--destructive) / 0.4);
   --gp-shadow:     var(--shadow-sm);
-  --gp-status-bar: hsl(var(--card));
+  --gp-status-bar: hsl(var(--destructive));
 }
 
 .dark {
-  --gp-bg:         hsl(var(--card));
-  --gp-fg:         hsl(var(--foreground));
-  --gp-border:     hsl(var(--border));
+  --gp-bg:         hsl(var(--destructive));
+  --gp-fg:         hsl(var(--destructive-foreground));
+  --gp-border:     hsl(var(--destructive) / 0.4);
   --gp-shadow:     var(--shadow-md);
-  --gp-status-bar: hsl(var(--card));
+  --gp-status-bar: hsl(var(--destructive));
 }
-
 /* ─── SHOP HEADER ─────────────────────────────────────── */
 /* [data-layout="shop"],
 :is([data-layout]) [data-layout="shop"] {
