@@ -1,17 +1,19 @@
-// components/shop/_components/StaticPageShell.tsx
-import React from "react";
+"use client";
 
-export type StaticPageData = {
+import { useEffect, useState } from "react";
+
+type StaticPage = {
+  id: string;
+  slug: string;
   title: string;
-  slug?: string;
   content: string;
   content_format: "html" | "markdown";
-  meta_description?: string | null;
-  updated_at?: string | null;
-  version?: number | null;
+  meta_description: string | null;
+  updated_at: string;
+  version: number;
 };
 
-function renderContent(page: Pick<StaticPageData, "content" | "content_format">) {
+function renderContent(page: Pick<StaticPage, "content" | "content_format">) {
   if (page.content_format === "html") {
     return (
       <div
@@ -27,14 +29,14 @@ function renderContent(page: Pick<StaticPageData, "content" | "content_format">)
     );
   }
 
-  // Simple markdown fallback (same style as your current page renderer)
+  // basic markdown (same model as your pages/[slug] route)
   return (
     <div className="prose prose-slate max-w-none dark:prose-invert">
       {page.content.split("\n").map((line, i) => {
         if (line.trim().startsWith("#")) {
           const level = line.match(/^#+/)?.[0].length || 1;
           const text = line.replace(/^#+\s*/, "");
-          const Tag = `h${Math.min(6, Math.max(1, level))}` as keyof JSX.IntrinsicElements;
+          const Tag = `h${level}` as keyof JSX.IntrinsicElements;
           return (
             <Tag key={i} className="text-[hsl(var(--foreground))]">
               {text}
@@ -55,71 +57,86 @@ function renderContent(page: Pick<StaticPageData, "content" | "content_format">)
 }
 
 export function StaticPageShell({
-  page,
-  compact = false,
-  showFooter = true,
+  slug,
+  className = "",
+  showHeader = false,
+  fallback = null,
 }: {
-  page: StaticPageData;
-  compact?: boolean; // nice when embedding into Landing
-  showFooter?: boolean;
+  slug: string;
+  className?: string;
+  showHeader?: boolean;
+  fallback?: React.ReactNode;
 }) {
+  const [page, setPage] = useState<StaticPage | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function run() {
+      try {
+        setLoading(true);
+        setErr(null);
+
+        const res = await fetch(`/api/static-pages/${encodeURIComponent(slug)}`, {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+          cache: "no-store",
+        });
+
+        const json = await res.json().catch(() => null);
+
+        if (!res.ok || !json?.ok) {
+          throw new Error(json?.error?.message || `Failed to load page: ${slug}`);
+        }
+
+        if (!cancelled) setPage(json.data as StaticPage);
+      } catch (e: any) {
+        if (!cancelled) setErr(e?.message || "Failed to load page");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [slug]);
+
+  if (loading) return fallback;
+  if (err) return null; // keep landing clean; no noisy iframe-like errors
+  if (!page) return null;
+
   return (
-    <div className="bg-background text-foreground">
-      <section className={compact ? "py-10 md:py-12" : "py-16 md:py-20"}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10">
-          <div className="mx-auto w-full max-w-4xl">
-            {/* Header */}
-            <header className="mb-8 border-b border-[hsl(var(--border))] pb-6">
-              <h1 className="text-3xl font-bold tracking-tight text-[hsl(var(--foreground))] sm:text-4xl">
-                {page.title}
-              </h1>
-
-              {page.meta_description ? (
-                <p className="mt-3 text-base text-[hsl(var(--muted-foreground))]">
-                  {page.meta_description}
-                </p>
-              ) : null}
-
-              {(page.updated_at || page.version != null) && (
-                <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-[hsl(var(--muted-foreground))]">
-                  {page.updated_at ? (
-                    <time dateTime={page.updated_at}>
-                      Last updated:{" "}
-                      {new Date(page.updated_at).toLocaleDateString("en-US", {
-                        year: "numeric",
-                        month: "long",
-                        day: "numeric",
-                      })}
-                    </time>
-                  ) : null}
-
-                  {page.updated_at && page.version != null ? <span>•</span> : null}
-
-                  {page.version != null ? <span>Version {page.version}</span> : null}
-                </div>
-              )}
-            </header>
-
-            {/* Content */}
-            <article className="text-[hsl(var(--foreground))]">
-              {renderContent({ content: page.content, content_format: page.content_format })}
-            </article>
-
-            {/* Footer */}
-            {showFooter ? (
-              <footer className="mt-12 border-t border-[hsl(var(--border))] pt-6">
-                <p className="text-sm text-[hsl(var(--muted-foreground))]">
-                  If you have questions about this page, please{" "}
-                  <a href="/contact" className="text-[hsl(var(--primary))] hover:underline">
-                    contact us
-                  </a>
-                  .
-                </p>
-              </footer>
-            ) : null}
+    <div className={className}>
+      {showHeader ? (
+        <header className="mb-6 border-b border-[hsl(var(--border))] pb-4">
+          <h2 className="text-2xl font-bold tracking-tight text-[hsl(var(--foreground))]">
+            {page.title}
+          </h2>
+          {page.meta_description ? (
+            <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">
+              {page.meta_description}
+            </p>
+          ) : null}
+          <div className="mt-3 flex items-center gap-3 text-xs text-[hsl(var(--muted-foreground))]">
+            <span>
+              Updated{" "}
+              {new Date(page.updated_at).toLocaleDateString("en-US", {
+                year: "numeric",
+                month: "short",
+                day: "numeric",
+              })}
+            </span>
+            <span>•</span>
+            <span>v{page.version}</span>
           </div>
-        </div>
-      </section>
+        </header>
+      ) : null}
+
+      {renderContent(page)}
     </div>
   );
 }

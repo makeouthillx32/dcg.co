@@ -37,6 +37,11 @@ export const NAV_DATA = [
         icon: Icons.HomeIcon,
         items: [
           {
+            title: "Landing",
+            url: "/settings/landing",
+            icon: Icons.FourCircle,
+          },
+          {
             title: "Pages",
             url: "/settings/static-pages",
             icon: Icons.Table,
