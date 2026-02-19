@@ -3,44 +3,9 @@
  * ─────────────────────────────────────────────────────────
  * Single source of truth for layout-specific color tokens.
  *
- * HOW IT WORKS:
- *   Each layout wrapper gets a data-layout="x" attribute.
- *   Components inside use --lt-* tokens instead of direct
- *   CSS variables so colors are controlled from one place.
- *
- * NESTING RULE:
- *   Each layout block includes a high-specificity nested
- *   selector so inner layouts always override outer ones.
- *
- * TOKENS:
- *   --lt-bg            main surface background
- *   --lt-fg            primary text color
- *   --lt-border        border color
- *   --lt-shadow        box-shadow token
- *   --lt-status-bar    iOS/browser status bar color (ALWAYS matches --lt-bg)
- *
- * GLOBAL PALETTE (GP):
- *   Set --gp-* once to control all layouts at once.
- *   Individual layout blocks reference var(--gp-*) by default.
- *   Override any single token in a layout block to break from group.
- *
- * CRITICAL RULE:
- *   --gp-status-bar ALWAYS equals --gp-bg (they must match)
- *
- * IMPORT in globals.css (before @tailwind directives):
- *   @import "@/style/layout-tokens.css";
- * ─────────────────────────────────────────────────────────
- */
-
-/* ─── GLOBAL PALETTE (GP) ──────────────────────────────────
- * Set these once to control all layouts simultaneously.
- * Individual layout blocks below can override per-layout.
- *
- * USAGE IN LAYOUT BLOCKS:
- *   --lt-bg: var(--gp-bg);        ← inherits group color
- *   --lt-bg: hsl(var(--primary)); ← overrides individually
- *
- * RULE: --gp-status-bar ALWAYS matches --gp-bg
+ * CRITICAL RULE FOR iOS STATUS BAR:
+ *   --lt-status-bar MUST reference --lt-bg (always matches background)
+ *   JavaScript will read this to set the iOS status bar color
  * ─────────────────────────────────────────────────────────
  */
 
@@ -49,7 +14,7 @@
   --gp-fg:         hsl(var(--destructive-foreground));
   --gp-border:     hsl(var(--destructive) / 0.4);
   --gp-shadow:     var(--shadow-sm);
-  --gp-status-bar: var(--gp-bg); /* ✅ Always matches background */
+  --gp-status-bar: hsl(var(--destructive)); /* References --gp-bg value */
 }
 
 .dark {
@@ -57,7 +22,7 @@
   --gp-fg:         hsl(var(--destructive-foreground));
   --gp-border:     hsl(var(--destructive) / 0.4);
   --gp-shadow:     var(--shadow-md);
-  --gp-status-bar: var(--gp-bg); /* ✅ Always matches background */
+  --gp-status-bar: hsl(var(--destructive)); /* References --gp-bg value */
 }
 
 /* ─── SHOP HEADER ─────────────────────────────────────── */
@@ -67,7 +32,7 @@
   --lt-fg:         var(--gp-fg);
   --lt-border:     var(--gp-border);
   --lt-shadow:     var(--gp-shadow);
-  --lt-status-bar: var(--lt-bg); /* ✅ Always matches this layout's background */
+  --lt-status-bar: var(--gp-bg); /* ✅ ALWAYS matches background */
 }
 
 .dark [data-layout="shop"],
@@ -76,7 +41,7 @@
   --lt-fg:         var(--gp-fg);
   --lt-border:     var(--gp-border);
   --lt-shadow:     var(--gp-shadow);
-  --lt-status-bar: var(--lt-bg); /* ✅ Always matches this layout's background */
+  --lt-status-bar: var(--gp-bg); /* ✅ ALWAYS matches background */
 }
 
 /* ─── APP HEADER ──────────────────────────────────────── */
@@ -86,7 +51,7 @@
   --lt-fg:         var(--gp-fg);
   --lt-border:     hsl(var(--primary) / 0.2);
   --lt-shadow:     var(--gp-shadow);
-  --lt-status-bar: var(--lt-bg); /* ✅ Always matches this layout's background */
+  --lt-status-bar: var(--gp-bg); /* ✅ ALWAYS matches background */
 }
 
 .dark [data-layout="app"],
@@ -95,7 +60,7 @@
   --lt-fg:         var(--gp-fg);
   --lt-border:     hsl(var(--primary) / 0.2);
   --lt-shadow:     var(--gp-shadow);
-  --lt-status-bar: var(--lt-bg); /* ✅ Always matches this layout's background */
+  --lt-status-bar: var(--gp-bg); /* ✅ ALWAYS matches background */
 }
 
 /* ─── DASHBOARD HEADER ────────────────────────────────── */
@@ -105,7 +70,7 @@
   --lt-fg:         var(--gp-fg);
   --lt-border:     var(--gp-border);
   --lt-shadow:     var(--gp-shadow);
-  --lt-status-bar: var(--lt-bg); /* ✅ Always matches this layout's background */
+  --lt-status-bar: var(--gp-bg); /* ✅ ALWAYS matches background */
 }
 
 .dark [data-layout="dashboard"],
@@ -114,7 +79,7 @@
   --lt-fg:         var(--gp-fg);
   --lt-border:     var(--gp-border);
   --lt-shadow:     var(--gp-shadow);
-  --lt-status-bar: var(--lt-bg); /* ✅ Always matches this layout's background */
+  --lt-status-bar: var(--gp-bg); /* ✅ ALWAYS matches background */
 }
 
 /* ─── SIDEBAR ─────────────────────────────────────────── */
@@ -124,7 +89,7 @@
   --lt-fg:         var(--gp-fg);
   --lt-border:     var(--gp-border);
   --lt-shadow:     var(--gp-shadow);
-  --lt-status-bar: var(--lt-bg); /* ✅ Always matches this layout's background */
+  --lt-status-bar: var(--gp-bg); /* ✅ ALWAYS matches background */
 }
 
 .dark [data-layout="sidebar"],
@@ -133,7 +98,7 @@
   --lt-fg:         var(--gp-fg);
   --lt-border:     var(--gp-border);
   --lt-shadow:     var(--gp-shadow);
-  --lt-status-bar: var(--lt-bg); /* ✅ Always matches this layout's background */
+  --lt-status-bar: var(--gp-bg); /* ✅ ALWAYS matches background */
 }
 
 /* ─── FOOTER ──────────────────────────────────────────── */
@@ -143,7 +108,7 @@
   --lt-fg:         var(--gp-fg);
   --lt-border:     var(--gp-border);
   --lt-shadow:     var(--gp-shadow);
-  --lt-status-bar: var(--lt-bg); /* ✅ Always matches this layout's background */
+  --lt-status-bar: var(--gp-bg); /* ✅ ALWAYS matches background */
 }
 
 .dark [data-layout="footer"],
@@ -152,5 +117,5 @@
   --lt-fg:         var(--gp-fg);
   --lt-border:     var(--gp-border);
   --lt-shadow:     var(--gp-shadow);
-  --lt-status-bar: var(--lt-bg); /* ✅ Always matches this layout's background */
+  --lt-status-bar: var(--gp-bg); /* ✅ ALWAYS matches background */
 }
