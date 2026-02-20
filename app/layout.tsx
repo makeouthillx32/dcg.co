@@ -1,4 +1,4 @@
-// app/layout.tsx - iOS 18 Safari Status Bar Fix
+// app/layout.tsx - iOS 18 Safari Status Bar Fix - WITH CHILDLIST OBSERVER
 "use client";
 
 import { useEffect, useLayoutEffect, useState } from "react";
@@ -86,20 +86,42 @@ function useMetaThemeColor(layout: "shop" | "dashboard" | "app", themeType: "lig
   useLayoutEffect(() => {
     let cancelled = false;
     let lastColor = "";
+    let retryCount = 0;
+    const maxRetries = 10;
+    const timers: NodeJS.Timeout[] = [];
 
     const updateStatusBar = () => {
       if (cancelled) return;
 
       const el = document.querySelector<HTMLElement>(`[data-layout="${layout}"]`);
+      
       if (!el) {
-        console.log(`⚠️ [data-layout="${layout}"] not found`);
+        console.log(`⚠️ [data-layout="${layout}"] not found (attempt ${retryCount + 1}/${maxRetries})`);
+        
+        // Retry with exponential backoff if element not found
+        if (retryCount < maxRetries) {
+          retryCount++;
+          const delay = Math.min(50 * Math.pow(1.5, retryCount), 1000);
+          const timer = setTimeout(updateStatusBar, delay);
+          timers.push(timer);
+        }
         return;
       }
+
+      // Element found - reset retry counter
+      retryCount = 0;
 
       const bgColor = getComputedStyle(el).backgroundColor;
       
       if (!bgColor || bgColor === "transparent" || bgColor === "rgba(0, 0, 0, 0)") {
         console.log(`⚠️ ${layout} color not ready: "${bgColor}"`);
+        
+        // Retry if color not ready
+        if (retryCount < maxRetries) {
+          retryCount++;
+          const timer = setTimeout(updateStatusBar, 100);
+          timers.push(timer);
+        }
         return;
       }
 
@@ -119,10 +141,16 @@ function useMetaThemeColor(layout: "shop" | "dashboard" | "app", themeType: "lig
       el.style.visibility = "visible";
     };
 
+    // Initial attempt
     updateStatusBar();
 
-    const quickTimer = setTimeout(updateStatusBar, 50);
+    // Quick follow-up attempts
+    const quickTimer1 = setTimeout(updateStatusBar, 50);
+    const quickTimer2 = setTimeout(updateStatusBar, 150);
+    const quickTimer3 = setTimeout(updateStatusBar, 300);
+    timers.push(quickTimer1, quickTimer2, quickTimer3);
 
+    // Watch for DOM changes (new elements added) AND attribute changes
     const observer = new MutationObserver(() => {
       if (!cancelled) {
         setTimeout(updateStatusBar, 100);
@@ -132,11 +160,13 @@ function useMetaThemeColor(layout: "shop" | "dashboard" | "app", themeType: "lig
     observer.observe(document.documentElement, {
       attributes: true,
       attributeFilter: ["class", "style"],
+      childList: true,      // ✅ Watch for new elements being added
+      subtree: true,        // ✅ Watch entire tree, not just direct children
     });
 
     return () => {
       cancelled = true;
-      clearTimeout(quickTimer);
+      timers.forEach(timer => clearTimeout(timer));
       observer.disconnect();
     };
   }, [layout, themeType]);
