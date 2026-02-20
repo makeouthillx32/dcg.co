@@ -66,6 +66,7 @@ export default function Toolbar({
   const [showFilterMenu, setShowFilterMenu] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [showUploadTooltip, setShowUploadTooltip] = useState(false);
 
   const sortOptions = [
     { value: 'name' as SortOption, label: 'Name' },
@@ -102,6 +103,7 @@ export default function Toolbar({
   return (
     <div className={`toolbar bg-background border border-border rounded-lg shadow-sm ${className}`}>
       
+      {/* Mobile Layout */}
       <div className="block sm:hidden">
         <div className="p-3 border-b border-border">
           <div className="relative">
@@ -134,7 +136,7 @@ export default function Toolbar({
                   ? 'bg-primary/60 cursor-not-allowed'
                   : 'bg-primary hover:bg-primary/90'
               } text-primary-foreground`}
-              title="Upload files"
+              title="Upload files or drag & drop anywhere"
             >
               <UploadIcon className="h-4 w-4" />
               {isUploading ? 'Uploading...' : 'Upload'}
@@ -281,6 +283,7 @@ export default function Toolbar({
         </div>
       </div>
 
+      {/* Desktop Layout */}
       <div className="hidden sm:block">
         <div className="flex items-center justify-between p-4">
           
@@ -498,26 +501,50 @@ export default function Toolbar({
                 <span className="hidden xl:inline text-sm">New Folder</span>
               </button>
 
-              <button
-                onClick={handleUpload}
-                disabled={isUploading}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
-                  isUploading
-                    ? 'bg-primary/60 cursor-not-allowed'
-                    : 'bg-primary hover:bg-primary/90'
-                } text-primary-foreground`}
-                title="Upload files"
-              >
-                <UploadIcon className="h-4 w-4" />
-                <span className="hidden sm:inline">
-                  {isUploading ? 'Uploading...' : 'Upload'}
-                </span>
-              </button>
+              {/* Enhanced Upload Button with Tooltip */}
+              <div className="relative">
+                <button
+                  onClick={handleUpload}
+                  onMouseEnter={() => setShowUploadTooltip(true)}
+                  onMouseLeave={() => setShowUploadTooltip(false)}
+                  disabled={isUploading}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
+                    isUploading
+                      ? 'bg-primary/60 cursor-not-allowed'
+                      : 'bg-primary hover:bg-primary/90 hover:shadow-md'
+                  } text-primary-foreground`}
+                  title="Upload files"
+                >
+                  <UploadIcon className="h-4 w-4" />
+                  <span className="hidden sm:inline">
+                    {isUploading ? 'Uploading...' : 'Upload'}
+                  </span>
+                </button>
+
+                {/* Tooltip with drag & drop hint */}
+                {showUploadTooltip && !isUploading && (
+                  <div className="absolute bottom-full right-0 mb-2 w-64 pointer-events-none">
+                    <div className="bg-popover border border-border rounded-lg shadow-lg p-3">
+                      <div className="text-sm text-popover-foreground">
+                        <p className="font-medium mb-1">Quick Upload</p>
+                        <p className="text-xs text-muted-foreground">
+                          Click to browse files or drag & drop anywhere on the page
+                        </p>
+                      </div>
+                      {/* Arrow */}
+                      <div className="absolute top-full right-4 -mt-1">
+                        <div className="w-2 h-2 bg-popover border-r border-b border-border transform rotate-45"></div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
       </div>
 
+      {/* Selection Bar */}
       {selectedCount > 0 && (
         <div className="border-t border-border px-4 py-3">
           <div className="flex items-center justify-between">
@@ -552,6 +579,7 @@ export default function Toolbar({
         </div>
       )}
 
+      {/* Close menu overlay */}
       {(showSortMenu || showFilterMenu || showMoreMenu) && (
         <div
           className="fixed inset-0 z-0"

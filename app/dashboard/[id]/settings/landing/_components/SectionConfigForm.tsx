@@ -72,6 +72,24 @@ export function SectionConfigForm({ type, config, onChange }: SectionConfigFormP
     }
   };
 
+  // Special handler for categories_grid that auto-updates columns
+  const updateCategoryIds = (selectedIds: string[]) => {
+    const newConfig = { ...config };
+    
+    if (selectedIds.length === 0) {
+      // No categories selected - remove both fields
+      delete newConfig.categoryIds;
+      delete newConfig.columns;
+    } else {
+      // Set the selected categories
+      newConfig.categoryIds = selectedIds;
+      // Auto-calculate columns based on number of selected categories
+      newConfig.columns = selectedIds.length;
+    }
+    
+    onChange(newConfig);
+  };
+
   if (loading) {
     return (
       <div className="form-field">
@@ -99,8 +117,60 @@ export function SectionConfigForm({ type, config, onChange }: SectionConfigFormP
     );
   }
 
-  // CATEGORIES GRID FORM
+  // HERO CAROUSEL FORM
+  if (type === 'hero_carousel') {
+    return (
+      <div className="custom-component-notice">
+        <div className="notice-icon">ℹ️</div>
+        <div className="notice-content">
+          <h4>Custom Component by unenter</h4>
+          <p>
+            This section uses a custom-built component that doesn't require configuration. 
+            The category carousel is managed directly in the component code and automatically 
+            pulls category images from your database.
+          </p>
+          <p className="notice-hint">
+            Simply add this section to your landing page - it will work automatically.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // CATEGORIES GRID FORM - MOBILE-FRIENDLY CHECKBOX VERSION
   if (type === 'categories_grid') {
+    const selectedCategoryIds = config.categoryIds || [];
+    const selectedCategories = selectedCategoryIds
+      .map((id: string) => categories.find(c => c.id === id))
+      .filter(Boolean);
+
+    const allSelected = categories.length > 0 && selectedCategoryIds.length === categories.length;
+    const noneSelected = selectedCategoryIds.length === 0;
+
+    const handleSelectAll = () => {
+      const allCategoryIds = categories.map(c => c.id);
+      updateCategoryIds(allCategoryIds);
+    };
+
+    const handleDeselectAll = () => {
+      updateCategoryIds([]);
+    };
+
+    const toggleCategory = (categoryId: string) => {
+      const currentIds = [...selectedCategoryIds];
+      const index = currentIds.indexOf(categoryId);
+      
+      if (index > -1) {
+        // Remove it
+        currentIds.splice(index, 1);
+      } else {
+        // Add it
+        currentIds.push(categoryId);
+      }
+      
+      updateCategoryIds(currentIds);
+    };
+
     return (
       <>
         <div className="form-field">
@@ -115,53 +185,85 @@ export function SectionConfigForm({ type, config, onChange }: SectionConfigFormP
         </div>
 
         <div className="form-field">
-          <label className="form-label">Number of Columns</label>
-          <select
-            value={config.columns || 3}
-            onChange={(e) => updateField('columns', parseInt(e.target.value))}
-            className="form-select"
-          >
-            <option value="2">2 Columns</option>
-            <option value="3">3 Columns</option>
-            <option value="4">4 Columns</option>
-            <option value="6">6 Columns</option>
-          </select>
-        </div>
-
-        <div className="form-field">
-          <label className="form-checkbox-label">
-            <input
-              type="checkbox"
-              checked={config.showImages !== false}
-              onChange={(e) => updateField('showImages', e.target.checked)}
-              className="form-checkbox"
-            />
-            Show category images
-          </label>
-        </div>
-
-        <div className="form-field">
-          <label className="form-label">Specific Categories (optional)</label>
-          <p className="form-hint">Leave empty to show all categories, or select specific ones (Hold Ctrl/Cmd for multiple)</p>
-          <select
-            multiple
-            value={config.categoryIds || []}
-            onChange={(e) => {
-              const selected = Array.from(e.target.selectedOptions).map(opt => opt.value);
-              updateField('categoryIds', selected);
-            }}
-            className="form-select"
-            style={{ minHeight: '120px' }}
-          >
-            {categories.map(cat => (
-              <option key={cat.id} value={cat.id}>
-                {cat.name}
-              </option>
-            ))}
-          </select>
-          {config.categoryIds && config.categoryIds.length > 0 && (
-            <p className="form-hint">
-              Selected: {config.categoryIds.length} {config.categoryIds.length === 1 ? 'category' : 'categories'}
+          <div className="form-label-with-actions">
+            <label className="form-label">Select Categories to Display</label>
+            <div className="form-actions">
+              <button
+                type="button"
+                onClick={handleSelectAll}
+                disabled={allSelected}
+                className="btn-select-action"
+                title="Select all categories"
+              >
+                ✓ Select All
+              </button>
+              <button
+                type="button"
+                onClick={handleDeselectAll}
+                disabled={noneSelected}
+                className="btn-select-action"
+                title="Deselect all categories"
+              >
+                ✕ Clear All
+              </button>
+            </div>
+          </div>
+          
+          <p className="form-hint">
+            Tap categories to select/deselect. Columns will automatically match the number of categories selected.
+          </p>
+          
+          {/* Checkbox-based category picker */}
+          <div className="category-checkbox-grid">
+            {categories.map(cat => {
+              const isSelected = selectedCategoryIds.includes(cat.id);
+              return (
+                <label
+                  key={cat.id}
+                  className={`category-checkbox-item ${isSelected ? 'selected' : ''}`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => toggleCategory(cat.id)}
+                    className="category-checkbox-input"
+                  />
+                  <span className="category-checkbox-label">{cat.name}</span>
+                  <span className="category-checkbox-checkmark">
+                    {isSelected ? '✓' : ''}
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+          
+          {categories.length === 0 && (
+            <p className="form-hint" style={{ marginTop: '12px', color: '#ef4444' }}>
+              ⚠️ No categories available. Create categories in Dashboard → Settings → Categories.
+            </p>
+          )}
+          
+          {/* Summary of selection */}
+          {selectedCategories.length > 0 ? (
+            <div className="config-summary" style={{ marginTop: '12px' }}>
+              <p className="config-summary-title">✓ Selection Summary:</p>
+              <p className="config-summary-text">
+                Displaying <strong>{selectedCategories.length}</strong> of <strong>{categories.length}</strong> total{' '}
+                {selectedCategories.length === 1 ? 'category' : 'categories'} 
+                {' '}in a <strong>{selectedCategories.length}-column</strong> grid
+              </p>
+              <div style={{ marginTop: '8px' }}>
+                <strong>Selected categories:</strong>
+                <ul style={{ marginTop: '4px', paddingLeft: '20px', maxHeight: '120px', overflowY: 'auto' }}>
+                  {selectedCategories.map((cat: any) => (
+                    <li key={cat.id}>{cat.name}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          ) : (
+            <p className="form-hint" style={{ marginTop: '12px', color: '#f59e0b' }}>
+              ⚠️ No categories selected. Click "Select All" or tap categories to select them.
             </p>
           )}
         </div>
@@ -362,29 +464,11 @@ export function SectionConfigForm({ type, config, onChange }: SectionConfigFormP
     );
   }
 
-  // HERO CAROUSEL FORM (Category Carousel)
-  if (type === 'hero_carousel') {
-    return (
-      <div className="custom-component-notice">
-        <div className="notice-icon">ℹ️</div>
-        <div className="notice-content">
-          <h4>Custom Component by unenter</h4>
-          <p>
-            This section displays a carousel of category images. It's a custom-built component 
-            that automatically pulls category images from your database.
-          </p>
-          <p className="notice-hint">
-            No configuration needed - the component handles everything automatically.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  // Default fallback
+  // Fallback for unknown types
   return (
     <div className="form-field">
-      <p className="form-hint">No form available for this section type. Use JSON editor below.</p>
+      <p className="form-hint">No configuration form available for this section type.</p>
+      <p className="form-hint">Use the Advanced JSON Editor to configure this section.</p>
     </div>
   );
 }

@@ -7,6 +7,7 @@ import {
   useFolderFavorites,
 } from '@/hooks/useDocuments';
 import { usePublicFolders } from '@/hooks/usePublicFolders';
+import DragDropUpload from './DragDropUpload';
 import Toolbar from './Toolbar';
 import ContextMenu from './ContextMenu';
 import Preview from './Preview';
@@ -119,12 +120,22 @@ export default function Documents({ className = '' }: DocumentsProps) {
     async (files: File[]) => {
       try {
         await uploadFiles(files, currentPath);
+        toast.success(`Uploading ${files.length} file${files.length > 1 ? 's' : ''}...`);
         await fetchDocuments();
       } catch (error) {
         console.error('Upload failed:', error);
+        toast.error('Upload failed');
       }
     },
     [uploadFiles, currentPath, fetchDocuments]
+  );
+
+  // Handler for drag & drop
+  const handleFilesDropped = useCallback(
+    async (files: File[]) => {
+      await handleFileUpload(files);
+    },
+    [handleFileUpload]
   );
 
   const handleCreateFolder = useCallback(
@@ -316,17 +327,11 @@ export default function Documents({ className = '' }: DocumentsProps) {
     console.log('🎯 Sort changed:', { newSortBy, newSortOrder });
     setSortBy(newSortBy);
     setSortOrder(newSortOrder);
-    
-    // TODO: Implement actual sorting logic here
-    // For now, just log the change
   }, []);
 
   const handleToggleFavorites = useCallback(() => {
     console.log('🎯 Toggle favorites filter:', !showFavoritesOnly);
     setShowFavoritesOnly(prev => !prev);
-    
-    // TODO: Implement favorites filtering logic here
-    // For now, just toggle the state
   }, [showFavoritesOnly]);
 
   const handleClearSelection = useCallback(() => {
@@ -481,141 +486,143 @@ export default function Documents({ className = '' }: DocumentsProps) {
     }
 
     return (
-      <main className={`flex-1 flex flex-col overflow-hidden bg-background text-foreground ${className}`}>
-        <div className="sticky top-0 z-10 border-b border-border bg-card">
-          <Toolbar
-            searchQuery={searchQuery}
-            onSearchChange={handleSearch}
-            searchPlaceholder="Search documents..."
-            viewMode={viewMode}
-            onViewModeChange={setViewMode}
-            onUpload={() => setShowUploadZone(true)}
-            onCreateFolder={handleCreateFolder}
-            onRefresh={handleRefresh}
-            sortBy={sortBy}
-            sortOrder={sortOrder}
-            onSortChange={handleSortChange}
-            showFavoritesOnly={showFavoritesOnly}
-            onToggleFavorites={handleToggleFavorites}
-            selectedCount={selectedItems.length}
-            onClearSelection={handleClearSelection}
-            onSelectAll={handleSelectAll}
-            isUploading={isUploading}
-            isLoading={loading || isSearching || isNavigating}
-            className=""
-          />
-        </div>
-
-        <div className="flex-1 flex overflow-hidden">
-          <div className="flex-1 overflow-auto">
-            {(loading || isSearching || isNavigating) && (
-              <div className="absolute inset-0 bg-background/50 flex items-center justify-center z-10">
-                <div className="flex items-center gap-2 bg-card px-4 py-2 rounded-lg border border-border">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-                  <span className="text-sm text-muted-foreground">{
-                    isSearching ? 'Searching...' : isNavigating ? 'Navigating...' : 'Loading...'
-                  }</span>
-                </div>
-              </div>
-            )}
-            <FileGrid
-              documents={sortedDocuments}
-              viewMode={viewMode}
-              selectedItems={selectedItems}
+      <DragDropUpload onFilesDropped={handleFilesDropped}>
+        <main className={`flex-1 flex flex-col overflow-hidden bg-background text-foreground ${className}`}>
+          <div className="sticky top-0 z-10 border-b border-border bg-card">
+            <Toolbar
               searchQuery={searchQuery}
-              currentPath={currentPath}
-              {...fileGridHandlers}
+              onSearchChange={handleSearch}
+              searchPlaceholder="Search documents..."
+              viewMode={viewMode}
+              onViewModeChange={setViewMode}
+              onUpload={() => setShowUploadZone(true)}
+              onCreateFolder={handleCreateFolder}
+              onRefresh={handleRefresh}
+              sortBy={sortBy}
+              sortOrder={sortOrder}
+              onSortChange={handleSortChange}
+              showFavoritesOnly={showFavoritesOnly}
+              onToggleFavorites={handleToggleFavorites}
+              selectedCount={selectedItems.length}
+              onClearSelection={handleClearSelection}
+              onSelectAll={handleSelectAll}
+              isUploading={isUploading}
+              isLoading={loading || isSearching || isNavigating}
+              className=""
             />
           </div>
-        </div>
 
-        <div className="flex-shrink-0 border-t border-border p-6 bg-card">
-          <FavoritesBar
-            favorites={favoriteItems}
-            currentPath={currentPath}
-            onNavigate={handleNavigate}
-            onAddFavorite={(path, name) => addFavorite(path, name)}
-            onRemoveFavorite={(favoriteId) => {
-              const favorite = favorites.find((f) => f.id === favoriteId);
-              if (favorite) removeFavorite(favorite.folder_path);
-            }}
-          />
-        </div>
-
-        {/* Debug: Show context menu state */}
-        {process.env.NODE_ENV === 'development' && contextMenu && (
-          <div className="fixed top-4 right-4 bg-yellow-100 border border-yellow-400 p-2 rounded text-xs z-50">
-            <div>Context Menu Active</div>
-            <div>Document: {contextMenu.documentId}</div>
-            <div>Position: {contextMenu.x}, {contextMenu.y}</div>
-          </div>
-        )}
-
-        {contextMenu && (
-          <ContextMenu
-            isOpen={true}
-            position={{ x: contextMenu.x, y: contextMenu.y }}
-            documentItem={documents.find((d) => d.id === contextMenu.documentId)}
-            onClose={() => {
-              console.log('🎯 Context menu onClose called');
-              setContextMenu(null);
-            }}
-            onAction={(action, docId) => {
-              console.log('🎯 Context menu onAction called:', { action, docId });
-              handleDocumentAction(action, docId);
-            }}
-            // Public folder props
-            isPublicFolder={documents.find((d) => d.id === contextMenu.documentId)?.is_public_folder || false}
-            publicSlug={documents.find((d) => d.id === contextMenu.documentId)?.public_slug || undefined}
-            onMakePublic={handleMakePublic}
-            onMakePrivate={handleMakePrivate}
-            onCopyPublicUrl={handleCopyPublicUrl}
-            onGenerateCode={handleGenerateCode}
-            className="context-menu"
-          />
-        )}
-
-        {previewDocument && (
-          <Preview
-            isOpen={true}
-            document={previewDoc}
-            documents={documents}
-            onClose={() => setPreviewDocument(null)}
-            onDownload={(docId) => handleDocumentAction('download', docId)}
-            onDelete={(docId) => handleDocumentAction('delete', docId)}
-            onNext={(docId) => setPreviewDocument(docId)}
-            onPrevious={(docId) => setPreviewDocument(docId)}
-          />
-        )}
-
-        {showUploadZone && (
-          <div className="fixed inset-0 bg-muted/70 flex items-center justify-center z-50">
-            <div className="bg-card rounded-lg p-6 max-w-md w-full mx-4 text-foreground border border-border">
-              <h3 className="text-lg font-medium mb-4">Upload Files</h3>
-              <input
-                type="file"
-                multiple
-                onChange={(e) => {
-                  const files = Array.from(e.target.files || []);
-                  if (files.length > 0) {
-                    handleFileUpload(files);
-                    setShowUploadZone(false);
-                  }
-                }}
-                className="block w-full border border-border rounded-lg p-2 bg-background text-foreground"
+          <div className="flex-1 flex overflow-hidden">
+            <div className="flex-1 overflow-auto">
+              {(loading || isSearching || isNavigating) && (
+                <div className="absolute inset-0 bg-background/50 flex items-center justify-center z-10">
+                  <div className="flex items-center gap-2 bg-card px-4 py-2 rounded-lg border border-border">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                    <span className="text-sm text-muted-foreground">{
+                      isSearching ? 'Searching...' : isNavigating ? 'Navigating...' : 'Loading...'
+                    }</span>
+                  </div>
+                </div>
+              )}
+              <FileGrid
+                documents={sortedDocuments}
+                viewMode={viewMode}
+                selectedItems={selectedItems}
+                searchQuery={searchQuery}
+                currentPath={currentPath}
+                {...fileGridHandlers}
               />
-              <div className="flex gap-2 mt-4">
-                <button
-                  onClick={() => setShowUploadZone(false)}
-                  className="px-4 py-2 text-muted-foreground border border-border rounded-lg hover:bg-muted"
-                >
-                  Cancel
-                </button>
-              </div>
             </div>
           </div>
-        )}
-      </main>
+
+          <div className="flex-shrink-0 border-t border-border p-6 bg-card">
+            <FavoritesBar
+              favorites={favoriteItems}
+              currentPath={currentPath}
+              onNavigate={handleNavigate}
+              onAddFavorite={(path, name) => addFavorite(path, name)}
+              onRemoveFavorite={(favoriteId) => {
+                const favorite = favorites.find((f) => f.id === favoriteId);
+                if (favorite) removeFavorite(favorite.folder_path);
+              }}
+            />
+          </div>
+
+          {/* Debug: Show context menu state */}
+          {process.env.NODE_ENV === 'development' && contextMenu && (
+            <div className="fixed top-4 right-4 bg-yellow-100 border border-yellow-400 p-2 rounded text-xs z-50">
+              <div>Context Menu Active</div>
+              <div>Document: {contextMenu.documentId}</div>
+              <div>Position: {contextMenu.x}, {contextMenu.y}</div>
+            </div>
+          )}
+
+          {contextMenu && (
+            <ContextMenu
+              isOpen={true}
+              position={{ x: contextMenu.x, y: contextMenu.y }}
+              documentItem={documents.find((d) => d.id === contextMenu.documentId)}
+              onClose={() => {
+                console.log('🎯 Context menu onClose called');
+                setContextMenu(null);
+              }}
+              onAction={(action, docId) => {
+                console.log('🎯 Context menu onAction called:', { action, docId });
+                handleDocumentAction(action, docId);
+              }}
+              // Public folder props
+              isPublicFolder={documents.find((d) => d.id === contextMenu.documentId)?.is_public_folder || false}
+              publicSlug={documents.find((d) => d.id === contextMenu.documentId)?.public_slug || undefined}
+              onMakePublic={handleMakePublic}
+              onMakePrivate={handleMakePrivate}
+              onCopyPublicUrl={handleCopyPublicUrl}
+              onGenerateCode={handleGenerateCode}
+              className="context-menu"
+            />
+          )}
+
+          {previewDocument && (
+            <Preview
+              isOpen={true}
+              document={previewDoc}
+              documents={documents}
+              onClose={() => setPreviewDocument(null)}
+              onDownload={(docId) => handleDocumentAction('download', docId)}
+              onDelete={(docId) => handleDocumentAction('delete', docId)}
+              onNext={(docId) => setPreviewDocument(docId)}
+              onPrevious={(docId) => setPreviewDocument(docId)}
+            />
+          )}
+
+          {showUploadZone && (
+            <div className="fixed inset-0 bg-muted/70 flex items-center justify-center z-50">
+              <div className="bg-card rounded-lg p-6 max-w-md w-full mx-4 text-foreground border border-border">
+                <h3 className="text-lg font-medium mb-4">Upload Files</h3>
+                <input
+                  type="file"
+                  multiple
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files || []);
+                    if (files.length > 0) {
+                      handleFileUpload(files);
+                      setShowUploadZone(false);
+                    }
+                  }}
+                  className="block w-full border border-border rounded-lg p-2 bg-background text-foreground"
+                />
+                <div className="flex gap-2 mt-4">
+                  <button
+                    onClick={() => setShowUploadZone(false)}
+                    className="px-4 py-2 text-muted-foreground border border-border rounded-lg hover:bg-muted"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </main>
+      </DragDropUpload>
     );
   };
 

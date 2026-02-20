@@ -39,7 +39,7 @@ export function Header() {
           Dashboard
         </h1>
         <p className="font-medium text-[hsl(var(--muted-foreground))] dark:text-[hsl(var(--muted-foreground))]">
-          DART Dashboard
+          Byrd's Dashboard
         </p>
       </div>
 

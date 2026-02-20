@@ -57,13 +57,11 @@ export function useLandingData() {
         
         const supabase = createClient();
 
-        // Fetch top-level categories only (parent_id = null)
+        // Fetch ALL categories (no parent_id filter, no limit)
         const { data: categoriesData, error: categoriesError } = await supabase
           .from("categories")
           .select("id, name, slug, cover_image_bucket, cover_image_path, cover_image_alt")
-          .is("parent_id", null) // ✅ Only top-level categories
-          .order("position", { ascending: true })
-          .limit(6);
+          .order("position", { ascending: true });
 
         if (categoriesError) {
           throw new Error(`Categories failed: ${categoriesError.message}`);

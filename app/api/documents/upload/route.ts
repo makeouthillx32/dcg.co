@@ -1,19 +1,38 @@
-// app/api/documents/upload/route.ts - FIXED VERSION
+// app/api/documents/upload/route.ts - ENHANCED WITH IMAGE RESOLUTION
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 
+// Helper to extract image dimensions from File
+async function getImageDimensions(file: File): Promise<{ width: number; height: number } | null> {
+  if (!file.type.startsWith('image/')) return null;
+  
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve({ width: img.width, height: img.height });
+    };
+    
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve(null);
+    };
+    
+    img.src = url;
+  });
+}
+
 export async function POST(req: NextRequest) {
   try {
-    // FIXED: Add await here - this was the issue!
     const supabase = await createClient();
 
-    // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Get the form data
     const formData = await req.formData();
     const file = formData.get("file") as File;
     const folderPath = formData.get("folderPath") as string || "";
@@ -23,14 +42,16 @@ export async function POST(req: NextRequest) {
     }
 
     // Validate file size (50MB limit)
-    const maxSize = 50 * 1024 * 1024; // 50MB
+    const maxSize = 50 * 1024 * 1024;
     if (file.size > maxSize) {
       return NextResponse.json({ error: "File too large. Maximum size is 50MB." }, { status: 400 });
     }
 
+    // Extract image dimensions if it's an image
+    const dimensions = await getImageDimensions(file);
+
     // Generate unique storage path
     const timestamp = Date.now();
-    const fileExtension = file.name.split('.').pop();
     const safeFileName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
     const storagePath = folderPath 
       ? `${folderPath}${timestamp}-${safeFileName}`
@@ -49,27 +70,38 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Failed to upload file to storage" }, { status: 500 });
     }
 
-    // Create document record in database
+    // Create document record with image dimensions
     const documentPath = folderPath ? `${folderPath}${file.name}` : file.name;
     const parentPath = folderPath || null;
 
+    const documentData: any = {
+      name: file.name,
+      path: documentPath,
+      parent_path: parentPath,
+      type: "file",
+      mime_type: file.type || "application/octet-stream",
+      size_bytes: file.size,
+      storage_path: uploadData.path,
+      bucket_name: "documents",
+      uploaded_by: user.id,
+      is_favorite: false,
+      is_shared: false,
+      visibility: "private",
+      tags: []
+    };
+
+    // Add dimensions to tags for easy display
+    if (dimensions) {
+      documentData.tags = [
+        `width:${dimensions.width}`,
+        `height:${dimensions.height}`,
+        `resolution:${dimensions.width}x${dimensions.height}`
+      ];
+    }
+
     const { data: document, error: dbError } = await supabase
       .from("documents")
-      .insert([{
-        name: file.name,
-        path: documentPath,
-        parent_path: parentPath,
-        type: "file",
-        mime_type: file.type || "application/octet-stream",
-        size_bytes: file.size,
-        storage_path: uploadData.path,
-        bucket_name: "documents",
-        uploaded_by: user.id,
-        is_favorite: false,
-        is_shared: false,
-        visibility: "private",
-        tags: []
-      }])
+      .insert([documentData])
       .select("*")
       .single();
 
@@ -84,7 +116,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Failed to create document record" }, { status: 500 });
     }
 
-    // Log upload activity
+    // Log upload activity with dimensions
     await supabase
       .from("document_activity")
       .insert([{
@@ -93,16 +125,20 @@ export async function POST(req: NextRequest) {
         activity_type: "uploaded",
         details: {
           file_size: file.size,
-          mime_type: file.type
+          mime_type: file.type,
+          ...(dimensions && { 
+            width: dimensions.width,
+            height: dimensions.height 
+          })
         },
         ip_address: req.headers.get("x-forwarded-for")?.split(',')[0] || 
                    req.headers.get("x-real-ip") || null,
         user_agent: req.headers.get("user-agent") || ""
       }]);
 
-    console.log(`📤 Uploaded file: ${file.name} (${file.size} bytes) to ${folderPath || 'root'}`);
+    console.log(`📤 Uploaded file: ${file.name} (${file.size} bytes)${dimensions ? ` ${dimensions.width}x${dimensions.height}` : ''} to ${folderPath || 'root'}`);
 
-    // Transform the response to match expected format
+    // Transform the response to include dimensions for display
     const transformedDocument = {
       id: document.id,
       name: document.name,
@@ -117,7 +153,12 @@ export async function POST(req: NextRequest) {
       is_shared: document.is_shared,
       tags: document.tags || [],
       storage_path: document.storage_path,
-      bucket_name: document.bucket_name
+      bucket_name: document.bucket_name,
+      ...(dimensions && { 
+        dimensions: `${dimensions.width}x${dimensions.height}`,
+        width: dimensions.width,
+        height: dimensions.height
+      })
     };
 
     return NextResponse.json(transformedDocument);
@@ -128,19 +169,16 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// Handle multiple file uploads
+// Handle multiple file uploads with image dimensions
 export async function PUT(req: NextRequest) {
   try {
-    // FIXED: Add await here too!
     const supabase = await createClient();
 
-    // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Get the form data
     const formData = await req.formData();
     const files = formData.getAll("files") as File[];
     const folderPath = formData.get("folderPath") as string || "";
@@ -156,7 +194,7 @@ export async function PUT(req: NextRequest) {
     for (const file of files) {
       try {
         // Validate file size
-        const maxSize = 50 * 1024 * 1024; // 50MB
+        const maxSize = 50 * 1024 * 1024;
         if (file.size > maxSize) {
           errors.push({
             filename: file.name,
@@ -164,6 +202,9 @@ export async function PUT(req: NextRequest) {
           });
           continue;
         }
+
+        // Extract image dimensions
+        const dimensions = await getImageDimensions(file);
 
         // Generate unique storage path
         const timestamp = Date.now();
@@ -189,34 +230,44 @@ export async function PUT(req: NextRequest) {
           continue;
         }
 
-        // Create document record in database
+        // Create document record
         const documentPath = folderPath ? `${folderPath}${file.name}` : file.name;
         const parentPath = folderPath || null;
 
+        const documentData: any = {
+          name: file.name,
+          path: documentPath,
+          parent_path: parentPath,
+          type: "file",
+          mime_type: file.type || "application/octet-stream",
+          size_bytes: file.size,
+          storage_path: uploadData.path,
+          bucket_name: "documents",
+          uploaded_by: user.id,
+          is_favorite: false,
+          is_shared: false,
+          visibility: "private",
+          tags: []
+        };
+
+        // Add dimensions to tags
+        if (dimensions) {
+          documentData.tags = [
+            `width:${dimensions.width}`,
+            `height:${dimensions.height}`,
+            `resolution:${dimensions.width}x${dimensions.height}`
+          ];
+        }
+
         const { data: document, error: dbError } = await supabase
           .from("documents")
-          .insert([{
-            name: file.name,
-            path: documentPath,
-            parent_path: parentPath,
-            type: "file",
-            mime_type: file.type || "application/octet-stream",
-            size_bytes: file.size,
-            storage_path: uploadData.path,
-            bucket_name: "documents",
-            uploaded_by: user.id,
-            is_favorite: false,
-            is_shared: false,
-            visibility: "private",
-            tags: []
-          }])
+          .insert([documentData])
           .select("*")
           .single();
 
         if (dbError) {
           console.error("Database insert error:", dbError);
           
-          // Clean up uploaded file if database insert fails
           await supabase.storage
             .from("documents")
             .remove([uploadData.path]);
@@ -237,16 +288,19 @@ export async function PUT(req: NextRequest) {
             activity_type: "uploaded",
             details: {
               file_size: file.size,
-              mime_type: file.type
+              mime_type: file.type,
+              ...(dimensions && { 
+                width: dimensions.width,
+                height: dimensions.height 
+              })
             },
             ip_address: req.headers.get("x-forwarded-for")?.split(',')[0] || 
                        req.headers.get("x-real-ip") || null,
             user_agent: req.headers.get("user-agent") || ""
           }]);
 
-        console.log(`📤 Uploaded file: ${file.name} (${file.size} bytes) to ${folderPath || 'root'}`);
+        console.log(`📤 Uploaded file: ${file.name} (${file.size} bytes)${dimensions ? ` ${dimensions.width}x${dimensions.height}` : ''} to ${folderPath || 'root'}`);
 
-        // Transform the response to match expected format
         const transformedDocument = {
           id: document.id,
           name: document.name,
@@ -261,7 +315,12 @@ export async function PUT(req: NextRequest) {
           is_shared: document.is_shared,
           tags: document.tags || [],
           storage_path: document.storage_path,
-          bucket_name: document.bucket_name
+          bucket_name: document.bucket_name,
+          ...(dimensions && { 
+            dimensions: `${dimensions.width}x${dimensions.height}`,
+            width: dimensions.width,
+            height: dimensions.height
+          })
         };
 
         results.push(transformedDocument);
