@@ -83,21 +83,27 @@ function rgbToHex(rgb: string): string {
 }
 
 /**
- * ✅ CRITICAL: resolve var() chains by letting the browser compute them.
- * We create a tiny probe element INSIDE the layout node so it inherits
- * --lt-status-bar/--lt-bg, then read computed backgroundColor (rgb...).
+ * Resolve the status-bar color from the layout element.
+ *
+ * Strategy 1 (preferred): Read the element's own computed backgroundColor.
+ *   The header elements already apply bg-[var(--lt-bg)] and --lt-status-bar
+ *   always matches --lt-bg, so the element's own background IS the status bar color.
+ *
+ * Strategy 2 (fallback): Create a probe element inside the layout node and
+ *   set its background to var(--lt-status-bar, var(--lt-bg)), then read
+ *   the computed value. This handles edge cases where the element itself
+ *   might not have a background set.
  */
 function getResolvedStatusBarRgb(layoutEl: HTMLElement) {
-  const probe = document.createElement("div");
-  probe.style.position = "absolute";
-  probe.style.left = "-9999px";
-  probe.style.top = "0";
-  probe.style.width = "1px";
-  probe.style.height = "1px";
-  probe.style.pointerEvents = "none";
+  // Strategy 1: read the element's own computed background directly
+  const directBg = getComputedStyle(layoutEl).backgroundColor;
+  if (directBg && directBg !== "transparent" && directBg !== "rgba(0, 0, 0, 0)") {
+    return directBg;
+  }
 
-  // Prefer status-bar token, fallback to lt-bg
-  probe.style.backgroundColor = "var(--lt-status-bar, var(--lt-bg))";
+  // Strategy 2: probe element fallback
+  const probe = document.createElement("div");
+  probe.style.cssText = "position:absolute;left:-9999px;top:0;width:1px;height:1px;pointer-events:none;background-color:var(--lt-status-bar, var(--lt-bg))";
 
   layoutEl.appendChild(probe);
   const rgb = getComputedStyle(probe).backgroundColor;
@@ -115,49 +121,56 @@ function useMetaThemeColor(layout: "shop" | "dashboard" | "app", themeType: "lig
      * and push it into <meta name="theme-color">.
      */
     const applyColor = () => {
-      if (cancelled) return;
+      if (cancelled) return false;
 
       const el = document.querySelector<HTMLElement>(`[data-layout="${layout}"]`);
-      if (!el) return false;
+      if (!el) {
+        console.log(`[v0] useMetaThemeColor: [data-layout="${layout}"] not found`);
+        return false;
+      }
 
       const rgb = getResolvedStatusBarRgb(el);
+      console.log(`[v0] useMetaThemeColor layout="${layout}" resolved: "${rgb}"`);
+
       if (!rgb || rgb === "transparent" || rgb === "rgba(0, 0, 0, 0)") return false;
 
       const hexColor = rgbToHex(rgb);
       if (!hexColor) return false;
 
+      console.log(`[v0] useMetaThemeColor layout="${layout}" -> theme-color: "${hexColor}"`);
       setMetaTag("theme-color", hexColor);
       setMetaTag("apple-mobile-web-app-status-bar-style", "black-translucent");
       return true;
     };
 
-    /**
-     * The theme provider applies CSS variables to <html> via useEffect,
-     * which fires AFTER this component's useLayoutEffect / first rAF.
-     * We use a two-pronged approach:
-     *   1. Poll until the layout element exists AND resolves a real color
-     *   2. Observe <html> style/class mutations to re-apply on theme changes
-     */
+    // Poll until the layout element exists AND resolves a real color.
+    // The theme provider applies CSS variables asynchronously (after
+    // fetching themes from Supabase), so we need patience.
     let attempts = 0;
-    const maxAttempts = 60; // ~1 second at 60fps
+    const maxAttempts = 120; // ~2 seconds at 60fps
 
     const poll = () => {
       if (cancelled) return;
       attempts++;
-      if (applyColor()) return; // success, stop polling
+      if (applyColor()) return;
       if (attempts < maxAttempts) requestAnimationFrame(poll);
     };
 
     // Start polling on next frame (gives children time to mount)
     requestAnimationFrame(poll);
 
-    // Observe <html> for class changes (light/dark toggle) AND
-    // inline style changes (dynamic CSS variable application from theme provider)
+    // Also observe <html> for class/style mutations so we re-apply
+    // when the theme toggles or the provider finishes applying variables.
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
     const observer = new MutationObserver(() => {
-      if (!cancelled) {
-        // Small delay to let the browser recompute styles after variable changes
+      if (cancelled) return;
+      // Debounce: the theme provider sets many variables in a loop,
+      // so we wait 50ms after the last mutation before probing.
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
         requestAnimationFrame(() => applyColor());
-      }
+      }, 50);
     });
 
     observer.observe(document.documentElement, {
@@ -168,6 +181,7 @@ function useMetaThemeColor(layout: "shop" | "dashboard" | "app", themeType: "lig
     return () => {
       cancelled = true;
       observer.disconnect();
+      if (debounceTimer) clearTimeout(debounceTimer);
     };
   }, [layout, themeType]);
 }
