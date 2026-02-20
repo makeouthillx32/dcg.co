@@ -1,7 +1,7 @@
-// app/layout.tsx - BLAZING FAST - Zero Loops, Cookie Cache, Lazy Load
+// app/layout.tsx - iOS 18 Safari Status Bar Fix - UNIFIED HEADER PATTERN
 "use client";
 
-import { useEffect, useLayoutEffect, useState, lazy, Suspense } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { Providers } from "./provider";
 import { useTheme } from "./provider";
@@ -10,9 +10,14 @@ import { Header as AppHeader } from "@/components/Layouts/app/nav";
 import { Header as DashboardHeader } from "@/components/Layouts/dashboard";
 import { Sidebar } from "@/components/Layouts/sidebar";
 import { SidebarProvider } from "@/components/Layouts/sidebar/sidebar-context";
+import Footer from "@/components/Layouts/footer";
+import AccessibilityOverlay from "@/components/Layouts/overlays/accessibility/accessibility";
+import { CookieConsent } from "@/components/CookieConsent";
+import ConditionalOverlays from "@/components/Layouts/overlays/ConditionalOverlays";
+import { CartProvider } from "@/components/Layouts/overlays/cart/cart-context";
 import MobileDrawer from "@/components/Layouts/shop/MobileDrawer";
 import analytics from "@/lib/analytics";
-import { getCookie, setCookie } from "@/lib/cookieUtils";
+import { setCookie } from "@/lib/cookieUtils";
 import { Toaster } from "react-hot-toast";
 import RegionBootstrap from "@/components/Auth/RegionBootstrap";
 import NextTopLoader from "nextjs-toploader";
@@ -21,167 +26,193 @@ import "@/css/satoshi.css";
 import "flatpickr/dist/flatpickr.min.css";
 import "jsvectormap/dist/jsvectormap.css";
 
-// ✅ LAZY LOAD NON-CRITICAL COMPONENTS (that don't need CartProvider)
-const Footer = lazy(() => import("@/components/Layouts/footer"));
-const AccessibilityOverlay = lazy(() => import("@/components/Layouts/overlays/accessibility/accessibility"));
-const CookieConsent = lazy(() => import("@/components/CookieConsent").then(m => ({ default: m.CookieConsent })));
-
-// ✅ IMPORT ConditionalOverlays normally (needs CartProvider context)
-import ConditionalOverlays from "@/components/Layouts/overlays/ConditionalOverlays";
-import { CartProvider } from "@/components/Layouts/overlays/cart/cart-context";
-
-// ✅ COOKIE-CACHED SCREEN SIZE (no resize listener until needed)
 function useScreenSize() {
-  const [screenSize, setScreenSize] = useState<"mobile" | "tablet" | "desktop">(() => {
-    // Try cookie first (SSR-safe)
-    if (typeof window === "undefined") return "desktop";
-    
-    const cached = getCookie("screenSize");
-    if (cached === "mobile" || cached === "tablet" || cached === "desktop") {
-      return cached;
-    }
-    
-    // Calculate once on mount
-    const width = window.innerWidth;
-    const size = width < 768 ? "mobile" : width < 1024 ? "tablet" : "desktop";
-    setCookie("screenSize", size, { maxAge: 86400 }); // 24h
-    return size;
-  });
+  const [screenSize, setScreenSize] = useState<"mobile" | "tablet" | "desktop">("desktop");
 
   useEffect(() => {
-    // Only add listener if screen size matters (for cookie consent variant)
-    let timeoutId: NodeJS.Timeout;
-    
     const checkScreenSize = () => {
-      clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => {
-        const width = window.innerWidth;
-        const newSize = width < 768 ? "mobile" : width < 1024 ? "tablet" : "desktop";
-        if (newSize !== screenSize) {
-          setScreenSize(newSize);
-          setCookie("screenSize", newSize, { maxAge: 86400 });
-        }
-      }, 200); // Debounce
+      const width = window.innerWidth;
+      if (width < 768) setScreenSize("mobile");
+      else if (width < 1024) setScreenSize("tablet");
+      else setScreenSize("desktop");
     };
 
+    checkScreenSize();
     window.addEventListener("resize", checkScreenSize);
-    return () => {
-      clearTimeout(timeoutId);
-      window.removeEventListener("resize", checkScreenSize);
-    };
-  }, [screenSize]);
+    return () => window.removeEventListener("resize", checkScreenSize);
+  }, []);
 
   return screenSize;
 }
 
-// ✅ OPTIMIZED iOS STATUS BAR - ZERO RETRIES, DIRECT ACCESS
+function getCookieConsentVariant(screenSize: "mobile" | "tablet" | "desktop") {
+  switch (screenSize) {
+    case "mobile":
+      return "small";
+    case "tablet":
+      return "mini";
+    default:
+      return "default";
+  }
+}
+
+// ─── iOS 18 Safari Status Bar Fix ─────────────────────────
+
+function setMetaTag(name: string, content: string) {
+  const existing = document.querySelector<HTMLMetaElement>(`meta[name="${name}"]`);
+  if (existing) {
+    existing.remove();
+  }
+  
+  const tag = document.createElement("meta");
+  tag.setAttribute("name", name);
+  tag.setAttribute("content", content);
+  document.head.appendChild(tag);
+  
+  console.log(`📱 Set ${name}: ${content}`);
+}
+
+function rgbToHex(rgb: string): string {
+  const match = rgb.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  if (!match) return "";
+  
+  const r = Number(match[1]);
+  const g = Number(match[2]);
+  const b = Number(match[3]);
+  
+  return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
+}
+
 function useMetaThemeColor(layout: "shop" | "dashboard" | "app", themeType: "light" | "dark") {
   useLayoutEffect(() => {
     let cancelled = false;
     let lastColor = "";
+    let retryCount = 0;
+    const maxRetries = 10;
+    const timers: NodeJS.Timeout[] = [];
 
     const updateStatusBar = () => {
       if (cancelled) return;
 
       const el = document.querySelector<HTMLElement>(`[data-layout="${layout}"]`);
-      if (!el) return; // Element renders synchronously now, if not found = wrong layout
+      
+      if (!el) {
+        console.log(`⚠️ [data-layout="${layout}"] not found (attempt ${retryCount + 1}/${maxRetries})`);
+        
+        // Retry with exponential backoff if element not found
+        if (retryCount < maxRetries) {
+          retryCount++;
+          const delay = Math.min(50 * Math.pow(1.5, retryCount), 1000);
+          const timer = setTimeout(updateStatusBar, delay);
+          timers.push(timer);
+        }
+        return;
+      }
+
+      // Element found - reset retry counter
+      retryCount = 0;
 
       const bgColor = getComputedStyle(el).backgroundColor;
-      if (!bgColor || bgColor === "transparent" || bgColor === "rgba(0, 0, 0, 0)") return;
-
-      // Convert RGB to hex
-      const match = bgColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-      if (!match) return;
       
-      const hex = `#${((1 << 24) + (Number(match[1]) << 16) + (Number(match[2]) << 8) + Number(match[3])).toString(16).slice(1)}`;
-      if (hex === lastColor) return;
-
-      lastColor = hex;
-
-      // Update meta tags
-      let meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
-      if (!meta) {
-        meta = document.createElement("meta");
-        meta.name = "theme-color";
-        document.head.appendChild(meta);
+      if (!bgColor || bgColor === "transparent" || bgColor === "rgba(0, 0, 0, 0)") {
+        console.log(`⚠️ ${layout} color not ready: "${bgColor}"`);
+        
+        // Retry if color not ready
+        if (retryCount < maxRetries) {
+          retryCount++;
+          const timer = setTimeout(updateStatusBar, 100);
+          timers.push(timer);
+        }
+        return;
       }
-      meta.content = hex;
 
-      let appleMeta = document.querySelector<HTMLMetaElement>('meta[name="apple-mobile-web-app-status-bar-style"]');
-      if (!appleMeta) {
-        appleMeta = document.createElement("meta");
-        appleMeta.name = "apple-mobile-web-app-status-bar-style";
-        document.head.appendChild(appleMeta);
+      const hexColor = rgbToHex(bgColor);
+      if (!hexColor || hexColor === lastColor) {
+        return;
       }
-      appleMeta.content = "default";
 
-      // Force repaint
+      lastColor = hexColor;
+      console.log(`✅ iOS Status Bar [${layout}] ${themeType}: ${hexColor}`);
+      
+      setMetaTag("theme-color", hexColor);
+      setMetaTag("apple-mobile-web-app-status-bar-style", "default");
+      
       el.style.visibility = "hidden";
       el.offsetHeight;
       el.style.visibility = "visible";
     };
 
-    // Single execution
+    // Initial attempt
     updateStatusBar();
 
-    // Only watch theme toggle (class changes on html element)
-    const observer = new MutationObserver((mutations) => {
-      if (cancelled) return;
-      const hasClassChange = mutations.some(m => m.attributeName === "class");
-      if (hasClassChange) updateStatusBar();
+    // Quick follow-up attempts
+    const quickTimer1 = setTimeout(updateStatusBar, 50);
+    const quickTimer2 = setTimeout(updateStatusBar, 150);
+    const quickTimer3 = setTimeout(updateStatusBar, 300);
+    timers.push(quickTimer1, quickTimer2, quickTimer3);
+
+    // Watch for DOM changes (new elements added) AND attribute changes
+    const observer = new MutationObserver(() => {
+      if (!cancelled) {
+        setTimeout(updateStatusBar, 100);
+      }
     });
 
     observer.observe(document.documentElement, {
       attributes: true,
-      attributeFilter: ["class"],
+      attributeFilter: ["class", "style"],
+      childList: true,      // ✅ Watch for new elements being added
+      subtree: true,        // ✅ Watch entire tree, not just direct children
     });
 
     return () => {
       cancelled = true;
+      timers.forEach(timer => clearTimeout(timer));
       observer.disconnect();
     };
   }, [layout, themeType]);
-}
-
-// ✅ ROUTE CLASSIFICATION - COMPUTED ONCE, NO LOOPS
-function classifyRoute(pathname: string) {
-  const lower = pathname.toLowerCase();
-  
-  return {
-    isHome: pathname === "/",
-    isToolsPage: lower.startsWith("/tools"),
-    isDashboardPage: lower.startsWith("/dashboard"),
-    isProductsPage: lower.startsWith("/products"),
-    isCollectionsPage: lower.startsWith("/collections"),
-    isCheckoutRoute: lower.startsWith("/checkout") || lower.startsWith("/cart"),
-    isProfileMeRoute: lower.startsWith("/profile/me"),
-    isAuthPage: lower.startsWith("/sign-in") || lower.startsWith("/sign-up") || lower.startsWith("/forgot-password"),
-    isCategoryPage: /^\/[^\/]+$/.test(pathname) && 
-                    !lower.startsWith("/tools") && 
-                    !lower.startsWith("/dashboard") && 
-                    !lower.startsWith("/products") &&
-                    !lower.startsWith("/auth"),
-  };
 }
 
 // ─── Root Layout Content ─────────────────────────────────
 
 function RootLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const [isFirstLoad, setIsFirstLoad] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { themeType } = useTheme();
+
   const screenSize = useScreenSize();
+  const cookieVariant = getCookieConsentVariant(screenSize);
 
-  // ✅ SINGLE ROUTE CLASSIFICATION
-  const route = classifyRoute(pathname);
-  const isShopRoute = route.isHome || route.isProductsPage || route.isCollectionsPage || route.isCategoryPage;
-  const useAppHeader = route.isCheckoutRoute || route.isProfileMeRoute;
-  const metaLayout = route.isDashboardPage ? "dashboard" : useAppHeader ? "app" : "shop";
+  const lowerPath = pathname.toLowerCase();
 
-  // ✅ iOS status bar
+  const isHome = pathname === "/";
+  const isToolsPage = lowerPath.startsWith("/tools");
+  const isDashboardPage = lowerPath.startsWith("/dashboard");
+  const isProductsPage = lowerPath.startsWith("/products");
+  const isCollectionsPage = lowerPath.startsWith("/collections");
+  const isCategoryPage =
+    /^\/[^\/]+$/.test(pathname) &&
+    !isToolsPage &&
+    !isDashboardPage &&
+    !isProductsPage &&
+    !lowerPath.startsWith("/auth");
+
+  const isCheckoutRoute = lowerPath.startsWith("/checkout") || lowerPath.startsWith("/cart");
+  const isProfileMeRoute = lowerPath.startsWith("/profile/me");
+  
+  const isAuthPage = lowerPath.startsWith("/sign-in") || lowerPath.startsWith("/sign-up") || lowerPath.startsWith("/forgot-password");
+
+  const isShopRoute = isHome || isProductsPage || isCollectionsPage || isCategoryPage;
+  const useAppHeader = isCheckoutRoute || isProfileMeRoute;
+
+  // Determine layout type
+  const metaLayout = isDashboardPage ? "dashboard" : useAppHeader ? "app" : "shop";
+
+  // ✅ iOS status bar hook
   useMetaThemeColor(metaLayout, themeType);
 
-  // ✅ MOBILE MENU HANDLING
+  // Handle mobile menu
   useEffect(() => {
     if (mobileMenuOpen) {
       document.body.style.overflow = "hidden";
@@ -191,39 +222,39 @@ function RootLayoutContent({ children }: { children: React.ReactNode }) {
     }
   }, [mobileMenuOpen]);
 
+  // Close mobile menu on route change
   useEffect(() => {
     setMobileMenuOpen(false);
   }, [pathname]);
 
-  // ✅ COOKIE-BASED LAST PAGE (auth excluded)
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const isAuthRoute = pathname === "/sign-in" || pathname === "/sign-up" || lowerPath.startsWith("/auth");
+      if (!isAuthRoute) {
+        setCookie("lastPage", pathname, { path: "/" });
+      }
+    }
+  }, [pathname, lowerPath]);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (!route.isAuthPage && !route.isDashboardPage) {
-      setCookie("lastPage", pathname, { path: "/", maxAge: 86400 }); // 24h
-    }
-  }, [pathname, route.isAuthPage, route.isDashboardPage]);
 
-  // ✅ ANALYTICS (deduped, lazy)
-  useEffect(() => {
-    if (typeof window === "undefined" || route.isAuthPage) return;
+    const isAuthRoute = pathname === "/sign-in" || pathname === "/sign-up" || lowerPath.startsWith("/auth");
+    if (isAuthRoute) return;
 
-    // Skip first load
-    const isFirstLoad = !sessionStorage.getItem("analyticsInit");
     if (isFirstLoad) {
-      sessionStorage.setItem("analyticsInit", "1");
+      setIsFirstLoad(false);
       return;
     }
 
-    // Debounce duplicate tracks
-    const lastUrl = sessionStorage.getItem("lastTrackedUrl");
-    if (lastUrl === pathname) return;
-    
-    sessionStorage.setItem("lastTrackedUrl", pathname);
     analytics.onRouteChange(window.location.href);
 
-    const pageCategory = route.isHome ? "landing" : route.isToolsPage ? "tools" : route.isDashboardPage ? "dashboard" : "general";
+    let pageCategory = "general";
+    if (isHome) pageCategory = "landing";
+    else if (isToolsPage) pageCategory = "tools";
+    else if (isDashboardPage) pageCategory = "dashboard";
 
-    requestIdleCallback(() => {
+    setTimeout(() => {
       analytics.trackEvent("navigation", {
         category: "user_flow",
         action: "page_change",
@@ -235,11 +266,26 @@ function RootLayoutContent({ children }: { children: React.ReactNode }) {
           timestamp: Date.now(),
         },
       });
-    });
-  }, [pathname, route]);
+    }, 100);
+  }, [pathname, lowerPath, isHome, isToolsPage, isDashboardPage, isFirstLoad]);
 
-  // ✅ Dashboard layout
-  if (route.isDashboardPage) {
+  useEffect(() => {
+    if (typeof window !== "undefined" && process.env.NODE_ENV === "development") {
+      (window as any).debugAnalytics = () => {
+        console.log("🔍 Analytics Debug Info:");
+        console.log("Session ID:", analytics.getSessionId());
+        console.log("Stats:", analytics.getStats());
+        analytics.debug();
+      };
+    }
+  }, []);
+
+  const showNav = isShopRoute;
+  const showFooter = isShopRoute;
+  const showAccessibility = isShopRoute;
+
+  // ✅ Dashboard layout rendering
+  if (isDashboardPage) {
     return (
       <SidebarProvider>
         <NextTopLoader color="hsl(var(--sidebar-primary))" showSpinner={false} />
@@ -256,12 +302,13 @@ function RootLayoutContent({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // ✅ Auth pages - minimal
-  if (route.isAuthPage) {
+  // ✅ Auth pages get minimal wrapper
+  if (isAuthPage) {
     return (
       <>
         <RegionBootstrap />
         {children}
+        
         <Toaster
           position="top-right"
           toastOptions={{
@@ -271,25 +318,36 @@ function RootLayoutContent({ children }: { children: React.ReactNode }) {
               color: "hsl(var(--foreground))",
               border: "1px solid hsl(var(--border))",
             },
+            success: {
+              iconTheme: {
+                primary: "hsl(var(--primary))",
+                secondary: "hsl(var(--primary-foreground))",
+              },
+            },
+            error: {
+              iconTheme: {
+                primary: "hsl(var(--destructive))",
+                secondary: "hsl(var(--destructive-foreground))",
+              },
+            },
           }}
         />
       </>
     );
   }
 
-  // ✅ Shop/App layout with lazy-loaded components
-  const cookieVariant = screenSize === "mobile" ? "small" : screenSize === "tablet" ? "mini" : "default";
-
+  // ✅ Shop/App layout rendering - NOW MATCHES DASHBOARD PATTERN
   return (
     <CartProvider>
       <RegionBootstrap />
 
       {useAppHeader ? (
         <AppHeader />
-      ) : isShopRoute ? (
+      ) : showNav ? (
         <>
           <ShopHeader onMenuClick={() => setMobileMenuOpen(true)} />
           
+          {/* Mobile drawer - managed in layout like Sidebar */}
           {mobileMenuOpen && (
             <>
               <div
@@ -310,25 +368,22 @@ function RootLayoutContent({ children }: { children: React.ReactNode }) {
 
       {children}
 
-      {/* ✅ LAZY LOAD NON-CRITICAL UI */}
-      <Suspense fallback={null}>
-        {!useAppHeader && isShopRoute && <Footer />}
-        {!useAppHeader && isShopRoute && <AccessibilityOverlay />}
-        <CookieConsent
-          variant={cookieVariant}
-          showCustomize={screenSize !== "mobile"}
-          description={
-            screenSize === "mobile"
-              ? "We use cookies to enhance your experience. Essential cookies are required for functionality."
-              : screenSize === "tablet"
-                ? "We use cookies to enhance your experience and analyze usage. Essential cookies required."
-                : "We use cookies to enhance your experience, analyze site usage, and improve our services. Essential cookies are required for basic functionality."
-          }
-        />
-      </Suspense>
+      {!useAppHeader && showFooter && <Footer />}
+      {!useAppHeader && showAccessibility && <AccessibilityOverlay />}
 
-      {/* ✅ NON-LAZY: ConditionalOverlays needs CartProvider immediately */}
       <ConditionalOverlays />
+
+      <CookieConsent
+        variant={cookieVariant}
+        showCustomize={screenSize !== "mobile"}
+        description={
+          screenSize === "mobile"
+            ? "We use cookies to enhance your experience. Essential cookies are required for functionality."
+            : screenSize === "tablet"
+              ? "We use cookies to enhance your experience and analyze usage. Essential cookies required."
+              : "We use cookies to enhance your experience, analyze site usage, and improve our services. Essential cookies are required for basic functionality."
+        }
+      />
 
       <Toaster
         position="top-right"
@@ -393,7 +448,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }}
         />
       </head>
-      <body className="min-h-screen font-[var(--font-sans)]" suppressHydrationWarning>
+      <body className="min-h-screen font-[var(--font-sans)]">
         <Providers>
           <RootLayoutContent>{children}</RootLayoutContent>
         </Providers>
