@@ -1,4 +1,4 @@
-// app/layout.tsx
+// app/layout.tsx - iOS 18 Safari Status Bar Fix
 "use client";
 
 import { useEffect, useLayoutEffect, useState } from "react";
@@ -55,17 +55,28 @@ function getCookieConsentVariant(screenSize: "mobile" | "tablet" | "desktop") {
   }
 }
 
-// ─── iOS Status Bar Meta Tag Management ─────────────────────────
-// Simplified to match dashboard's working pattern exactly
+// ─── iOS 18 Safari Status Bar Fix ─────────────────────────
+// Research findings:
+// 1. iOS Safari caches theme-color on first paint
+// 2. JavaScript updates often ignored after initial detection
+// 3. Safari auto-samples <body> background if theme-color not set early
+// 4. iOS 18 "Liquid Glass" adds transparency/blur to status bar
+// 5. Need aggressive cache-busting and multiple update strategies
 
 function setMetaTag(name: string, content: string) {
-  let tag = document.querySelector<HTMLMetaElement>(`meta[name="${name}"]`);
-  if (!tag) {
-    tag = document.createElement("meta");
-    tag.setAttribute("name", name);
-    document.head.appendChild(tag);
+  // Remove existing tag first (cache bust)
+  const existing = document.querySelector<HTMLMetaElement>(`meta[name="${name}"]`);
+  if (existing) {
+    existing.remove();
   }
+  
+  // Create fresh tag
+  const tag = document.createElement("meta");
+  tag.setAttribute("name", name);
   tag.setAttribute("content", content);
+  document.head.appendChild(tag);
+  
+  console.log(`📱 Set ${name}: ${content}`);
 }
 
 function rgbToHex(rgb: string): string {
@@ -82,18 +93,19 @@ function rgbToHex(rgb: string): string {
 function useMetaThemeColor(layout: "shop" | "dashboard" | "app", themeType: "light" | "dark") {
   useLayoutEffect(() => {
     let cancelled = false;
+    let lastColor = "";
 
     const updateStatusBar = () => {
       if (cancelled) return;
 
-      // Find the header element (same as dashboard)
+      // Find header element
       const el = document.querySelector<HTMLElement>(`[data-layout="${layout}"]`);
       if (!el) {
         console.log(`⚠️ [data-layout="${layout}"] not found`);
         return;
       }
 
-      // Read computed backgroundColor directly (same as dashboard header)
+      // Read computed backgroundColor
       const bgColor = getComputedStyle(el).backgroundColor;
       
       if (!bgColor || bgColor === "transparent" || bgColor === "rgba(0, 0, 0, 0)") {
@@ -102,22 +114,35 @@ function useMetaThemeColor(layout: "shop" | "dashboard" | "app", themeType: "lig
       }
 
       const hexColor = rgbToHex(bgColor);
-      if (!hexColor) {
-        console.log(`❌ Failed to convert ${layout}: "${bgColor}"`);
-        return;
+      if (!hexColor || hexColor === lastColor) {
+        return; // Skip if same color
       }
 
-      console.log(`✅ iOS Status Bar [${layout}]: ${hexColor}`);
+      lastColor = hexColor;
+      console.log(`✅ iOS Status Bar [${layout}] ${themeType}: ${hexColor}`);
+      
+      // iOS 18 Fix: Remove and recreate tags to bust cache
       setMetaTag("theme-color", hexColor);
       setMetaTag("apple-mobile-web-app-status-bar-style", "default");
+      
+      // iOS 18 Fix: Force repaint by toggling visibility
+      el.style.visibility = "hidden";
+      el.offsetHeight; // Force reflow
+      el.style.visibility = "visible";
     };
 
-    // Initial attempt after brief delay
-    const timer = setTimeout(updateStatusBar, 100);
+    // Strategy 1: Immediate update (before first paint if possible)
+    updateStatusBar();
 
-    // Watch for theme changes on <html>
+    // Strategy 2: After a brief delay (catch late DOM updates)
+    const quickTimer = setTimeout(updateStatusBar, 50);
+
+    // Strategy 3: Watch for theme changes
     const observer = new MutationObserver(() => {
-      if (!cancelled) updateStatusBar();
+      if (!cancelled) {
+        // Debounce updates
+        setTimeout(updateStatusBar, 100);
+      }
     });
 
     observer.observe(document.documentElement, {
@@ -127,10 +152,10 @@ function useMetaThemeColor(layout: "shop" | "dashboard" | "app", themeType: "lig
 
     return () => {
       cancelled = true;
-      clearTimeout(timer);
+      clearTimeout(quickTimer);
       observer.disconnect();
     };
-  }, [layout, themeType]);
+  }, [layout, themeType]); // Re-run when theme changes
 }
 
 // ─── Root Layout Content ─────────────────────────────────
@@ -166,7 +191,7 @@ function RootLayoutContent({ children }: { children: React.ReactNode }) {
   // Determine layout type
   const metaLayout = isDashboardPage ? "dashboard" : useAppHeader ? "app" : "shop";
 
-  // ✅ iOS status bar hook (same as dashboard)
+  // ✅ iOS status bar hook
   useMetaThemeColor(metaLayout, themeType);
 
   useEffect(() => {
@@ -305,7 +330,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" suppressHydrationWarning>
       <head>
         <meta name="apple-mobile-web-app-capable" content="yes" />
+        {/* iOS 18 Fix: Use "default" so theme-color is respected */}
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        
+        {/* iOS 18 Fix: Provide neutral initial value (will be updated by JS) */}
         <meta name="theme-color" content="#000000" />
 
         <meta name="viewport" content="width=device-width, initial-scale=1" />
