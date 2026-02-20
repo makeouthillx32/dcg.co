@@ -4,6 +4,7 @@
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { Providers } from "./provider";
+import { useTheme } from "./provider";
 import ShopHeader from "@/components/Layouts/shop/Header";
 import AppHeader from "@/components/Layouts/app/nav";
 import Footer from "@/components/Layouts/footer";
@@ -15,7 +16,6 @@ import analytics from "@/lib/analytics";
 import { setCookie } from "@/lib/cookieUtils";
 import { Toaster } from "react-hot-toast";
 import RegionBootstrap from "@/components/Auth/RegionBootstrap";
-import MetaThemeColor from "@/components/Layouts/meta-theme-color";
 import "./globals.css";
 
 function useScreenSize() {
@@ -45,13 +45,116 @@ function getCookieConsentVariant(screenSize: "mobile" | "tablet" | "desktop") {
   }
 }
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+// ─── iOS Status Bar Meta Tag Management ─────────────────────────
+
+function setMetaTag(name: string, content: string) {
+  let tag = document.querySelector<HTMLMetaElement>(`meta[name="${name}"]`);
+  if (!tag) {
+    tag = document.createElement("meta");
+    tag.setAttribute("name", name);
+    document.head.appendChild(tag);
+  }
+  tag.setAttribute("content", content);
+  console.log(`📝 Set meta[name="${name}"] content="${content}"`);
+}
+
+function toHex(color: string): string {
+  if (!color) return "";
+  if (color.startsWith("#")) return color;
+  
+  const div = document.createElement("div");
+  div.style.color = color;
+  document.body.appendChild(div);
+  const computed = getComputedStyle(div).color;
+  document.body.removeChild(div);
+  
+  const match = computed.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+  if (!match) return color;
+  
+  const [, r, g, b] = match.map(Number);
+  return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
+}
+
+function useMetaThemeColor(layout: "shop" | "dashboard" | "app", themeType: "light" | "dark") {
+  useEffect(() => {
+    console.log(`\n🚀 MetaThemeColor: layout="${layout}", theme="${themeType}"`);
+    
+    let cancelled = false;
+    let attempts = 0;
+    const maxAttempts = 20;
+
+    const trySetColor = () => {
+      if (cancelled) return;
+      
+      attempts++;
+      console.log(`  📍 Attempt ${attempts}/${maxAttempts}`);
+
+      // Try to find the element
+      const el = document.querySelector<HTMLElement>(`[data-layout="${layout}"]`);
+      
+      if (!el) {
+        console.warn(`  ⚠️ Element [data-layout="${layout}"] not found yet`);
+        
+        if (attempts < maxAttempts) {
+          requestAnimationFrame(trySetColor);
+        } else {
+          console.error(`  ❌ Failed after ${maxAttempts} attempts`);
+        }
+        return;
+      }
+
+      // Element exists - read the CSS variable
+      const bgColor = getComputedStyle(el).getPropertyValue("--lt-bg").trim();
+      
+      console.log(`  ✅ Found element`);
+      console.log(`  📊 --lt-bg: "${bgColor}"`);
+
+      // Check if CSS variable is resolved
+      if (!bgColor || bgColor.includes("var(")) {
+        console.warn(`  ⚠️ CSS not ready yet (unresolved var)`);
+        
+        if (attempts < maxAttempts) {
+          requestAnimationFrame(trySetColor);
+        }
+        return;
+      }
+
+      // Normalize color format
+      let color = bgColor;
+      if (!color.startsWith("#") && !color.startsWith("rgb") && !color.startsWith("hsl(")) {
+        color = `hsl(${color})`;
+      }
+
+      // Convert to hex
+      const hexColor = toHex(color);
+      
+      if (!hexColor) {
+        console.error(`  ❌ Failed to convert to hex: "${color}"`);
+        return;
+      }
+
+      console.log(`  ✅ Final color: "${hexColor}"\n`);
+      
+      // Set the meta tags
+      setMetaTag("theme-color", hexColor);
+      setMetaTag("apple-mobile-web-app-status-bar-style", "black-translucent");
+    };
+
+    // Start trying on next frame
+    requestAnimationFrame(trySetColor);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [layout, themeType]);
+}
+
+// ─── Root Layout Component ───────────────────────────────
+
+function RootLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [isFirstLoad, setIsFirstLoad] = useState(true);
+  const { themeType } = useTheme();
 
   const screenSize = useScreenSize();
   const cookieVariant = getCookieConsentVariant(screenSize);
@@ -78,6 +181,9 @@ export default function RootLayout({
 
   // Determine layout type
   const metaLayout = isDashboardPage ? "dashboard" : useAppHeader ? "app" : "shop";
+
+  // ✅ Call the iOS status bar hook
+  useMetaThemeColor(metaLayout, themeType);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -137,6 +243,66 @@ export default function RootLayout({
   const showAccessibility = isShopRoute;
 
   return (
+    <CartProvider>
+      <RegionBootstrap />
+
+      {/* Headers render */}
+      {useAppHeader ? <AppHeader /> : showNav && <ShopHeader />}
+
+      {children}
+      
+      {!useAppHeader && showFooter && <Footer />}
+      {!useAppHeader && showAccessibility && <AccessibilityOverlay />}
+
+      <ConditionalOverlays />
+
+      <CookieConsent
+        variant={cookieVariant}
+        showCustomize={screenSize !== "mobile"}
+        description={
+          screenSize === "mobile"
+            ? "We use cookies to enhance your experience. Essential cookies are required for functionality."
+            : screenSize === "tablet"
+              ? "We use cookies to enhance your experience and analyze usage. Essential cookies required."
+              : "We use cookies to enhance your experience, analyze site usage, and improve our services. Essential cookies are required for basic functionality."
+        }
+      />
+
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          duration: 3000,
+          style: {
+            background: "hsl(var(--background))",
+            color: "hsl(var(--foreground))",
+            border: "1px solid hsl(var(--border))",
+          },
+          success: {
+            iconTheme: {
+              primary: "hsl(var(--primary))",
+              secondary: "hsl(var(--primary-foreground))",
+            },
+          },
+          error: {
+            iconTheme: {
+              primary: "hsl(var(--destructive))",
+              secondary: "hsl(var(--destructive-foreground))",
+            },
+          },
+        }}
+      />
+    </CartProvider>
+  );
+}
+
+// ─── Root Layout Wrapper ─────────────────────────────────
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
     <html lang="en" suppressHydrationWarning>
       <head>
         <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -172,56 +338,7 @@ export default function RootLayout({
       </head>
       <body className="min-h-screen font-[var(--font-sans)]">
         <Providers>
-          <CartProvider>
-            <RegionBootstrap />
-
-            {/* Headers and MetaThemeColor - let MetaThemeColor handle its own timing */}
-            {useAppHeader ? <AppHeader /> : showNav && <ShopHeader />}
-            <MetaThemeColor layout={metaLayout} />
-
-            {children}
-            
-            {!useAppHeader && showFooter && <Footer />}
-            {!useAppHeader && showAccessibility && <AccessibilityOverlay />}
-
-            <ConditionalOverlays />
-
-            <CookieConsent
-              variant={cookieVariant}
-              showCustomize={screenSize !== "mobile"}
-              description={
-                screenSize === "mobile"
-                  ? "We use cookies to enhance your experience. Essential cookies are required for functionality."
-                  : screenSize === "tablet"
-                    ? "We use cookies to enhance your experience and analyze usage. Essential cookies required."
-                    : "We use cookies to enhance your experience, analyze site usage, and improve our services. Essential cookies are required for basic functionality."
-              }
-            />
-
-            <Toaster
-              position="top-right"
-              toastOptions={{
-                duration: 3000,
-                style: {
-                  background: "hsl(var(--background))",
-                  color: "hsl(var(--foreground))",
-                  border: "1px solid hsl(var(--border))",
-                },
-                success: {
-                  iconTheme: {
-                    primary: "hsl(var(--primary))",
-                    secondary: "hsl(var(--primary-foreground))",
-                  },
-                },
-                error: {
-                  iconTheme: {
-                    primary: "hsl(var(--destructive))",
-                    secondary: "hsl(var(--destructive-foreground))",
-                  },
-                },
-              }}
-            />
-          </CartProvider>
+          <RootLayoutContent>{children}</RootLayoutContent>
         </Providers>
       </body>
     </html>
