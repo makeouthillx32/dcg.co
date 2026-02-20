@@ -1,7 +1,7 @@
 // app/layout.tsx
 "use client";
 
-import { useEffect, useLayoutEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { Providers } from "./provider";
 import { useTheme } from "./provider";
@@ -69,8 +69,6 @@ function setMetaTag(name: string, content: string) {
   // (Safe no-op for other browsers)
   tag.setAttribute("content", "");
   tag.setAttribute("content", content);
-
-  console.log(`📝 Set meta[name="${name}"] content="${content}"`);
 }
 
 function rgbToHex(rgb: string): string {
@@ -109,51 +107,67 @@ function getResolvedStatusBarRgb(layoutEl: HTMLElement) {
 }
 
 function useMetaThemeColor(layout: "shop" | "dashboard" | "app", themeType: "light" | "dark") {
-  useLayoutEffect(() => {
-    console.log(`\n🚀 MetaThemeColor: layout="${layout}", theme="${themeType}"`);
-
+  useEffect(() => {
     let cancelled = false;
-    let attempts = 0;
-    const maxAttempts = 30;
 
-    const trySetColor = () => {
+    /**
+     * Probe the resolved --lt-status-bar color from the layout element
+     * and push it into <meta name="theme-color">.
+     */
+    const applyColor = () => {
       if (cancelled) return;
 
-      attempts++;
-      console.log(`  📍 Attempt ${attempts}/${maxAttempts}`);
-
       const el = document.querySelector<HTMLElement>(`[data-layout="${layout}"]`);
-      if (!el) {
-        console.warn(`  ⚠️ Element [data-layout="${layout}"] not found yet`);
-        if (attempts < maxAttempts) requestAnimationFrame(trySetColor);
-        return;
-      }
+      if (!el) return false;
 
       const rgb = getResolvedStatusBarRgb(el);
-      console.log(`  📊 Resolved status-bar rgb: "${rgb}"`);
-
-      if (!rgb || rgb === "transparent" || rgb === "rgba(0, 0, 0, 0)") {
-        console.warn(`  ⚠️ Color not ready yet or transparent`);
-        if (attempts < maxAttempts) requestAnimationFrame(trySetColor);
-        return;
-      }
+      if (!rgb || rgb === "transparent" || rgb === "rgba(0, 0, 0, 0)") return false;
 
       const hexColor = rgbToHex(rgb);
-      if (!hexColor) {
-        console.error(`  ❌ Failed to convert to hex: "${rgb}"`);
-        return;
-      }
-
-      console.log(`  ✅ Final color: "${hexColor}"\n`);
+      if (!hexColor) return false;
 
       setMetaTag("theme-color", hexColor);
       setMetaTag("apple-mobile-web-app-status-bar-style", "black-translucent");
+      return true;
     };
 
-    requestAnimationFrame(trySetColor);
+    /**
+     * The theme provider applies CSS variables to <html> via useEffect,
+     * which fires AFTER this component's useLayoutEffect / first rAF.
+     * We use a two-pronged approach:
+     *   1. Poll until the layout element exists AND resolves a real color
+     *   2. Observe <html> style/class mutations to re-apply on theme changes
+     */
+    let attempts = 0;
+    const maxAttempts = 60; // ~1 second at 60fps
+
+    const poll = () => {
+      if (cancelled) return;
+      attempts++;
+      if (applyColor()) return; // success, stop polling
+      if (attempts < maxAttempts) requestAnimationFrame(poll);
+    };
+
+    // Start polling on next frame (gives children time to mount)
+    requestAnimationFrame(poll);
+
+    // Observe <html> for class changes (light/dark toggle) AND
+    // inline style changes (dynamic CSS variable application from theme provider)
+    const observer = new MutationObserver(() => {
+      if (!cancelled) {
+        // Small delay to let the browser recompute styles after variable changes
+        requestAnimationFrame(() => applyColor());
+      }
+    });
+
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class", "style"],
+    });
 
     return () => {
       cancelled = true;
+      observer.disconnect();
     };
   }, [layout, themeType]);
 }
