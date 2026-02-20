@@ -11,7 +11,7 @@ import SignInWithGoogle from "@/components/ui/SignInWithGoogle";
 import { Mail, Lock } from "lucide-react";
 
 // ✅ ADD
-import { AuthBreadcrumbs } from "@/components/auth/AuthBreadcrumbs";
+import { AuthBreadcrumbs } from "@/components/Auth/AuthBreadcrumbs";
 
 export const metadata: Metadata = {
   title: "Sign in",

@@ -12,7 +12,7 @@ import SignInWithGoogle from "@/components/ui/SignInWithGoogle";
 import { Mail, Lock, User } from "lucide-react";
 
 // ✅ If you added the breadcrumbs component earlier:
-import { AuthBreadcrumbs } from "@/components/auth/AuthBreadcrumbs";
+import { AuthBreadcrumbs } from "@/components/Auth/AuthBreadcrumbs";
 
 export const metadata: Metadata = {
   title: "Create account",
