@@ -56,6 +56,7 @@ function getCookieConsentVariant(screenSize: "mobile" | "tablet" | "desktop") {
 }
 
 // ─── iOS Status Bar Meta Tag Management ─────────────────────────
+// Simplified to match dashboard's working pattern exactly
 
 function setMetaTag(name: string, content: string) {
   let tag = document.querySelector<HTMLMetaElement>(`meta[name="${name}"]`);
@@ -64,96 +65,70 @@ function setMetaTag(name: string, content: string) {
     tag.setAttribute("name", name);
     document.head.appendChild(tag);
   }
-
-  // iOS Safari can be stubborn; forcing a reset sometimes helps.
-  // (Safe no-op for other browsers)
-  tag.setAttribute("content", "");
   tag.setAttribute("content", content);
-
-  console.log(`📝 Set meta[name="${name}"] content="${content}"`);
 }
 
 function rgbToHex(rgb: string): string {
   const match = rgb.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
   if (!match) return "";
-
+  
   const r = Number(match[1]);
   const g = Number(match[2]);
   const b = Number(match[3]);
-
+  
   return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
-}
-
-/**
- * ✅ CRITICAL: resolve var() chains by letting the browser compute them.
- * We create a tiny probe element INSIDE the layout node so it inherits
- * --lt-status-bar/--lt-bg, then read computed backgroundColor (rgb...).
- */
-function getResolvedStatusBarRgb(layoutEl: HTMLElement) {
-  const probe = document.createElement("div");
-  probe.style.position = "absolute";
-  probe.style.left = "-9999px";
-  probe.style.top = "0";
-  probe.style.width = "1px";
-  probe.style.height = "1px";
-  probe.style.pointerEvents = "none";
-
-  // Prefer status-bar token, fallback to lt-bg
-  probe.style.backgroundColor = "var(--lt-status-bar, var(--lt-bg))";
-
-  layoutEl.appendChild(probe);
-  const rgb = getComputedStyle(probe).backgroundColor;
-  layoutEl.removeChild(probe);
-
-  return rgb;
 }
 
 function useMetaThemeColor(layout: "shop" | "dashboard" | "app", themeType: "light" | "dark") {
   useLayoutEffect(() => {
-    console.log(`\n🚀 MetaThemeColor: layout="${layout}", theme="${themeType}"`);
-
     let cancelled = false;
-    let attempts = 0;
-    const maxAttempts = 30;
 
-    const trySetColor = () => {
+    const updateStatusBar = () => {
       if (cancelled) return;
 
-      attempts++;
-      console.log(`  📍 Attempt ${attempts}/${maxAttempts}`);
-
+      // Find the header element (same as dashboard)
       const el = document.querySelector<HTMLElement>(`[data-layout="${layout}"]`);
       if (!el) {
-        console.warn(`  ⚠️ Element [data-layout="${layout}"] not found yet`);
-        if (attempts < maxAttempts) requestAnimationFrame(trySetColor);
+        console.log(`⚠️ [data-layout="${layout}"] not found`);
         return;
       }
 
-      const rgb = getResolvedStatusBarRgb(el);
-      console.log(`  📊 Resolved status-bar rgb: "${rgb}"`);
-
-      if (!rgb || rgb === "transparent" || rgb === "rgba(0, 0, 0, 0)") {
-        console.warn(`  ⚠️ Color not ready yet or transparent`);
-        if (attempts < maxAttempts) requestAnimationFrame(trySetColor);
+      // Read computed backgroundColor directly (same as dashboard header)
+      const bgColor = getComputedStyle(el).backgroundColor;
+      
+      if (!bgColor || bgColor === "transparent" || bgColor === "rgba(0, 0, 0, 0)") {
+        console.log(`⚠️ ${layout} color not ready: "${bgColor}"`);
         return;
       }
 
-      const hexColor = rgbToHex(rgb);
+      const hexColor = rgbToHex(bgColor);
       if (!hexColor) {
-        console.error(`  ❌ Failed to convert to hex: "${rgb}"`);
+        console.log(`❌ Failed to convert ${layout}: "${bgColor}"`);
         return;
       }
 
-      console.log(`  ✅ Final color: "${hexColor}"\n`);
-
+      console.log(`✅ iOS Status Bar [${layout}]: ${hexColor}`);
       setMetaTag("theme-color", hexColor);
       setMetaTag("apple-mobile-web-app-status-bar-style", "default");
     };
 
-    requestAnimationFrame(trySetColor);
+    // Initial attempt after brief delay
+    const timer = setTimeout(updateStatusBar, 100);
+
+    // Watch for theme changes on <html>
+    const observer = new MutationObserver(() => {
+      if (!cancelled) updateStatusBar();
+    });
+
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class", "style"],
+    });
 
     return () => {
       cancelled = true;
+      clearTimeout(timer);
+      observer.disconnect();
     };
   }, [layout, themeType]);
 }
@@ -191,7 +166,7 @@ function RootLayoutContent({ children }: { children: React.ReactNode }) {
   // Determine layout type
   const metaLayout = isDashboardPage ? "dashboard" : useAppHeader ? "app" : "shop";
 
-  // ✅ iOS status bar hook (resolved computed color via probe)
+  // ✅ iOS status bar hook (same as dashboard)
   useMetaThemeColor(metaLayout, themeType);
 
   useEffect(() => {
@@ -330,10 +305,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" suppressHydrationWarning>
       <head>
         <meta name="apple-mobile-web-app-capable" content="yes" />
-        {/* Status bar style set to default so iOS respects theme-color meta tag */}
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-
-        {/* Optional: provide a default theme-color so iOS has something immediately */}
         <meta name="theme-color" content="#000000" />
 
         <meta name="viewport" content="width=device-width, initial-scale=1" />
