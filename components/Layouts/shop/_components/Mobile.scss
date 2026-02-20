@@ -165,9 +165,6 @@
 
 /* ONLY target the home page header with .header-container class */
 .header-container {
-  /* Force clear background - no overlays */
-  
-  
   /* Prevent any backdrop effects */
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
@@ -295,8 +292,6 @@
 @media (max-width: 768px) {
   /* ONLY protect home page header - be very specific */
   .header-container {
-    /* Force solid background handled by JSX */
-    
     /* No backdrop effects whatsoever */
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;

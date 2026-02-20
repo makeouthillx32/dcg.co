@@ -1,11 +1,11 @@
-// app/layout.tsx - iOS 18 Safari Status Bar Fix - WITH CHILDLIST OBSERVER
+// app/layout.tsx - iOS 18 Safari Status Bar Fix - UNIFIED HEADER PATTERN
 "use client";
 
 import { useEffect, useLayoutEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { Providers } from "./provider";
 import { useTheme } from "./provider";
-import ShopHeader from "@/components/Layouts/shop/Header";
+import { Header as ShopHeader } from "@/components/Layouts/shop/Header";
 import AppHeader from "@/components/Layouts/app/nav";
 import { Header as DashboardHeader } from "@/components/Layouts/dashboard";
 import { Sidebar } from "@/components/Layouts/sidebar";
@@ -15,6 +15,7 @@ import AccessibilityOverlay from "@/components/Layouts/overlays/accessibility/ac
 import { CookieConsent } from "@/components/CookieConsent";
 import ConditionalOverlays from "@/components/Layouts/overlays/ConditionalOverlays";
 import { CartProvider } from "@/components/Layouts/overlays/cart/cart-context";
+import MobileDrawer from "@/components/Layouts/shop/MobileDrawer";
 import analytics from "@/lib/analytics";
 import { setCookie } from "@/lib/cookieUtils";
 import { Toaster } from "react-hot-toast";
@@ -177,6 +178,7 @@ function useMetaThemeColor(layout: "shop" | "dashboard" | "app", themeType: "lig
 function RootLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [isFirstLoad, setIsFirstLoad] = useState(true);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { themeType } = useTheme();
 
   const screenSize = useScreenSize();
@@ -199,7 +201,6 @@ function RootLayoutContent({ children }: { children: React.ReactNode }) {
   const isCheckoutRoute = lowerPath.startsWith("/checkout") || lowerPath.startsWith("/cart");
   const isProfileMeRoute = lowerPath.startsWith("/profile/me");
   
-  // ✅ FIX: Detect auth pages
   const isAuthPage = lowerPath.startsWith("/sign-in") || lowerPath.startsWith("/sign-up") || lowerPath.startsWith("/forgot-password");
 
   const isShopRoute = isHome || isProductsPage || isCollectionsPage || isCategoryPage;
@@ -210,6 +211,21 @@ function RootLayoutContent({ children }: { children: React.ReactNode }) {
 
   // ✅ iOS status bar hook
   useMetaThemeColor(metaLayout, themeType);
+
+  // Handle mobile menu
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = "";
+      };
+    }
+  }, [mobileMenuOpen]);
+
+  // Close mobile menu on route change
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -286,14 +302,13 @@ function RootLayoutContent({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // ✅ FIX: Auth pages get minimal wrapper (no headers/footers, but keep RegionBootstrap for post-auth)
+  // ✅ Auth pages get minimal wrapper
   if (isAuthPage) {
     return (
       <>
         <RegionBootstrap />
         {children}
         
-        {/* Keep toaster for error messages */}
         <Toaster
           position="top-right"
           toastOptions={{
@@ -321,12 +336,35 @@ function RootLayoutContent({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // ✅ Shop/App layout rendering
+  // ✅ Shop/App layout rendering - NOW MATCHES DASHBOARD PATTERN
   return (
     <CartProvider>
       <RegionBootstrap />
 
-      {useAppHeader ? <AppHeader /> : showNav && <ShopHeader />}
+      {useAppHeader ? (
+        <AppHeader />
+      ) : showNav ? (
+        <>
+          <ShopHeader onMenuClick={() => setMobileMenuOpen(true)} />
+          
+          {/* Mobile drawer - managed in layout like Sidebar */}
+          {mobileMenuOpen && (
+            <>
+              <div
+                className="fixed inset-0 z-40 bg-black/50 transition-opacity duration-300 lg:hidden"
+                onClick={() => setMobileMenuOpen(false)}
+                aria-hidden="true"
+              />
+              <div
+                className="fixed bottom-0 left-0 top-0 z-50 w-[min(86vw,360px)] overflow-y-auto border-r border-[var(--lt-border)] bg-[var(--lt-bg)] shadow-[var(--lt-shadow)] lg:hidden"
+                data-layout="shop"
+              >
+                <MobileDrawer session={null} onClose={() => setMobileMenuOpen(false)} />
+              </div>
+            </>
+          )}
+        </>
+      ) : null}
 
       {children}
 
