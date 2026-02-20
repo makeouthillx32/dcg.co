@@ -83,43 +83,75 @@ function rgbToHex(rgb: string): string {
 }
 
 /**
- * Resolve the status-bar color from the layout element.
+ * Read the resolved background color from the layout element.
  *
- * Strategy 1 (preferred): Read the element's own computed backgroundColor.
- *   The header elements already apply bg-[var(--lt-bg)] and --lt-status-bar
- *   always matches --lt-bg, so the element's own background IS the status bar color.
+ * The dashboard header works because its <header data-layout="dashboard">
+ * applies bg-[var(--lt-bg)] directly, and --lt-bg resolves through the chain:
+ *   --lt-bg -> --gp-bg -> hsl(var(--destructive))
  *
- * Strategy 2 (fallback): Create a probe element inside the layout node and
- *   set its background to var(--lt-status-bar, var(--lt-bg)), then read
- *   the computed value. This handles edge cases where the element itself
- *   might not have a background set.
+ * We use three strategies in order:
+ *   1. Read the element's own computed backgroundColor
+ *   2. Probe inside the element with var(--lt-status-bar, var(--lt-bg))
+ *   3. Probe on document.body with var(--gp-status-bar, var(--gp-bg))
+ *      (bypasses layout-scoped tokens, reads the global palette directly)
  */
-function getResolvedStatusBarRgb(layoutEl: HTMLElement) {
-  // Strategy 1: read the element's own computed background directly
-  const directBg = getComputedStyle(layoutEl).backgroundColor;
-  if (directBg && directBg !== "transparent" && directBg !== "rgba(0, 0, 0, 0)") {
+function getResolvedStatusBarColor(layoutEl: HTMLElement): string | null {
+  const isUsable = (c: string | undefined | null) =>
+    !!c && c !== "transparent" && c !== "rgba(0, 0, 0, 0)";
+
+  const layout = layoutEl.getAttribute("data-layout") || "unknown";
+  const cs = getComputedStyle(layoutEl);
+
+  // Log the CSS variable chain for diagnostics
+  console.log(`[v0] StatusBarColor[${layout}] diagnostics:`, {
+    tagName: layoutEl.tagName,
+    className: layoutEl.className.slice(0, 100),
+    "--lt-bg": cs.getPropertyValue("--lt-bg").trim(),
+    "--lt-status-bar": cs.getPropertyValue("--lt-status-bar").trim(),
+    "--gp-bg": cs.getPropertyValue("--gp-bg").trim(),
+    "--gp-status-bar": cs.getPropertyValue("--gp-status-bar").trim(),
+    "--destructive": cs.getPropertyValue("--destructive").trim(),
+    backgroundColor: cs.backgroundColor,
+    background: cs.background.slice(0, 80),
+  });
+
+  // Strategy 1: element's own computed background
+  const directBg = cs.backgroundColor;
+  if (isUsable(directBg)) {
+    console.log(`[v0] StatusBarColor[${layout}] -> Strategy 1 (direct): ${directBg}`);
     return directBg;
   }
 
-  // Strategy 2: probe element fallback
+  // Strategy 2: probe inside the layout element (inherits --lt-* tokens)
   const probe = document.createElement("div");
-  probe.style.cssText = "position:absolute;left:-9999px;top:0;width:1px;height:1px;pointer-events:none;background-color:var(--lt-status-bar, var(--lt-bg))";
-
+  probe.style.cssText =
+    "position:absolute;left:-9999px;top:0;width:1px;height:1px;pointer-events:none;" +
+    "background-color:var(--lt-status-bar, var(--lt-bg))";
   layoutEl.appendChild(probe);
-  const rgb = getComputedStyle(probe).backgroundColor;
+  const probeBg = getComputedStyle(probe).backgroundColor;
   layoutEl.removeChild(probe);
+  console.log(`[v0] StatusBarColor[${layout}] -> Strategy 2 (probe): ${probeBg}`);
+  if (isUsable(probeBg)) return probeBg;
 
-  return rgb;
+  // Strategy 3: probe on body with global palette tokens directly
+  const bodyProbe = document.createElement("div");
+  bodyProbe.style.cssText =
+    "position:absolute;left:-9999px;top:0;width:1px;height:1px;pointer-events:none;" +
+    "background-color:var(--gp-status-bar, var(--gp-bg))";
+  document.body.appendChild(bodyProbe);
+  const bodyProbeBg = getComputedStyle(bodyProbe).backgroundColor;
+  document.body.removeChild(bodyProbe);
+  console.log(`[v0] StatusBarColor[${layout}] -> Strategy 3 (body): ${bodyProbeBg}`);
+  if (isUsable(bodyProbeBg)) return bodyProbeBg;
+
+  return null;
 }
 
 function useMetaThemeColor(layout: "shop" | "dashboard" | "app", themeType: "light" | "dark") {
   useEffect(() => {
     let cancelled = false;
+    let lastHex = "";
 
-    /**
-     * Probe the resolved --lt-status-bar color from the layout element
-     * and push it into <meta name="theme-color">.
-     */
     const applyColor = () => {
       if (cancelled) return false;
 
@@ -129,48 +161,46 @@ function useMetaThemeColor(layout: "shop" | "dashboard" | "app", themeType: "lig
         return false;
       }
 
-      const rgb = getResolvedStatusBarRgb(el);
-      console.log(`[v0] useMetaThemeColor layout="${layout}" resolved: "${rgb}"`);
-
-      if (!rgb || rgb === "transparent" || rgb === "rgba(0, 0, 0, 0)") return false;
+      const rgb = getResolvedStatusBarColor(el);
+      if (!rgb) {
+        console.log(`[v0] useMetaThemeColor layout="${layout}" - no color resolved`);
+        return false;
+      }
 
       const hexColor = rgbToHex(rgb);
       if (!hexColor) return false;
 
-      console.log(`[v0] useMetaThemeColor layout="${layout}" -> theme-color: "${hexColor}"`);
-      setMetaTag("theme-color", hexColor);
-      setMetaTag("apple-mobile-web-app-status-bar-style", "black-translucent");
+      // Only update if the color actually changed
+      if (hexColor !== lastHex) {
+        lastHex = hexColor;
+        console.log(`[v0] useMetaThemeColor layout="${layout}" -> "${hexColor}"`);
+        setMetaTag("theme-color", hexColor);
+        setMetaTag("apple-mobile-web-app-status-bar-style", "black-translucent");
+      }
       return true;
     };
 
-    // Poll until the layout element exists AND resolves a real color.
-    // The theme provider applies CSS variables asynchronously (after
-    // fetching themes from Supabase), so we need patience.
+    // --- Phase 1: Poll until the element exists and has a color ---
     let attempts = 0;
-    const maxAttempts = 120; // ~2 seconds at 60fps
-
+    const maxAttempts = 120;
     const poll = () => {
       if (cancelled) return;
       attempts++;
       if (applyColor()) return;
       if (attempts < maxAttempts) requestAnimationFrame(poll);
     };
-
-    // Start polling on next frame (gives children time to mount)
     requestAnimationFrame(poll);
 
-    // Also observe <html> for class/style mutations so we re-apply
-    // when the theme toggles or the provider finishes applying variables.
+    // --- Phase 2: MutationObserver on <html> for theme changes ---
+    // The theme provider applies CSS vars to <html> via useEffect after
+    // fetching from Supabase. We debounce because it sets many vars in a loop.
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-
     const observer = new MutationObserver(() => {
       if (cancelled) return;
-      // Debounce: the theme provider sets many variables in a loop,
-      // so we wait 50ms after the last mutation before probing.
       if (debounceTimer) clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => {
         requestAnimationFrame(() => applyColor());
-      }, 50);
+      }, 80);
     });
 
     observer.observe(document.documentElement, {
