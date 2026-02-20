@@ -10,6 +10,9 @@ import { Label } from "@/components/ui/label";
 import SignInWithGoogle from "@/components/ui/SignInWithGoogle";
 import { Mail, Lock } from "lucide-react";
 
+// ✅ ADD
+import { AuthBreadcrumbs } from "@/components/auth/AuthBreadcrumbs";
+
 export const metadata: Metadata = {
   title: "Sign in",
   description: "Sign in to your account.",
@@ -22,6 +25,9 @@ export default async function SignInPage({
 }) {
   return (
     <div className="mx-auto w-full max-w-md rounded-[var(--radius)] bg-[hsl(var(--card))] shadow-[var(--shadow-xl)] p-6 md:p-8">
+      {/* ✅ ADD */}
+      <AuthBreadcrumbs current="Sign in" />
+
       <h1 className="text-2xl md:text-3xl font-[var(--font-serif)] font-bold text-center text-[hsl(var(--sidebar-primary))] mb-6 leading-[1.2]">
         Welcome Back
       </h1>
