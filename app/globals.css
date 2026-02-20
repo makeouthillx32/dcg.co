@@ -267,22 +267,7 @@ body {
   color: hsl(var(--foreground));
 }
 
-/* ✅ PWA / Add-to-Home-Screen (standalone) tweaks */
-html.is-pwa,
-html.is-pwa body {
-  /* Helps the “app” feel in standalone */
-  height: 100%;
-  overscroll-behavior-y: contain;
 
-  /* Optional: use safe areas so content doesn’t fight the notch/home bar */
-  padding-top: env(safe-area-inset-top);
-  padding-bottom: env(safe-area-inset-bottom);
-}
-
-/* Optional: prevent iOS text auto-resize weirdness in standalone */
-html.is-pwa {
-  -webkit-text-size-adjust: 100%;
-}
 /* Form and input styling */
 input,
 textarea {
