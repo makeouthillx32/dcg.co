@@ -19,7 +19,7 @@
 
   /* ✅ scrollbar styling */
   scrollbar-width: thin; /* firefox */
-  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+  scrollbar-color: hsl(var(--foreground) / 0.12) transparent;
 }
 
 /* Chrome/Safari scrollbar */
@@ -32,14 +32,14 @@
 }
 
 .drawer-content::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.18);
+  background: hsl(var(--foreground) / 0.12);
   border-radius: 999px;
   border: 3px solid transparent;
   background-clip: padding-box;
 }
 
 .drawer-content::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.28);
+  background: hsl(var(--foreground) / 0.18);
   background-clip: padding-box;
 }
 
@@ -230,7 +230,7 @@
   position: fixed;
   inset: 0;
   z-index: 60; 
-  background: rgba(0, 0, 0, 0.45);
+  background: hsl(var(--foreground) / 0.25);
   backdrop-filter: blur(2px);
   -webkit-backdrop-filter: blur(2px);
   
@@ -260,7 +260,7 @@
 
   background: var(--lt-bg);
   border-right: 1px solid hsl(var(--border));
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.25);
+  box-shadow: var(--lt-shadow);
 
   /* ✅ THE ONLY SCROLLER */
   overflow-y: auto;

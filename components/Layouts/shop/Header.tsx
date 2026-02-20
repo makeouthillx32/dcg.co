@@ -162,7 +162,12 @@ const Header: React.FC = () => {
             aria-hidden="true"
           />
 
-          <div className="mobile-drawer-shell" role="dialog" aria-modal="true">
+          <div 
+            className="mobile-drawer-shell" 
+            data-layout="shop"
+            role="dialog" 
+            aria-modal="true"
+          >
             <MobileDrawer session={session} onClose={closeMobileMenu} />
           </div>
         </>

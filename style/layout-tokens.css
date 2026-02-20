@@ -10,21 +10,20 @@
  */
 
 :root {
-  --gp-bg:         hsl(var(--destructive));
-  --gp-fg:         hsl(var(--destructive-foreground));
-  --gp-border:     hsl(var(--destructive) / 0.4);
+  --gp-bg:         hsl(var(--primary));
+  --gp-fg:         hsl(var(--primary-foreground));
+  --gp-border:     hsl(var(--primary) / 0.2);
   --gp-shadow:     var(--shadow-sm);
-  --gp-status-bar: hsl(var(--destructive)); /* References --gp-bg value */
+  --gp-status-bar: hsl(var(--primary));
 }
 
 .dark {
-  --gp-bg:         hsl(var(--destructive));
-  --gp-fg:         hsl(var(--destructive-foreground));
-  --gp-border:     hsl(var(--destructive) / 0.4);
+  --gp-bg:         hsl(var(--primary));
+  --gp-fg:         hsl(var(--primary-foreground));
+  --gp-border:     hsl(var(--primary) / 0.3);
   --gp-shadow:     var(--shadow-md);
-  --gp-status-bar: hsl(var(--destructive)); /* References --gp-bg value */
+  --gp-status-bar: hsl(var(--primary));
 }
-
 /* ─── SHOP HEADER ─────────────────────────────────────── */
 [data-layout="shop"],
 :is([data-layout]) [data-layout="shop"] {
