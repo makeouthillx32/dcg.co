@@ -1,7 +1,7 @@
 // app/layout.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { Providers } from "./provider";
 import { useTheme } from "./provider";
@@ -83,7 +83,10 @@ function toHex(color: string): string {
 }
 
 function useMetaThemeColor(layout: "shop" | "dashboard" | "app", themeType: "light" | "dark") {
-  useEffect(() => {
+  // ✅ CRITICAL FIX: Use useLayoutEffect instead of useEffect
+  // useLayoutEffect runs AFTER DOM updates but BEFORE browser paint
+  // This ensures headers are in the DOM when we try to read them
+  useLayoutEffect(() => {
     console.log(`\n🚀 MetaThemeColor: layout="${layout}", theme="${themeType}"`);
     
     let cancelled = false;
@@ -189,7 +192,7 @@ function RootLayoutContent({ children }: { children: React.ReactNode }) {
   // Determine layout type
   const metaLayout = isDashboardPage ? "dashboard" : useAppHeader ? "app" : "shop";
 
-  // ✅ Call the iOS status bar hook
+  // ✅ Call the iOS status bar hook (now uses useLayoutEffect internally)
   useMetaThemeColor(metaLayout, themeType);
 
   useEffect(() => {
