@@ -227,7 +227,7 @@ export default function DesktopNav() {
     return (
       <nav className="nav-container" aria-label="Primary">
         <div className="nav-menu">
-          <div className="text-sm text-muted-foreground">Loading...</div>
+          <div className="text-sm">Loading...</div>
         </div>
       </nav>
     );
@@ -237,7 +237,7 @@ export default function DesktopNav() {
     return (
       <nav className="nav-container" aria-label="Primary">
         <div className="nav-menu">
-          <div className="text-sm text-muted-foreground">No navigation available</div>
+          <div className="text-sm">No navigation available</div>
         </div>
       </nav>
     );
@@ -259,7 +259,7 @@ export default function DesktopNav() {
                   ref={(el) => {
                     navRefs.current[index] = el;
                   }}
-                  className="nav-top-link text-[var(--lt-fg)] hover:text-primary bg-transparent border-none cursor-pointer transition-colors duration-200 px-4 py-2 rounded-md hover:bg-muted/50"
+                  className="nav-top-link"
                   onClick={handleNavClick(true)}
                   onKeyDown={(e) => handleKeyDown(e, index, node.key)}
                   aria-expanded={openKey === node.key}
@@ -283,9 +283,9 @@ export default function DesktopNav() {
                   ref={(el) => {
                     dropdownRefs.current[index] = el;
                   }}
-                  className={`nav-dropdown bg-popover border border-border shadow-lg rounded-md ${getDropdownAlignment(
+                  className={`nav-dropdown bg-[var(--lt-bg)] border-[var(--lt-border)] ${getDropdownAlignment(
                     index
-                  )} ${openKey === node.key ? "block animate-fade-in" : "hidden"}`}
+                  )}`}
                   data-state={openKey === node.key ? "open" : "closed"}
                   data-parent={node.key}
                   onMouseEnter={handleDropdownMouseEnter}
@@ -300,7 +300,7 @@ export default function DesktopNav() {
                           <a
                             href={child.href}
                             onClick={handleSubmenuClick}
-                            className="nav-sub-link block text-popover-foreground hover:text-primary hover:bg-muted/50 no-underline px-3 py-2 rounded-sm transition-colors duration-150 text-sm"
+                            className="nav-sub-link"
                             role="menuitem"
                             tabIndex={openKey === node.key ? 0 : -1}
                           >
@@ -310,7 +310,7 @@ export default function DesktopNav() {
                           <Link
                             href={child.href}
                             onClick={handleSubmenuClick}
-                            className="nav-sub-link block text-popover-foreground hover:text-primary hover:bg-muted/50 no-underline px-3 py-2 rounded-sm transition-colors duration-150 text-sm"
+                            className="nav-sub-link"
                             role="menuitem"
                             tabIndex={openKey === node.key ? 0 : -1}
                           >
@@ -331,7 +331,7 @@ export default function DesktopNav() {
                     }}
                     href={node.href}
                     onClick={handleNavClick(false)}
-                    className="nav-top-link text-[var(--lt-fg)] hover:text-primary no-underline transition-colors duration-200 px-4 py-2 rounded-md hover:bg-muted/50 inline-block"
+                    className="nav-top-link"
                     onKeyDown={(e) => handleKeyDown(e, index, node.key)}
                     tabIndex={0}
                   >
@@ -344,7 +344,7 @@ export default function DesktopNav() {
                     }}
                     href={node.href}
                     onClick={handleNavClick(false)}
-                    className="nav-top-link text-[var(--lt-fg)] hover:text-primary no-underline transition-colors duration-200 px-4 py-2 rounded-md hover:bg-muted/50 inline-block"
+                    className="nav-top-link"
                     onKeyDown={(e) => handleKeyDown(e, index, node.key)}
                     tabIndex={0}
                   >

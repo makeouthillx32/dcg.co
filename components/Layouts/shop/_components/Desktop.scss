@@ -3,14 +3,12 @@
 /* Header Component */
 .header-container {
   border-bottom: 1px solid var(--lt-border);
-  background: var(--lt-bg);
-  color: var(--lt-fg);
   padding: 0.5rem 1rem;
   position: relative;
   z-index: 100;
   
   /* Smooth transitions for theme changes */
-  transition: background-color 0.2s ease, border-color 0.2s ease;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
   
   @media (min-width: 768px) {
     padding: 0.75rem 1rem;
@@ -268,7 +266,7 @@
   transition: background-color 0.15s ease, opacity 0.15s ease;
 
   &:hover {
-    background-color: hsl(var(--muted) / 0.4);
+    background-color: hsl(var(--muted) / 0.1);
   }
 
   &:focus {
@@ -293,7 +291,7 @@
 
   padding: 0.35rem;
   border-radius: 0.5rem;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.12);
+  box-shadow: var(--lt-shadow);
 
   display: none;
 
@@ -415,7 +413,7 @@
   }
   
   &:hover {
-    background-color: rgba(0, 0, 0, 0.05);
+    background-color: hsl(var(--foreground) / 0.03);
   }
   
   &:active {
@@ -446,7 +444,7 @@
   
   /* Backdrop blur effect */
   backdrop-filter: blur(4px);
-  background-color: rgba(0, 0, 0, 0.1);
+  background-color: hsl(var(--foreground) / 0.05);
   
   /* Animation */
   animation: fade-in 0.2s ease;
@@ -483,7 +481,7 @@
   }
   
   .mobile-drawer-overlay {
-    background-color: rgba(0, 0, 0, 0.3);
+    background-color: hsl(var(--foreground) / 0.2);
   }
 }
 
