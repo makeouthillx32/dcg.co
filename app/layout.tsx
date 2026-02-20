@@ -102,7 +102,7 @@ function useScreenSize() {
   return screenSize;
 }
 
-// ✅ OPTIMIZED iOS STATUS BAR - SAFARI + BRAVE COMPATIBLE
+// ✅ OPTIMIZED iOS STATUS BAR - ZERO RETRIES, DIRECT ACCESS
 function useMetaThemeColor(layout: "shop" | "dashboard" | "app", themeType: "light" | "dark") {
   useLayoutEffect(() => {
     let cancelled = false;
@@ -112,7 +112,7 @@ function useMetaThemeColor(layout: "shop" | "dashboard" | "app", themeType: "lig
       if (cancelled) return;
 
       const el = document.querySelector<HTMLElement>(`[data-layout="${layout}"]`);
-      if (!el) return;
+      if (!el) return; // Element renders synchronously now, if not found = wrong layout
 
       const bgColor = getComputedStyle(el).backgroundColor;
       if (!bgColor || bgColor === "transparent" || bgColor === "rgba(0, 0, 0, 0)") return;
@@ -126,35 +126,15 @@ function useMetaThemeColor(layout: "shop" | "dashboard" | "app", themeType: "lig
 
       lastColor = hex;
 
-      // Update meta tags with media queries
-      let lightMeta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"][media*="light"]');
-      if (!lightMeta) {
-        lightMeta = document.createElement("meta");
-        lightMeta.name = "theme-color";
-        lightMeta.media = "(prefers-color-scheme: light)";
-        document.head.appendChild(lightMeta);
+      // Update meta tags
+      let meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+      if (!meta) {
+        meta = document.createElement("meta");
+        meta.name = "theme-color";
+        document.head.appendChild(meta);
       }
-      lightMeta.content = hex;
+      meta.content = hex;
 
-      let darkMeta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"][media*="dark"]');
-      if (!darkMeta) {
-        darkMeta = document.createElement("meta");
-        darkMeta.name = "theme-color";
-        darkMeta.media = "(prefers-color-scheme: dark)";
-        document.head.appendChild(darkMeta);
-      }
-      darkMeta.content = hex;
-
-      // Brave iOS fallback
-      let generalMeta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]:not([media])');
-      if (!generalMeta) {
-        generalMeta = document.createElement("meta");
-        generalMeta.name = "theme-color";
-        document.head.appendChild(generalMeta);
-      }
-      generalMeta.content = hex;
-
-      // Apple status bar style
       let appleMeta = document.querySelector<HTMLMetaElement>('meta[name="apple-mobile-web-app-status-bar-style"]');
       if (!appleMeta) {
         appleMeta = document.createElement("meta");
@@ -162,10 +142,6 @@ function useMetaThemeColor(layout: "shop" | "dashboard" | "app", themeType: "lig
         document.head.appendChild(appleMeta);
       }
       appleMeta.content = "default";
-
-      // Match document background
-      document.documentElement.style.backgroundColor = bgColor;
-      document.body.style.backgroundColor = bgColor;
 
       // Force repaint
       el.style.visibility = "hidden";
@@ -430,12 +406,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+        <meta name="theme-color" content="#000000" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="format-detection" content="telephone=no" />
-        <meta name="color-scheme" content="light dark" />
-        <meta name="theme-color" content="#faf8f5" media="(prefers-color-scheme: light)" />
-        <meta name="theme-color" content="#1a1a1a" media="(prefers-color-scheme: dark)" />
-        <meta name="theme-color" content="#faf8f5" />
 
         <link rel="icon" href="/favicon.ico" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
