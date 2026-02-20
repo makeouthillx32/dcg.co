@@ -7,6 +7,9 @@ import { Providers } from "./provider";
 import { useTheme } from "./provider";
 import ShopHeader from "@/components/Layouts/shop/Header";
 import AppHeader from "@/components/Layouts/app/nav";
+import { Header as DashboardHeader } from "@/components/Layouts/dashboard";
+import { Sidebar } from "@/components/Layouts/sidebar";
+import { SidebarProvider } from "@/components/Layouts/sidebar/sidebar-context";
 import Footer from "@/components/Layouts/footer";
 import AccessibilityOverlay from "@/components/Layouts/overlays/accessibility/accessibility";
 import { CookieConsent } from "@/components/CookieConsent";
@@ -16,7 +19,11 @@ import analytics from "@/lib/analytics";
 import { setCookie } from "@/lib/cookieUtils";
 import { Toaster } from "react-hot-toast";
 import RegionBootstrap from "@/components/Auth/RegionBootstrap";
+import NextTopLoader from "nextjs-toploader";
 import "./globals.css";
+import "@/css/satoshi.css";
+import "flatpickr/dist/flatpickr.min.css";
+import "jsvectormap/dist/jsvectormap.css";
 
 function useScreenSize() {
   const [screenSize, setScreenSize] = useState<"mobile" | "tablet" | "desktop">("desktop");
@@ -149,7 +156,7 @@ function useMetaThemeColor(layout: "shop" | "dashboard" | "app", themeType: "lig
   }, [layout, themeType]);
 }
 
-// ─── Root Layout Component ───────────────────────────────
+// ─── Root Layout Content ─────────────────────────────────
 
 function RootLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -242,6 +249,25 @@ function RootLayoutContent({ children }: { children: React.ReactNode }) {
   const showFooter = isShopRoute;
   const showAccessibility = isShopRoute;
 
+  // ✅ Dashboard layout rendering
+  if (isDashboardPage) {
+    return (
+      <SidebarProvider>
+        <NextTopLoader color="hsl(var(--sidebar-primary))" showSpinner={false} />
+        <div className="flex min-h-screen">
+          <Sidebar />
+          <div className="w-full">
+            <DashboardHeader />
+            <main className="isolate mx-auto w-full max-w-screen-2xl overflow-hidden p-4 md:p-6 2xl:p-10">
+              {children}
+            </main>
+          </div>
+        </div>
+      </SidebarProvider>
+    );
+  }
+
+  // ✅ Shop/App layout rendering
   return (
     <CartProvider>
       <RegionBootstrap />
