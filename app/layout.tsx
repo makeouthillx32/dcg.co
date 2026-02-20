@@ -102,17 +102,18 @@ function useScreenSize() {
   return screenSize;
 }
 
-// ✅ OPTIMIZED iOS STATUS BAR - ZERO RETRIES, DIRECT ACCESS
+// ✅ OPTIMIZED iOS STATUS BAR - SAFARI + BRAVE COMPATIBLE
 function useMetaThemeColor(layout: "shop" | "dashboard" | "app", themeType: "light" | "dark") {
   useLayoutEffect(() => {
     let cancelled = false;
     let lastColor = "";
+    let isFirstRun = true;
 
     const updateStatusBar = () => {
       if (cancelled) return;
 
       const el = document.querySelector<HTMLElement>(`[data-layout="${layout}"]`);
-      if (!el) return; // Element renders synchronously now, if not found = wrong layout
+      if (!el) return;
 
       const bgColor = getComputedStyle(el).backgroundColor;
       if (!bgColor || bgColor === "transparent" || bgColor === "rgba(0, 0, 0, 0)") return;
@@ -126,15 +127,46 @@ function useMetaThemeColor(layout: "shop" | "dashboard" | "app", themeType: "lig
 
       lastColor = hex;
 
-      // Update meta tags
-      let meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
-      if (!meta) {
-        meta = document.createElement("meta");
-        meta.name = "theme-color";
-        document.head.appendChild(meta);
-      }
-      meta.content = hex;
+      // ✅ FIRST RUN: Just update existing tags (Safari-friendly)
+      if (isFirstRun) {
+        isFirstRun = false;
+        
+        // Update or create theme-color tags
+        let lightMeta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"][media*="light"]');
+        if (!lightMeta) {
+          lightMeta = document.createElement("meta");
+          lightMeta.name = "theme-color";
+          lightMeta.media = "(prefers-color-scheme: light)";
+          document.head.appendChild(lightMeta);
+        }
+        lightMeta.content = hex;
 
+        let darkMeta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"][media*="dark"]');
+        if (!darkMeta) {
+          darkMeta = document.createElement("meta");
+          darkMeta.name = "theme-color";
+          darkMeta.media = "(prefers-color-scheme: dark)";
+          document.head.appendChild(darkMeta);
+        }
+        darkMeta.content = hex;
+      } else {
+        // ✅ THEME TOGGLE: Remove + reinsert for Brave iOS
+        document.querySelectorAll('meta[name="theme-color"]').forEach(tag => tag.remove());
+
+        const lightMeta = document.createElement("meta");
+        lightMeta.name = "theme-color";
+        lightMeta.content = hex;
+        lightMeta.media = "(prefers-color-scheme: light)";
+        document.head.appendChild(lightMeta);
+
+        const darkMeta = document.createElement("meta");
+        darkMeta.name = "theme-color";
+        darkMeta.content = hex;
+        darkMeta.media = "(prefers-color-scheme: dark)";
+        document.head.appendChild(darkMeta);
+      }
+
+      // Apple status bar style
       let appleMeta = document.querySelector<HTMLMetaElement>('meta[name="apple-mobile-web-app-status-bar-style"]');
       if (!appleMeta) {
         appleMeta = document.createElement("meta");
@@ -142,6 +174,10 @@ function useMetaThemeColor(layout: "shop" | "dashboard" | "app", themeType: "lig
         document.head.appendChild(appleMeta);
       }
       appleMeta.content = "default";
+
+      // ✅ Match document background
+      document.documentElement.style.backgroundColor = bgColor;
+      document.body.style.backgroundColor = bgColor;
 
       // Force repaint
       el.style.visibility = "hidden";
@@ -404,21 +440,32 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        {/* PWA Meta Tags */}
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="theme-color" content="#000000" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <meta name="format-detection" content="telephone=no" />
+        
+        {/* Color Scheme - Critical for iOS 2026 */}
+        <meta name="color-scheme" content="light dark" />
+        
+        {/* Static Theme Colors - Server-rendered for Brave iOS initial parse */}
+        <meta name="theme-color" content="#faf8f5" media="(prefers-color-scheme: light)" />
+        <meta name="theme-color" content="#1a1a1a" media="(prefers-color-scheme: dark)" />
 
+        {/* Icons */}
         <link rel="icon" href="/favicon.ico" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <link rel="manifest" href="/manifest.json" />
 
+        {/* Font Preconnects */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
 
+        {/* Canonical */}
         <link rel="canonical" href="https://desertcowgirl.co/" />
 
+        {/* Structured Data */}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
