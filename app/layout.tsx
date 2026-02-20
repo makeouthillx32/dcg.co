@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useState, lazy, Suspense } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Providers } from "./provider";
 import { useTheme } from "./provider";
 import { Header as ShopHeader } from "@/components/Layouts/shop/Header";
@@ -16,6 +16,7 @@ import { getCookie, setCookie } from "@/lib/cookieUtils";
 import { Toaster } from "react-hot-toast";
 import RegionBootstrap from "@/components/Auth/RegionBootstrap";
 import NextTopLoader from "nextjs-toploader";
+import { RefreshCw } from "lucide-react";
 import "./globals.css";
 import "@/css/satoshi.css";
 import "flatpickr/dist/flatpickr.min.css";
@@ -30,44 +31,80 @@ const CookieConsent = lazy(() => import("@/components/CookieConsent").then(m => 
 import ConditionalOverlays from "@/components/Layouts/overlays/ConditionalOverlays";
 import { CartProvider } from "@/components/Layouts/overlays/cart/cart-context";
 
+/* ──────────────────────────────────────────────────────────────
+   ✅ PWA / A2HS STANDALONE DETECTION (NO LOOPS, NO POLLING)
+   - Adds html.is-pwa class when in standalone mode
+   - Used to show refresh affordance
+────────────────────────────────────────────────────────────── */
+function detectStandalone() {
+  if (typeof window === "undefined") return false;
+
+  // Modern: display-mode
+  const dm = window.matchMedia?.("(display-mode: standalone)")?.matches;
+
+  // iOS Safari legacy
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const iosLegacy = (window.navigator as any).standalone === true;
+
+  return Boolean(dm || iosLegacy);
+}
+
+function useStandalonePwa() {
+  const [isStandalone, setIsStandalone] = useState(false);
+
+  useEffect(() => {
+    const update = () => setIsStandalone(detectStandalone());
+    update();
+
+    const mq = window.matchMedia?.("(display-mode: standalone)");
+    mq?.addEventListener?.("change", update);
+
+    return () => mq?.removeEventListener?.("change", update);
+  }, []);
+
+  // ✅ toggle html class for CSS specialization
+  useEffect(() => {
+    const root = document.documentElement;
+    if (!root) return;
+
+    if (isStandalone) root.classList.add("is-pwa");
+    else root.classList.remove("is-pwa");
+  }, [isStandalone]);
+
+  return isStandalone;
+}
+
 // ✅ COOKIE-CACHED SCREEN SIZE (iOS-safe with fallbacks)
 function useScreenSize() {
   const [screenSize, setScreenSize] = useState<"mobile" | "tablet" | "desktop">(() => {
-    // SSR-safe with iOS error handling
     if (typeof window === "undefined") return "desktop";
-    
+
     try {
       const cached = getCookie("screenSize");
       if (cached === "mobile" || cached === "tablet" || cached === "desktop") {
         return cached;
       }
     } catch (e) {
-      // iOS cookie access can fail in private mode
       console.warn("Cookie access failed:", e);
     }
-    
-    // Calculate from viewport
+
     try {
       const width = window.innerWidth;
       const size = width < 768 ? "mobile" : width < 1024 ? "tablet" : "desktop";
-      
-      // Try to cache, but don't fail if it doesn't work
+
       try {
         setCookie("screenSize", size, { maxAge: 86400 });
-      } catch (e) {
-        // Silent fail on cookie write
-      }
-      
+      } catch {}
+
       return size;
-    } catch (e) {
-      // Fallback if window.innerWidth fails
+    } catch {
       return "desktop";
     }
   });
 
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
-    
+
     const checkScreenSize = () => {
       clearTimeout(timeoutId);
       timeoutId = setTimeout(() => {
@@ -78,13 +115,9 @@ function useScreenSize() {
             setScreenSize(newSize);
             try {
               setCookie("screenSize", newSize, { maxAge: 86400 });
-            } catch (e) {
-              // Silent fail
-            }
+            } catch {}
           }
-        } catch (e) {
-          // Silent fail on resize
-        }
+        } catch {}
       }, 200);
     };
 
@@ -94,7 +127,7 @@ function useScreenSize() {
         clearTimeout(timeoutId);
         window.removeEventListener("resize", checkScreenSize);
       };
-    } catch (e) {
+    } catch {
       return () => clearTimeout(timeoutId);
     }
   }, [screenSize]);
@@ -112,21 +145,19 @@ function useMetaThemeColor(layout: "shop" | "dashboard" | "app", themeType: "lig
       if (cancelled) return;
 
       const el = document.querySelector<HTMLElement>(`[data-layout="${layout}"]`);
-      if (!el) return; // Element renders synchronously now, if not found = wrong layout
+      if (!el) return;
 
       const bgColor = getComputedStyle(el).backgroundColor;
       if (!bgColor || bgColor === "transparent" || bgColor === "rgba(0, 0, 0, 0)") return;
 
-      // Convert RGB to hex
       const match = bgColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
       if (!match) return;
-      
+
       const hex = `#${((1 << 24) + (Number(match[1]) << 16) + (Number(match[2]) << 8) + Number(match[3])).toString(16).slice(1)}`;
       if (hex === lastColor) return;
 
       lastColor = hex;
 
-      // Update meta tags
       let meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
       if (!meta) {
         meta = document.createElement("meta");
@@ -143,16 +174,13 @@ function useMetaThemeColor(layout: "shop" | "dashboard" | "app", themeType: "lig
       }
       appleMeta.content = "default";
 
-      // Force repaint
       el.style.visibility = "hidden";
       el.offsetHeight;
       el.style.visibility = "visible";
     };
 
-    // Single execution
     updateStatusBar();
 
-    // Only watch theme toggle (class changes on html element)
     const observer = new MutationObserver((mutations) => {
       if (cancelled) return;
       const hasClassChange = mutations.some(m => m.attributeName === "class");
@@ -174,7 +202,7 @@ function useMetaThemeColor(layout: "shop" | "dashboard" | "app", themeType: "lig
 // ✅ ROUTE CLASSIFICATION - COMPUTED ONCE, NO LOOPS
 function classifyRoute(pathname: string) {
   const lower = pathname.toLowerCase();
-  
+
   return {
     isHome: pathname === "/",
     isToolsPage: lower.startsWith("/tools"),
@@ -184,21 +212,25 @@ function classifyRoute(pathname: string) {
     isCheckoutRoute: lower.startsWith("/checkout") || lower.startsWith("/cart"),
     isProfileMeRoute: lower.startsWith("/profile/me"),
     isAuthPage: lower.startsWith("/sign-in") || lower.startsWith("/sign-up") || lower.startsWith("/forgot-password"),
-    isCategoryPage: /^\/[^\/]+$/.test(pathname) && 
-                    !lower.startsWith("/tools") && 
-                    !lower.startsWith("/dashboard") && 
-                    !lower.startsWith("/products") &&
-                    !lower.startsWith("/auth"),
+    isCategoryPage: /^\/[^\/]+$/.test(pathname) &&
+      !lower.startsWith("/tools") &&
+      !lower.startsWith("/dashboard") &&
+      !lower.startsWith("/products") &&
+      !lower.startsWith("/auth"),
   };
 }
 
 // ─── Root Layout Content ─────────────────────────────────
-
 function RootLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { themeType } = useTheme();
   const screenSize = useScreenSize();
+
+  // ✅ NEW: PWA detection (standalone mode)
+  const isPwa = useStandalonePwa();
 
   // ✅ SINGLE ROUTE CLASSIFICATION
   const route = classifyRoute(pathname);
@@ -227,7 +259,7 @@ function RootLayoutContent({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (!route.isAuthPage && !route.isDashboardPage) {
-      setCookie("lastPage", pathname, { path: "/", maxAge: 86400 }); // 24h
+      setCookie("lastPage", pathname, { path: "/", maxAge: 86400 });
     }
   }, [pathname, route.isAuthPage, route.isDashboardPage]);
 
@@ -236,28 +268,22 @@ function RootLayoutContent({ children }: { children: React.ReactNode }) {
     if (typeof window === "undefined" || route.isAuthPage) return;
 
     try {
-      // Skip first load
       const isFirstLoad = !sessionStorage.getItem("analyticsInit");
       if (isFirstLoad) {
         sessionStorage.setItem("analyticsInit", "1");
         return;
       }
 
-      // Debounce duplicate tracks
       const lastUrl = sessionStorage.getItem("lastTrackedUrl");
       if (lastUrl === pathname) return;
-      
+
       sessionStorage.setItem("lastTrackedUrl", pathname);
-    } catch (e) {
-      // iOS private mode - sessionStorage might fail
-      // Continue without deduplication
-    }
+    } catch {}
 
     analytics.onRouteChange(window.location.href);
 
     const pageCategory = route.isHome ? "landing" : route.isToolsPage ? "tools" : route.isDashboardPage ? "dashboard" : "general";
 
-    // Use setTimeout fallback if requestIdleCallback not available (older iOS)
     const scheduleTracking = () => {
       analytics.trackEvent("navigation", {
         category: "user_flow",
@@ -293,6 +319,28 @@ function RootLayoutContent({ children }: { children: React.ReactNode }) {
             </main>
           </div>
         </div>
+
+        {/* ✅ PWA Refresh (dashboard too, but only when installed) */}
+        {isPwa && (
+          <button
+            type="button"
+            aria-label="Refresh"
+            onClick={() => router.refresh()}
+            className="
+              fixed bottom-6 right-6 z-50
+              rounded-full
+              border border-[hsl(var(--border))]
+              bg-[hsl(var(--card))]
+              shadow-[var(--shadow-lg)]
+              p-3
+              backdrop-blur
+              active:scale-95
+              transition
+            "
+          >
+            <RefreshCw className="h-5 w-5 text-[hsl(var(--foreground))]" />
+          </button>
+        )}
       </SidebarProvider>
     );
   }
@@ -303,6 +351,29 @@ function RootLayoutContent({ children }: { children: React.ReactNode }) {
       <>
         <RegionBootstrap />
         {children}
+
+        {/* ✅ PWA Refresh (auth too, but only when installed) */}
+        {isPwa && (
+          <button
+            type="button"
+            aria-label="Refresh"
+            onClick={() => router.refresh()}
+            className="
+              fixed bottom-6 right-6 z-50
+              rounded-full
+              border border-[hsl(var(--border))]
+              bg-[hsl(var(--card))]
+              shadow-[var(--shadow-lg)]
+              p-3
+              backdrop-blur
+              active:scale-95
+              transition
+            "
+          >
+            <RefreshCw className="h-5 w-5 text-[hsl(var(--foreground))]" />
+          </button>
+        )}
+
         <Toaster
           position="top-right"
           toastOptions={{
@@ -330,7 +401,7 @@ function RootLayoutContent({ children }: { children: React.ReactNode }) {
       ) : isShopRoute ? (
         <>
           <ShopHeader onMenuClick={() => setMobileMenuOpen(true)} />
-          
+
           {mobileMenuOpen && (
             <>
               <div
@@ -351,8 +422,8 @@ function RootLayoutContent({ children }: { children: React.ReactNode }) {
 
       {children}
 
-      {/* ✅ LAZY LOAD NON-CRITICAL UI with error boundaries */}
-      <Suspense fallback={<div style={{ minHeight: '1px' }} />}>
+      {/* ✅ LAZY LOAD NON-CRITICAL UI */}
+      <Suspense fallback={<div style={{ minHeight: "1px" }} />}>
         {!useAppHeader && isShopRoute && <Footer />}
         {!useAppHeader && isShopRoute && <AccessibilityOverlay />}
         <CookieConsent
@@ -370,6 +441,28 @@ function RootLayoutContent({ children }: { children: React.ReactNode }) {
 
       {/* ✅ NON-LAZY: ConditionalOverlays needs CartProvider immediately */}
       <ConditionalOverlays />
+
+      {/* ✅ PWA Refresh (shop/app too, but only when installed) */}
+      {isPwa && (
+        <button
+          type="button"
+          aria-label="Refresh"
+          onClick={() => router.refresh()}
+          className="
+            fixed bottom-6 right-6 z-50
+            rounded-full
+            border border-[hsl(var(--border))]
+            bg-[hsl(var(--card))]
+            shadow-[var(--shadow-lg)]
+            p-3
+            backdrop-blur
+            active:scale-95
+            transition
+          "
+        >
+          <RefreshCw className="h-5 w-5 text-[hsl(var(--foreground))]" />
+        </button>
+      )}
 
       <Toaster
         position="top-right"
@@ -399,7 +492,6 @@ function RootLayoutContent({ children }: { children: React.ReactNode }) {
 }
 
 // ─── Root Layout Wrapper ─────────────────────────────────
-
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
