@@ -52,7 +52,6 @@ export default function RootLayout({
 }) {
   const pathname = usePathname();
   const [isFirstLoad, setIsFirstLoad] = useState(true);
-  const [headersReady, setHeadersReady] = useState(false);
 
   const screenSize = useScreenSize();
   const cookieVariant = getCookieConsentVariant(screenSize);
@@ -79,11 +78,6 @@ export default function RootLayout({
 
   // Determine layout type
   const metaLayout = isDashboardPage ? "dashboard" : useAppHeader ? "app" : "shop";
-
-  // Mark headers as ready after first render
-  useEffect(() => {
-    setHeadersReady(true);
-  }, []);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -145,7 +139,6 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* NO static theme-color - controlled by MetaThemeColor */}
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         
@@ -182,15 +175,9 @@ export default function RootLayout({
           <CartProvider>
             <RegionBootstrap />
 
-            {/* 
-              ✅ CRITICAL ORDER:
-              1. Headers render FIRST
-              2. MetaThemeColor renders AFTER (when headersReady = true)
-            */}
+            {/* Headers and MetaThemeColor - let MetaThemeColor handle its own timing */}
             {useAppHeader ? <AppHeader /> : showNav && <ShopHeader />}
-            
-            {/* Only render after headers are mounted */}
-            {headersReady && <MetaThemeColor layout={metaLayout} />}
+            <MetaThemeColor layout={metaLayout} />
 
             {children}
             
