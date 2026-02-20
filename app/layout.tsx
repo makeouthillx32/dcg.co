@@ -4,13 +4,13 @@
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { Providers } from "./provider";
-import ConditionalOverlays from "@/components/Layouts/overlays/ConditionalOverlays";
-import { CartProvider } from "@/components/Layouts/overlays/cart/cart-context";
 import ShopHeader from "@/components/Layouts/shop/Header";
 import AppHeader from "@/components/Layouts/app/nav";
 import Footer from "@/components/Layouts/footer";
 import AccessibilityOverlay from "@/components/Layouts/overlays/accessibility/accessibility";
 import { CookieConsent } from "@/components/CookieConsent";
+import ConditionalOverlays from "@/components/Layouts/overlays/ConditionalOverlays";
+import { CartProvider } from "@/components/Layouts/overlays/cart/cart-context";
 import analytics from "@/lib/analytics";
 import { setCookie } from "@/lib/cookieUtils";
 import { Toaster } from "react-hot-toast";
@@ -45,9 +45,15 @@ function getCookieConsentVariant(screenSize: "mobile" | "tablet" | "desktop") {
   }
 }
 
-function ClientContent({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const pathname = usePathname();
   const [isFirstLoad, setIsFirstLoad] = useState(true);
+  const [headersReady, setHeadersReady] = useState(false);
+
   const screenSize = useScreenSize();
   const cookieVariant = getCookieConsentVariant(screenSize);
 
@@ -70,6 +76,14 @@ function ClientContent({ children }: { children: React.ReactNode }) {
 
   const isShopRoute = isHome || isProductsPage || isCollectionsPage || isCategoryPage;
   const useAppHeader = isCheckoutRoute || isProfileMeRoute;
+
+  // Determine layout type
+  const metaLayout = isDashboardPage ? "dashboard" : useAppHeader ? "app" : "shop";
+
+  // Mark headers as ready after first render
+  useEffect(() => {
+    setHeadersReady(true);
+  }, []);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -128,71 +142,10 @@ function ClientContent({ children }: { children: React.ReactNode }) {
   const showFooter = isShopRoute;
   const showAccessibility = isShopRoute;
 
-  const metaLayout = isDashboardPage ? "dashboard" : useAppHeader ? "app" : "shop";
-
-  return (
-    <>
-      <RegionBootstrap />
-
-      {/* ✅ Headers render FIRST - this ensures [data-layout] exists */}
-      {useAppHeader ? <AppHeader /> : showNav && <ShopHeader />}
-      
-      {/* ✅ MetaThemeColor runs AFTER headers are mounted */}
-      <MetaThemeColor layout={metaLayout} />
-
-      {children}
-      
-      {!useAppHeader && showFooter && <Footer />}
-      {!useAppHeader && showAccessibility && <AccessibilityOverlay />}
-
-      <CookieConsent
-        variant={cookieVariant}
-        showCustomize={screenSize !== "mobile"}
-        description={
-          screenSize === "mobile"
-            ? "We use cookies to enhance your experience. Essential cookies are required for functionality."
-            : screenSize === "tablet"
-              ? "We use cookies to enhance your experience and analyze usage. Essential cookies required."
-              : "We use cookies to enhance your experience, analyze site usage, and improve our services. Essential cookies are required for basic functionality."
-        }
-      />
-
-      <Toaster
-        position="top-right"
-        toastOptions={{
-          duration: 3000,
-          style: {
-            background: "hsl(var(--background))",
-            color: "hsl(var(--foreground))",
-            border: "1px solid hsl(var(--border))",
-          },
-          success: {
-            iconTheme: {
-              primary: "hsl(var(--primary))",
-              secondary: "hsl(var(--primary-foreground))",
-            },
-          },
-          error: {
-            iconTheme: {
-              primary: "hsl(var(--destructive))",
-              secondary: "hsl(var(--destructive-foreground))",
-            },
-          },
-        }}
-      />
-    </>
-  );
-}
-
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* iOS-specific status bar configuration */}
+        {/* NO static theme-color - controlled by MetaThemeColor */}
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         
@@ -227,8 +180,60 @@ export default function RootLayout({
       <body className="min-h-screen font-[var(--font-sans)]">
         <Providers>
           <CartProvider>
-            <ClientContent>{children}</ClientContent>
+            <RegionBootstrap />
+
+            {/* 
+              ✅ CRITICAL ORDER:
+              1. Headers render FIRST
+              2. MetaThemeColor renders AFTER (when headersReady = true)
+            */}
+            {useAppHeader ? <AppHeader /> : showNav && <ShopHeader />}
+            
+            {/* Only render after headers are mounted */}
+            {headersReady && <MetaThemeColor layout={metaLayout} />}
+
+            {children}
+            
+            {!useAppHeader && showFooter && <Footer />}
+            {!useAppHeader && showAccessibility && <AccessibilityOverlay />}
+
             <ConditionalOverlays />
+
+            <CookieConsent
+              variant={cookieVariant}
+              showCustomize={screenSize !== "mobile"}
+              description={
+                screenSize === "mobile"
+                  ? "We use cookies to enhance your experience. Essential cookies are required for functionality."
+                  : screenSize === "tablet"
+                    ? "We use cookies to enhance your experience and analyze usage. Essential cookies required."
+                    : "We use cookies to enhance your experience, analyze site usage, and improve our services. Essential cookies are required for basic functionality."
+              }
+            />
+
+            <Toaster
+              position="top-right"
+              toastOptions={{
+                duration: 3000,
+                style: {
+                  background: "hsl(var(--background))",
+                  color: "hsl(var(--foreground))",
+                  border: "1px solid hsl(var(--border))",
+                },
+                success: {
+                  iconTheme: {
+                    primary: "hsl(var(--primary))",
+                    secondary: "hsl(var(--primary-foreground))",
+                  },
+                },
+                error: {
+                  iconTheme: {
+                    primary: "hsl(var(--destructive))",
+                    secondary: "hsl(var(--destructive-foreground))",
+                  },
+                },
+              }}
+            />
           </CartProvider>
         </Providers>
       </body>
