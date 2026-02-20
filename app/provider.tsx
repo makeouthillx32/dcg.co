@@ -35,7 +35,7 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   isLoading: boolean;
-  refreshSession: () => void; // Added for iOS session refresh
+  refreshSession: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -51,12 +51,8 @@ export const useAuth = () => {
 // 🍎 iOS Session Persistence Component
 function IOSSessionManager({ children }: { children: React.ReactNode }) {
   useEffect(() => {
-    // Setup iOS session persistence handlers
     const cleanup = iosSessionHelpers.setupIOSHandlers();
-    
     console.log('[Provider] 🍎 iOS session persistence initialized');
-    
-    // Return cleanup function
     return cleanup;
   }, []);
 
@@ -69,7 +65,6 @@ function InternalAuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
 
-  // 🍎 Manual session refresh function for iOS
   const refreshSession = () => {
     iosSessionHelpers.refreshSession();
     console.log('[Provider] 🔄 Manual session refresh triggered');
@@ -85,16 +80,22 @@ function InternalAuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!isLoading && !session) {
-      // Public routes that don't require authentication
+      // ✅ EXPANDED: Add all public routes including auth callback
       const publicRoutes = [
         "/", 
         "/sign-in", 
         "/sign-up", 
         "/forgot-password", 
-        "/reset-password"
+        "/reset-password",
+        "/auth/callback",
+        "/auth/callback/oauth"
       ];
       
-      const isPublicRoute = publicRoutes.includes(pathname);
+      // ✅ Also check if path starts with public prefixes
+      const publicPrefixes = ["/products", "/collections", "/auth"];
+      
+      const isPublicRoute = publicRoutes.includes(pathname) || 
+                           publicPrefixes.some(prefix => pathname.startsWith(prefix));
       
       if (!isPublicRoute) {
         console.log(`[Provider] Redirecting to sign-in from: ${pathname}`);
@@ -120,8 +121,8 @@ export function useIOSSessionRefresh() {
   return { refreshSession };
 }
 
-// Main Supabase Provider (renamed from Providers to SupabaseProvider for consistency)
-export const SupabaseProvider: React.FC<{
+// Main Provider Component
+export const Providers: React.FC<{
   children: React.ReactNode;
   session?: Session | null;
 }> = ({ children, session }) => {
@@ -130,7 +131,6 @@ export const SupabaseProvider: React.FC<{
   const [mounted, setMounted] = useState(false);
   const [availableThemes, setAvailableThemes] = useState<string[]>([]);
   
-  // Updated getTheme function
   const getTheme = async (id?: string): Promise<Theme | null> => {
     const targetId = id || themeId;
     try {
@@ -146,7 +146,6 @@ export const SupabaseProvider: React.FC<{
     }
   };
   
-  // Enhanced setThemeId function with smooth transitions
   const setThemeId = async (id: string, element?: HTMLElement) => {
     const themeChangeCallback = async () => {
       try {
@@ -164,7 +163,6 @@ export const SupabaseProvider: React.FC<{
       }
     };
 
-    // Use smooth transition if element provided, otherwise regular transition
     if (element) {
       await smoothThemeToggle(element, themeChangeCallback);
     } else {
@@ -172,13 +170,11 @@ export const SupabaseProvider: React.FC<{
     }
   };
 
-  // Enhanced toggleTheme with smooth transitions
   const toggleTheme = async (element?: HTMLElement) => {
     const themeChangeCallback = () => {
       setThemeType((prev) => (prev === "light" ? "dark" : "light"));
     };
 
-    // Use smooth transition if element provided, otherwise regular transition
     if (element) {
       await smoothThemeToggle(element, themeChangeCallback);
     } else {
@@ -186,7 +182,6 @@ export const SupabaseProvider: React.FC<{
     }
   };
 
-  // Load available themes from database
   useEffect(() => {
     const loadAvailableThemes = async () => {
       try {
@@ -195,20 +190,18 @@ export const SupabaseProvider: React.FC<{
         console.log(`📚 Loaded ${themeIds.length} available themes:`, themeIds);
       } catch (error) {
         console.error("❌ Error loading available themes:", error);
-        setAvailableThemes([defaultThemeId]); // Fallback
+        setAvailableThemes([defaultThemeId]);
       }
     };
     
     loadAvailableThemes();
   }, []);
 
-  // Initialize theme from storage
   useEffect(() => {
     if (typeof window !== "undefined") {
       setMounted(true);
       
       const initializeTheme = async () => {
-        // Load saved theme ID
         const savedThemeId = localStorage.getItem("themeId") || getCookie("themeId");
         if (savedThemeId) {
           const theme = await getThemeById(savedThemeId);
@@ -220,7 +213,6 @@ export const SupabaseProvider: React.FC<{
           }
         }
         
-        // Load saved theme type
         const savedThemeType = localStorage.getItem("theme") || getCookie("theme");
         if (!savedThemeType) {
           const systemPrefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
@@ -234,7 +226,6 @@ export const SupabaseProvider: React.FC<{
     }
   }, []);
 
-  // Apply theme when it changes
   useEffect(() => {
     if (!mounted || availableThemes.length === 0) return;
     
@@ -251,22 +242,18 @@ export const SupabaseProvider: React.FC<{
         const variables = themeType === "dark" ? theme.dark : theme.light;
         const html = document.documentElement;
         
-        // Remove old classes
         html.classList.remove("light", "dark");
         availableThemes.forEach(id => html.classList.remove(`theme-${id}`));
         
-        // Add new classes
         html.classList.add(themeType);
         html.classList.add(`theme-${themeId}`);
         
         console.log(`🔧 Applying ${Object.keys(variables).length} CSS variables`);
         
-        // Apply CSS variables
         for (const [key, value] of Object.entries(variables)) {
           html.style.setProperty(key, value);
         }
         
-        // Load fonts
         try {
           console.log(`🔤 Auto-loading fonts from CSS variables...`);
           await dynamicFontManager.autoLoadFontsFromCSS();
@@ -274,12 +261,10 @@ export const SupabaseProvider: React.FC<{
           console.error('❌ Failed to auto-load fonts:', error);
         }
         
-        // Apply typography
         if (theme.typography?.trackingNormal) {
           document.body.style.letterSpacing = theme.typography.trackingNormal;
         }
         
-        // Save theme type
         localStorage.setItem("theme", themeType);
         setCookie("theme", themeType, { path: "/", maxAge: 31536000 });
         
