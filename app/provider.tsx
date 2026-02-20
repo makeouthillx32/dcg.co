@@ -10,7 +10,6 @@ import { Theme } from "@/types/theme";
 import { defaultThemeId, getThemeById, getAvailableThemeIds } from "@/themes";
 import { dynamicFontManager } from "@/lib/dynamicFontManager";
 import { transitionTheme, smoothThemeToggle } from "@/utils/themeTransitions";
-import MetaThemeColor from "@/components/Layouts/meta-theme-color";
 
 interface EnhancedThemeContextType {
   themeType: "light" | "dark";
@@ -86,19 +85,16 @@ function InternalAuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!isLoading && !session) {
-      // ✅ FIXED: Added /CMS and /CMS/schedule to public routes
+      // Public routes that don't require authentication
       const publicRoutes = [
         "/", 
         "/sign-in", 
         "/sign-up", 
         "/forgot-password", 
-        "/reset-password",
-        "/CMS",
-        "/CMS/schedule"
+        "/reset-password"
       ];
       
-      // ✅ FIXED: Also check if pathname starts with /CMS for any CMS subroutes
-      const isPublicRoute = publicRoutes.includes(pathname) || pathname.startsWith('/CMS');
+      const isPublicRoute = publicRoutes.includes(pathname);
       
       if (!isPublicRoute) {
         console.log(`[Provider] Redirecting to sign-in from: ${pathname}`);
@@ -124,8 +120,8 @@ export function useIOSSessionRefresh() {
   return { refreshSession };
 }
 
-// Theme provider implementation
-export const Providers: React.FC<{
+// Main Supabase Provider (renamed from Providers to SupabaseProvider for consistency)
+export const SupabaseProvider: React.FC<{
   children: React.ReactNode;
   session?: Session | null;
 }> = ({ children, session }) => {

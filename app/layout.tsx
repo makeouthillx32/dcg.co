@@ -56,21 +56,13 @@ function getCookieConsentVariant(screenSize: "mobile" | "tablet" | "desktop") {
 }
 
 // ─── iOS 18 Safari Status Bar Fix ─────────────────────────
-// Research findings:
-// 1. iOS Safari caches theme-color on first paint
-// 2. JavaScript updates often ignored after initial detection
-// 3. Safari auto-samples <body> background if theme-color not set early
-// 4. iOS 18 "Liquid Glass" adds transparency/blur to status bar
-// 5. Need aggressive cache-busting and multiple update strategies
 
 function setMetaTag(name: string, content: string) {
-  // Remove existing tag first (cache bust)
   const existing = document.querySelector<HTMLMetaElement>(`meta[name="${name}"]`);
   if (existing) {
     existing.remove();
   }
   
-  // Create fresh tag
   const tag = document.createElement("meta");
   tag.setAttribute("name", name);
   tag.setAttribute("content", content);
@@ -98,14 +90,12 @@ function useMetaThemeColor(layout: "shop" | "dashboard" | "app", themeType: "lig
     const updateStatusBar = () => {
       if (cancelled) return;
 
-      // Find header element
       const el = document.querySelector<HTMLElement>(`[data-layout="${layout}"]`);
       if (!el) {
         console.log(`⚠️ [data-layout="${layout}"] not found`);
         return;
       }
 
-      // Read computed backgroundColor
       const bgColor = getComputedStyle(el).backgroundColor;
       
       if (!bgColor || bgColor === "transparent" || bgColor === "rgba(0, 0, 0, 0)") {
@@ -115,32 +105,26 @@ function useMetaThemeColor(layout: "shop" | "dashboard" | "app", themeType: "lig
 
       const hexColor = rgbToHex(bgColor);
       if (!hexColor || hexColor === lastColor) {
-        return; // Skip if same color
+        return;
       }
 
       lastColor = hexColor;
       console.log(`✅ iOS Status Bar [${layout}] ${themeType}: ${hexColor}`);
       
-      // iOS 18 Fix: Remove and recreate tags to bust cache
       setMetaTag("theme-color", hexColor);
       setMetaTag("apple-mobile-web-app-status-bar-style", "default");
       
-      // iOS 18 Fix: Force repaint by toggling visibility
       el.style.visibility = "hidden";
-      el.offsetHeight; // Force reflow
+      el.offsetHeight;
       el.style.visibility = "visible";
     };
 
-    // Strategy 1: Immediate update (before first paint if possible)
     updateStatusBar();
 
-    // Strategy 2: After a brief delay (catch late DOM updates)
     const quickTimer = setTimeout(updateStatusBar, 50);
 
-    // Strategy 3: Watch for theme changes
     const observer = new MutationObserver(() => {
       if (!cancelled) {
-        // Debounce updates
         setTimeout(updateStatusBar, 100);
       }
     });
@@ -155,7 +139,7 @@ function useMetaThemeColor(layout: "shop" | "dashboard" | "app", themeType: "lig
       clearTimeout(quickTimer);
       observer.disconnect();
     };
-  }, [layout, themeType]); // Re-run when theme changes
+  }, [layout, themeType]);
 }
 
 // ─── Root Layout Content ─────────────────────────────────
@@ -184,6 +168,9 @@ function RootLayoutContent({ children }: { children: React.ReactNode }) {
 
   const isCheckoutRoute = lowerPath.startsWith("/checkout") || lowerPath.startsWith("/cart");
   const isProfileMeRoute = lowerPath.startsWith("/profile/me");
+  
+  // ✅ FIX: Detect auth pages
+  const isAuthPage = lowerPath.startsWith("/sign-in") || lowerPath.startsWith("/sign-up") || lowerPath.startsWith("/forgot-password");
 
   const isShopRoute = isHome || isProductsPage || isCollectionsPage || isCategoryPage;
   const useAppHeader = isCheckoutRoute || isProfileMeRoute;
@@ -196,8 +183,8 @@ function RootLayoutContent({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const isAuthPage = pathname === "/sign-in" || pathname === "/sign-up" || lowerPath.startsWith("/auth");
-      if (!isAuthPage) {
+      const isAuthRoute = pathname === "/sign-in" || pathname === "/sign-up" || lowerPath.startsWith("/auth");
+      if (!isAuthRoute) {
         setCookie("lastPage", pathname, { path: "/" });
       }
     }
@@ -206,8 +193,8 @@ function RootLayoutContent({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const isAuthPage = pathname === "/sign-in" || pathname === "/sign-up" || lowerPath.startsWith("/auth");
-    if (isAuthPage) return;
+    const isAuthRoute = pathname === "/sign-in" || pathname === "/sign-up" || lowerPath.startsWith("/auth");
+    if (isAuthRoute) return;
 
     if (isFirstLoad) {
       setIsFirstLoad(false);
@@ -269,12 +256,46 @@ function RootLayoutContent({ children }: { children: React.ReactNode }) {
     );
   }
 
+  // ✅ FIX: Auth pages get minimal wrapper (no headers/footers, but keep RegionBootstrap for post-auth)
+  if (isAuthPage) {
+    return (
+      <>
+        <RegionBootstrap />
+        {children}
+        
+        {/* Keep toaster for error messages */}
+        <Toaster
+          position="top-right"
+          toastOptions={{
+            duration: 3000,
+            style: {
+              background: "hsl(var(--background))",
+              color: "hsl(var(--foreground))",
+              border: "1px solid hsl(var(--border))",
+            },
+            success: {
+              iconTheme: {
+                primary: "hsl(var(--primary))",
+                secondary: "hsl(var(--primary-foreground))",
+              },
+            },
+            error: {
+              iconTheme: {
+                primary: "hsl(var(--destructive))",
+                secondary: "hsl(var(--destructive-foreground))",
+              },
+            },
+          }}
+        />
+      </>
+    );
+  }
+
   // ✅ Shop/App layout rendering
   return (
     <CartProvider>
       <RegionBootstrap />
 
-      {/* Headers render */}
       {useAppHeader ? <AppHeader /> : showNav && <ShopHeader />}
 
       {children}
@@ -330,12 +351,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" suppressHydrationWarning>
       <head>
         <meta name="apple-mobile-web-app-capable" content="yes" />
-        {/* iOS 18 Fix: Use "default" so theme-color is respected */}
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        
-        {/* iOS 18 Fix: Provide neutral initial value (will be updated by JS) */}
         <meta name="theme-color" content="#000000" />
-
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="format-detection" content="telephone=no" />
 
