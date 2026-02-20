@@ -1,4 +1,4 @@
-// Enhanced app/provider.tsx with iOS session persistence added
+// app/provider.tsx
 "use client";
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { createBrowserClient } from "@supabase/ssr";
@@ -10,7 +10,6 @@ import { Theme } from "@/types/theme";
 import { defaultThemeId, getThemeById, getAvailableThemeIds } from "@/themes";
 import { dynamicFontManager } from "@/lib/dynamicFontManager";
 import { transitionTheme, smoothThemeToggle } from "@/utils/themeTransitions";
-import MetaThemeColor from "@/components/Layouts/meta-theme-color";
 
 interface EnhancedThemeContextType {
   themeType: "light" | "dark";
@@ -23,20 +22,57 @@ interface EnhancedThemeContextType {
 
 const ThemeContext = createContext<EnhancedThemeContextType | undefined>(undefined);
 
-export const useTheme = () => {
+// ✅ NEW: Export a hook that can be used OUTSIDE the provider (for layout.tsx)
+// This reads the DOM directly instead of requiring context
+export function useTheme() {
   const context = useContext(ThemeContext);
-  if (context === undefined) {
-    throw new Error("useTheme must be used within a ThemeProvider");
+  
+  // If we're inside the provider, use the context
+  if (context !== undefined) {
+    return context;
   }
-  return context;
-};
+  
+  // If we're outside the provider (like in layout.tsx before Providers wraps),
+  // return a minimal implementation that reads from DOM
+  const [themeType, setThemeType] = useState<"light" | "dark">(() => {
+    if (typeof window === "undefined") return "light";
+    return document.documentElement.classList.contains("dark") ? "dark" : "light";
+  });
+
+  // Listen for theme changes on the DOM
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const observer = new MutationObserver(() => {
+      const isDark = document.documentElement.classList.contains("dark");
+      setThemeType(isDark ? "dark" : "light");
+    });
+
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+
+    return () => observer.disconnect();
+  }, []);
+
+  // Minimal implementation for outside the provider
+  return {
+    themeType,
+    toggleTheme: async () => {},
+    themeId: defaultThemeId,
+    setThemeId: async () => {},
+    getTheme: async () => null,
+    availableThemes: [defaultThemeId],
+  };
+}
 
 // Auth context interface
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   isLoading: boolean;
-  refreshSession: () => void; // Added for iOS session refresh
+  refreshSession: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -52,12 +88,8 @@ export const useAuth = () => {
 // 🍎 iOS Session Persistence Component
 function IOSSessionManager({ children }: { children: React.ReactNode }) {
   useEffect(() => {
-    // Setup iOS session persistence handlers
     const cleanup = iosSessionHelpers.setupIOSHandlers();
-    
     console.log('[Provider] 🍎 iOS session persistence initialized');
-    
-    // Return cleanup function
     return cleanup;
   }, []);
 
@@ -70,7 +102,6 @@ function InternalAuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
 
-  // 🍎 Manual session refresh function for iOS
   const refreshSession = () => {
     iosSessionHelpers.refreshSession();
     console.log('[Provider] 🔄 Manual session refresh triggered');
@@ -86,7 +117,6 @@ function InternalAuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!isLoading && !session) {
-      // ✅ FIXED: Added /CMS and /CMS/schedule to public routes
       const publicRoutes = [
         "/", 
         "/sign-in", 
@@ -97,7 +127,6 @@ function InternalAuthProvider({ children }: { children: React.ReactNode }) {
         "/CMS/schedule"
       ];
       
-      // ✅ FIXED: Also check if pathname starts with /CMS for any CMS subroutes
       const isPublicRoute = publicRoutes.includes(pathname) || pathname.startsWith('/CMS');
       
       if (!isPublicRoute) {
@@ -134,7 +163,6 @@ export const Providers: React.FC<{
   const [mounted, setMounted] = useState(false);
   const [availableThemes, setAvailableThemes] = useState<string[]>([]);
   
-  // Updated getTheme function
   const getTheme = async (id?: string): Promise<Theme | null> => {
     const targetId = id || themeId;
     try {
@@ -150,7 +178,6 @@ export const Providers: React.FC<{
     }
   };
   
-  // Enhanced setThemeId function with smooth transitions
   const setThemeId = async (id: string, element?: HTMLElement) => {
     const themeChangeCallback = async () => {
       try {
@@ -168,7 +195,6 @@ export const Providers: React.FC<{
       }
     };
 
-    // Use smooth transition if element provided, otherwise regular transition
     if (element) {
       await smoothThemeToggle(element, themeChangeCallback);
     } else {
@@ -176,13 +202,11 @@ export const Providers: React.FC<{
     }
   };
 
-  // Enhanced toggleTheme with smooth transitions
   const toggleTheme = async (element?: HTMLElement) => {
     const themeChangeCallback = () => {
       setThemeType((prev) => (prev === "light" ? "dark" : "light"));
     };
 
-    // Use smooth transition if element provided, otherwise regular transition
     if (element) {
       await smoothThemeToggle(element, themeChangeCallback);
     } else {
@@ -190,7 +214,6 @@ export const Providers: React.FC<{
     }
   };
 
-  // Load available themes from database
   useEffect(() => {
     const loadAvailableThemes = async () => {
       try {
@@ -199,20 +222,18 @@ export const Providers: React.FC<{
         console.log(`📚 Loaded ${themeIds.length} available themes:`, themeIds);
       } catch (error) {
         console.error("❌ Error loading available themes:", error);
-        setAvailableThemes([defaultThemeId]); // Fallback
+        setAvailableThemes([defaultThemeId]);
       }
     };
     
     loadAvailableThemes();
   }, []);
 
-  // Initialize theme from storage
   useEffect(() => {
     if (typeof window !== "undefined") {
       setMounted(true);
       
       const initializeTheme = async () => {
-        // Load saved theme ID
         const savedThemeId = localStorage.getItem("themeId") || getCookie("themeId");
         if (savedThemeId) {
           const theme = await getThemeById(savedThemeId);
@@ -224,7 +245,6 @@ export const Providers: React.FC<{
           }
         }
         
-        // Load saved theme type
         const savedThemeType = localStorage.getItem("theme") || getCookie("theme");
         if (!savedThemeType) {
           const systemPrefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
@@ -238,7 +258,6 @@ export const Providers: React.FC<{
     }
   }, []);
 
-  // Apply theme when it changes
   useEffect(() => {
     if (!mounted || availableThemes.length === 0) return;
     
@@ -255,22 +274,18 @@ export const Providers: React.FC<{
         const variables = themeType === "dark" ? theme.dark : theme.light;
         const html = document.documentElement;
         
-        // Remove old classes
         html.classList.remove("light", "dark");
         availableThemes.forEach(id => html.classList.remove(`theme-${id}`));
         
-        // Add new classes
         html.classList.add(themeType);
         html.classList.add(`theme-${themeId}`);
         
         console.log(`🔧 Applying ${Object.keys(variables).length} CSS variables`);
         
-        // Apply CSS variables
         for (const [key, value] of Object.entries(variables)) {
           html.style.setProperty(key, value);
         }
         
-        // Load fonts
         try {
           console.log(`🔤 Auto-loading fonts from CSS variables...`);
           await dynamicFontManager.autoLoadFontsFromCSS();
@@ -278,12 +293,10 @@ export const Providers: React.FC<{
           console.error('❌ Failed to auto-load fonts:', error);
         }
         
-        // Apply typography
         if (theme.typography?.trackingNormal) {
           document.body.style.letterSpacing = theme.typography.trackingNormal;
         }
         
-        // Save theme type
         localStorage.setItem("theme", themeType);
         setCookie("theme", themeType, { path: "/", maxAge: 31536000 });
         
