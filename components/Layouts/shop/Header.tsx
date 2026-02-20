@@ -24,81 +24,68 @@ export function Header({ onMenuClick }: HeaderProps = {}) {
   return (
     <header 
       data-layout="shop"
-      className="header-container bg-[var(--lt-bg)] text-[var(--lt-fg)] border-b border-[var(--lt-border)]"
+      className="sticky top-0 z-30 flex items-center justify-between border-b border-[var(--lt-border)] bg-[var(--lt-bg)] px-4 py-5 shadow-[var(--lt-shadow)] text-[var(--lt-fg)] md:px-5 2xl:px-10"
     >
-      <div className="header-content">
-        {/* LEFT (Mobile): Hamburger */}
-        <div className="header-left">
-          <button
-            className="mobile-hamburger text-[var(--lt-fg)] focus:ring-primary"
-            onClick={onMenuClick}
-            aria-label="Open menu"
-            type="button"
+      {/* LEFT (Mobile): Hamburger */}
+      <button
+        className="mobile-hamburger rounded-[var(--radius)] border border-[hsl(var(--border))] px-1.5 py-1 dark:border-[hsl(var(--sidebar-border))] dark:bg-[hsl(var(--background))] hover:dark:bg-[hsla(var(--background),0.1)] lg:hidden"
+        onClick={onMenuClick}
+        aria-label="Open menu"
+        type="button"
+      >
+        <Menu className="h-5 w-5" />
+        <span className="sr-only">Toggle Menu</span>
+      </button>
+
+      {/* CENTER: Logo */}
+      <Link href="/" className="flex-shrink-0 hover:opacity-80 transition-opacity">
+        <img
+          src={
+            themeType === "dark"
+              ? "/images/home/dartlogowhite.svg"
+              : "/images/home/dartlogo.svg"
+          }
+          alt="DART Logo"
+          className="h-12 w-auto md:h-14"
+        />
+      </Link>
+
+      {/* CENTER (Desktop): Desktop Nav */}
+      <div className="hidden md:flex flex-1 items-center justify-center">
+        <DesktopNav />
+      </div>
+
+      {/* RIGHT: Auth + Theme */}
+      <div className="flex flex-1 items-center justify-end gap-2 min-[375px]:gap-4">
+        {/* Desktop Auth */}
+        {!session ? (
+          <Link
+            href="/sign-in"
+            className="font-medium text-sm whitespace-nowrap hover:underline transition-colors"
+            aria-label="Sign in"
           >
-            <Menu className="hamburger-icon" />
-          </button>
-        </div>
-
-        {/* CENTER: Logo */}
-        <div className="header-logo">
-          <Link href="/" className="logo-link focus:ring-primary">
-            <img
-              src={
-                themeType === "dark"
-                  ? "/images/home/dartlogowhite.svg"
-                  : "/images/home/dartlogo.svg"
-              }
-              alt="DART Logo"
-              className="logo-image"
-            />
+            <span className="md:hidden">Sign In</span>
+            <span className="hidden md:inline-flex items-center">
+              <User className="w-5 h-5" aria-hidden="true" />
+            </span>
           </Link>
-        </div>
+        ) : (
+          <button
+            onClick={handleAccountClick}
+            className="font-medium text-sm whitespace-nowrap hover:underline transition-colors"
+            type="button"
+            aria-label="Account"
+          >
+            <span className="md:hidden">Account</span>
+            <span className="hidden md:inline-flex items-center">
+              <User className="w-5 h-5" aria-hidden="true" />
+            </span>
+          </button>
+        )}
 
-        {/* CENTER (Desktop): Desktop Nav */}
-        <div className="header-nav">
-          <DesktopNav />
-        </div>
-
-        {/* RIGHT: Auth + Theme */}
-        <div className="header-actions">
-          {/* Desktop Auth */}
-          <div className="header-auth">
-            {!session ? (
-              <Link
-                href="/sign-in"
-                className="auth-button text-[var(--lt-fg)] hover:text-[var(--lt-fg)] focus:ring-primary"
-                aria-label="Sign in"
-              >
-                {/* Mobile: text */}
-                <span className="md:hidden">Sign In</span>
-
-                {/* Desktop: icon */}
-                <span className="hidden md:inline-flex items-center">
-                  <User className="w-5 h-5" aria-hidden="true" />
-                </span>
-              </Link>
-            ) : (
-              <button
-                onClick={handleAccountClick}
-                className="auth-button text-[var(--lt-fg)] hover:text-[var(--lt-fg)] focus:ring-primary"
-                type="button"
-                aria-label="Account"
-              >
-                {/* Mobile: text */}
-                <span className="md:hidden">Account</span>
-
-                {/* Desktop: icon */}
-                <span className="hidden md:inline-flex items-center text-[var(--lt-fg)] hover:text-primary transition-colors">
-                  <User className="w-5 h-5" aria-hidden="true" />
-                </span>
-              </button>
-            )}
-          </div>
-
-          {/* Theme Switcher */}
-          <div className="theme-switcher text-[var(--lt-fg)] hover:text-primary transition-colors">
-            <SwitchtoDarkMode />
-          </div>
+        {/* Theme Switcher */}
+        <div className="flex items-center justify-center">
+          <SwitchtoDarkMode />
         </div>
       </div>
     </header>
