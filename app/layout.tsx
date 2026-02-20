@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { Providers } from "./provider";
 import { useTheme } from "./provider";
 import { Header as ShopHeader } from "@/components/Layouts/shop/Header";
-import AppHeader from "@/components/Layouts/app/nav";
+import { Header as AppHeader } from "@/components/Layouts/app/nav";
 import { Header as DashboardHeader } from "@/components/Layouts/dashboard";
 import { Sidebar } from "@/components/Layouts/sidebar";
 import { SidebarProvider } from "@/components/Layouts/sidebar/sidebar-context";
