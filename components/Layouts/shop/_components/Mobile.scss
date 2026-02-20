@@ -257,8 +257,6 @@
   width: min(86vw, 360px);
 
   z-index: 61; /* --z-drawer panel */
-
-  background: var(--lt-bg);
   border-right: 1px solid hsl(var(--border));
   box-shadow: var(--lt-shadow);
 
@@ -297,8 +295,7 @@
 @media (max-width: 768px) {
   /* ONLY protect home page header - be very specific */
   .header-container {
-    /* Force solid background */
-    background: var(--lt-bg) !important;
+    /* Force solid background handled by JSX */
     
     /* No backdrop effects whatsoever */
     backdrop-filter: none !important;

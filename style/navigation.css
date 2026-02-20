@@ -28,7 +28,7 @@
   .nav-dropdown {
     @apply absolute top-full mt-2 z-50 rounded-b-xl shadow-lg p-3
            left-1/2 -translate-x-1/2 max-w-[90vw] w-max;
-    background: var(--lt-bg);
+    /* Background handled by JSX bg-[var(--lt-bg)] */
     opacity: 0;
     visibility: hidden;
     transition: opacity 150ms ease-in-out, visibility 150ms ease-in-out;
@@ -61,7 +61,7 @@
   .drawer-content {
     @apply absolute top-16 left-0 right-0 z-50 border-b
            shadow-md rounded-b-xl overflow-hidden max-h-fit;
-    background: var(--lt-bg);
+    /* Background handled by JSX bg-[var(--lt-bg)] */
     border-color: var(--lt-border);
   }
 
@@ -71,7 +71,7 @@
   }
 
   .drawer-link:hover {
-    background: var(--lt-bg);
+    /* Background handled by JSX bg-[var(--lt-bg)] */
     opacity: 0.85;
   }
 
