@@ -13,6 +13,7 @@ import ContextMenu from './ContextMenu';
 import Preview from './Preview';
 import FavoritesBar from './FavoritesBar';
 import FileGrid from './FileGrid';
+import { Upload, X } from 'lucide-react';
 
 interface DocumentsProps {
   className?: string;
@@ -40,6 +41,7 @@ export default function Documents({ className = '' }: DocumentsProps) {
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [isSearching, setIsSearching] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
+  const [dragOverUploadZone, setDragOverUploadZone] = useState(false);
   
   // Additional state for toolbar functionality
   const [sortBy, setSortBy] = useState<'name' | 'date' | 'size' | 'type'>('name');
@@ -142,36 +144,20 @@ export default function Documents({ className = '' }: DocumentsProps) {
     async () => {
       console.log('🎯 Documents handleCreateFolder called');
       
-      // Show prompt to get folder name
       const folderName = prompt('Enter folder name:');
       
-      // Validate folder name
       if (!folderName || folderName.trim().length === 0) {
         console.log('❌ User cancelled or provided empty folder name');
         return;
       }
       
       const safeFolderName = folderName.trim();
-      console.log('🎯 Creating folder:', {
-        folderName: safeFolderName,
-        currentPath,
-        currentPathType: typeof currentPath
-      });
-      
-      // Ensure currentPath is a string
       const safeCurrentPath = typeof currentPath === 'string' ? currentPath : '';
       
       try {
-        console.log('🎯 Calling createFolder with safe values:', {
-          folderName: safeFolderName,
-          parentPath: safeCurrentPath
-        });
-        
         await createFolder(safeFolderName, safeCurrentPath || undefined);
         console.log('✅ Folder created successfully');
         toast.success(`Folder "${safeFolderName}" created successfully`);
-        
-        // Refresh the documents list
         await fetchDocuments();
       } catch (error) {
         console.error('❌ Failed to create folder:', error);
@@ -183,11 +169,10 @@ export default function Documents({ className = '' }: DocumentsProps) {
 
   // Public folder handlers
   const handleMakePublic = useCallback(async (documentId: string) => {
-    console.log('🎯 Making folder public:', documentId);
     try {
       await makefolderPublic(documentId);
       toast.success('Folder made public successfully');
-      await fetchDocuments(); // Refresh to get updated data
+      await fetchDocuments();
     } catch (error) {
       console.error('❌ Failed to make folder public:', error);
       toast.error('Failed to make folder public');
@@ -195,11 +180,10 @@ export default function Documents({ className = '' }: DocumentsProps) {
   }, [makefolderPublic, fetchDocuments]);
 
   const handleMakePrivate = useCallback(async (documentId: string) => {
-    console.log('🎯 Making folder private:', documentId);
     try {
       await makeFolderPrivate(documentId);
       toast.success('Folder made private successfully');
-      await fetchDocuments(); // Refresh to get updated data
+      await fetchDocuments();
     } catch (error) {
       console.error('❌ Failed to make folder private:', error);
       toast.error('Failed to make folder private');
@@ -207,7 +191,6 @@ export default function Documents({ className = '' }: DocumentsProps) {
   }, [makeFolderPrivate, fetchDocuments]);
 
   const handleCopyPublicUrl = useCallback((publicSlug: string) => {
-    console.log('🎯 Copying public URL for slug:', publicSlug);
     try {
       copyFolderUrl(publicSlug);
       toast.success('Public URL copied to clipboard');
@@ -218,7 +201,6 @@ export default function Documents({ className = '' }: DocumentsProps) {
   }, [copyFolderUrl]);
 
   const handleGenerateCode = useCallback((publicSlug: string) => {
-    console.log('🎯 Generating code for slug:', publicSlug);
     try {
       const code = generateUsageExample(publicSlug);
       navigator.clipboard.writeText(code);
@@ -241,40 +223,32 @@ export default function Documents({ className = '' }: DocumentsProps) {
       try {
         switch (action) {
           case 'preview':
-            console.log('👁️ Opening preview for:', document.name);
             setPreviewDocument(documentId);
             break;
           case 'download':
-            console.log('⬇️ Downloading:', document.name);
             window.open(`/api/documents/${documentId}/download`, '_blank');
             break;
           case 'favorite':
-            console.log('⭐ Toggling favorite for:', document.name);
             await updateDocument(documentId, {
               is_favorite: !document.is_favorite,
             });
             break;
           case 'delete':
-            console.log('🗑️ Attempting to delete:', document.name);
             if (confirm(`Are you sure you want to delete "${document.name}"?`)) {
               await deleteDocument(documentId);
             }
             break;
           case 'edit':
-            console.log('✏️ Editing:', document.name);
             const newName = prompt('Enter new name:', document.name);
             if (newName && newName !== document.name) {
               await updateDocument(documentId, { name: newName });
             }
             break;
-          default:
-            console.log('❓ Unknown action:', action);
         }
       } catch (error) {
         console.error(`❌ Failed to ${action} document:`, error);
       }
       
-      // Always close context menu after action
       setContextMenu(null);
     },
     [documents, updateDocument, deleteDocument]
@@ -282,25 +256,14 @@ export default function Documents({ className = '' }: DocumentsProps) {
 
   const handleContextMenu = useCallback(
     (e: React.MouseEvent, documentId: string) => {
-      console.log('🎯 Context menu triggered:', { 
-        documentId, 
-        clientX: e.clientX, 
-        clientY: e.clientY,
-        button: e.button,
-        type: e.type 
-      });
-      
       e.preventDefault();
       e.stopPropagation();
       
-      // Find the document to make sure it exists
       const document = documents.find(d => d.id === documentId);
       if (!document) {
         console.error('❌ Document not found for context menu:', documentId);
         return;
       }
-      
-      console.log('✅ Setting context menu state for:', document.name);
       
       setContextMenu({
         x: e.clientX,
@@ -312,7 +275,6 @@ export default function Documents({ className = '' }: DocumentsProps) {
   );
 
   const handleSelect = useCallback((id: string, isMulti: boolean) => {
-    console.log('🎯 Selection triggered:', { id, isMulti });
     setSelectedItems((prev) =>
       isMulti
         ? prev.includes(id)
@@ -324,28 +286,23 @@ export default function Documents({ className = '' }: DocumentsProps) {
 
   // Toolbar handlers
   const handleSortChange = useCallback((newSortBy: 'name' | 'date' | 'size' | 'type', newSortOrder: 'asc' | 'desc') => {
-    console.log('🎯 Sort changed:', { newSortBy, newSortOrder });
     setSortBy(newSortBy);
     setSortOrder(newSortOrder);
   }, []);
 
   const handleToggleFavorites = useCallback(() => {
-    console.log('🎯 Toggle favorites filter:', !showFavoritesOnly);
     setShowFavoritesOnly(prev => !prev);
-  }, [showFavoritesOnly]);
+  }, []);
 
   const handleClearSelection = useCallback(() => {
-    console.log('🎯 Clearing selection');
     setSelectedItems([]);
   }, []);
 
   const handleSelectAll = useCallback(() => {
-    console.log('🎯 Selecting all documents');
     setSelectedItems(documents.map(doc => doc.id));
   }, [documents]);
 
   const handleRefresh = useCallback(async () => {
-    console.log('🎯 Refreshing documents');
     try {
       await fetchDocuments();
     } catch (error) {
@@ -355,18 +312,9 @@ export default function Documents({ className = '' }: DocumentsProps) {
 
   const fileGridHandlers = useMemo(
     () => ({
-      onPreview: (id: string) => {
-        console.log('🎯 Preview handler called:', id);
-        setPreviewDocument(id);
-      },
-      onDownload: (id: string) => {
-        console.log('🎯 Download handler called:', id);
-        handleDocumentAction('download', id);
-      },
-      onToggleFavorite: (id: string) => {
-        console.log('🎯 Favorite handler called:', id);
-        handleDocumentAction('favorite', id);
-      },
+      onPreview: (id: string) => setPreviewDocument(id),
+      onDownload: (id: string) => handleDocumentAction('download', id),
+      onToggleFavorite: (id: string) => handleDocumentAction('favorite', id),
       onNavigate: handleNavigate,
       onAddFavorite: addFavorite,
       onContextMenu: handleContextMenu,
@@ -432,18 +380,14 @@ export default function Documents({ className = '' }: DocumentsProps) {
   // Close context menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      // Don't close if clicking on the context menu itself
       const target = e.target as HTMLElement;
       if (target.closest('.context-menu')) {
         return;
       }
-      
-      console.log('🎯 Closing context menu due to outside click');
       setContextMenu(null);
     };
 
     if (contextMenu) {
-      console.log('✅ Adding outside click listener');
       document.addEventListener('click', handleClickOutside);
       document.addEventListener('contextmenu', handleClickOutside);
     }
@@ -454,16 +398,6 @@ export default function Documents({ className = '' }: DocumentsProps) {
     };
   }, [contextMenu]);
 
-  // Debug context menu state
-  useEffect(() => {
-    if (contextMenu) {
-      console.log('🎯 Context menu state updated:', contextMenu);
-      const document = documents.find(d => d.id === contextMenu.documentId);
-      console.log('📄 Context menu document:', document);
-    }
-  }, [contextMenu, documents]);
-
-  // NOW we can conditionally render content (but hooks are already called)
   const renderContent = () => {
     if (isInitialLoading && loading) {
       return (
@@ -548,29 +482,13 @@ export default function Documents({ className = '' }: DocumentsProps) {
             />
           </div>
 
-          {/* Debug: Show context menu state */}
-          {process.env.NODE_ENV === 'development' && contextMenu && (
-            <div className="fixed top-4 right-4 bg-yellow-100 border border-yellow-400 p-2 rounded text-xs z-50">
-              <div>Context Menu Active</div>
-              <div>Document: {contextMenu.documentId}</div>
-              <div>Position: {contextMenu.x}, {contextMenu.y}</div>
-            </div>
-          )}
-
           {contextMenu && (
             <ContextMenu
               isOpen={true}
               position={{ x: contextMenu.x, y: contextMenu.y }}
               documentItem={documents.find((d) => d.id === contextMenu.documentId)}
-              onClose={() => {
-                console.log('🎯 Context menu onClose called');
-                setContextMenu(null);
-              }}
-              onAction={(action, docId) => {
-                console.log('🎯 Context menu onAction called:', { action, docId });
-                handleDocumentAction(action, docId);
-              }}
-              // Public folder props
+              onClose={() => setContextMenu(null)}
+              onAction={(action, docId) => handleDocumentAction(action, docId)}
               isPublicFolder={documents.find((d) => d.id === contextMenu.documentId)?.is_public_folder || false}
               publicSlug={documents.find((d) => d.id === contextMenu.documentId)?.public_slug || undefined}
               onMakePublic={handleMakePublic}
@@ -594,29 +512,76 @@ export default function Documents({ className = '' }: DocumentsProps) {
             />
           )}
 
+          {/* Enhanced Upload Modal */}
           {showUploadZone && (
-            <div className="fixed inset-0 bg-muted/70 flex items-center justify-center z-50">
-              <div className="bg-card rounded-lg p-6 max-w-md w-full mx-4 text-foreground border border-border">
-                <h3 className="text-lg font-medium mb-4">Upload Files</h3>
-                <input
-                  type="file"
-                  multiple
-                  onChange={(e) => {
-                    const files = Array.from(e.target.files || []);
-                    if (files.length > 0) {
-                      handleFileUpload(files);
-                      setShowUploadZone(false);
-                    }
-                  }}
-                  className="block w-full border border-border rounded-lg p-2 bg-background text-foreground"
-                />
-                <div className="flex gap-2 mt-4">
+            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+              <div className="bg-card rounded-2xl border border-border shadow-2xl max-w-md w-full overflow-hidden">
+                {/* Header */}
+                <div className="flex items-center justify-between p-6 border-b border-border">
+                  <h3 className="text-lg font-semibold text-foreground">Upload Files</h3>
                   <button
                     onClick={() => setShowUploadZone(false)}
-                    className="px-4 py-2 text-muted-foreground border border-border rounded-lg hover:bg-muted"
+                    className="p-2 hover:bg-muted rounded-lg transition-colors"
                   >
-                    Cancel
+                    <X className="h-5 w-5 text-muted-foreground" />
                   </button>
+                </div>
+
+                {/* Upload Area */}
+                <div className="p-6">
+                  <div
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setDragOverUploadZone(true);
+                    }}
+                    onDragLeave={() => setDragOverUploadZone(false)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setDragOverUploadZone(false);
+                      const files = Array.from(e.dataTransfer.files);
+                      if (files.length > 0) {
+                        handleFileUpload(files);
+                        setShowUploadZone(false);
+                      }
+                    }}
+                    className={`relative border-2 border-dashed rounded-xl p-8 text-center transition-all ${
+                      dragOverUploadZone
+                        ? 'border-primary bg-primary/5 scale-105'
+                        : 'border-border hover:border-primary/50 hover:bg-muted/50'
+                    }`}
+                  >
+                    <Upload className={`h-12 w-12 mx-auto mb-4 transition-colors ${
+                      dragOverUploadZone ? 'text-primary' : 'text-muted-foreground'
+                    }`} />
+                    
+                    <div className="space-y-2">
+                      <p className="text-base font-medium text-foreground">
+                        {dragOverUploadZone ? 'Drop files here' : 'Drag & drop files here'}
+                      </p>
+                      <p className="text-sm text-muted-foreground">or</p>
+                      <label className="inline-block">
+                        <input
+                          type="file"
+                          multiple
+                          onChange={(e) => {
+                            const files = Array.from(e.target.files || []);
+                            if (files.length > 0) {
+                              handleFileUpload(files);
+                              setShowUploadZone(false);
+                            }
+                          }}
+                          className="hidden"
+                        />
+                        <span className="px-4 py-2 bg-primary text-primary-foreground rounded-lg font-medium cursor-pointer hover:bg-primary/90 transition-colors inline-block">
+                          Browse Files
+                        </span>
+                      </label>
+                    </div>
+
+                    <p className="text-xs text-muted-foreground mt-4">
+                      Maximum file size: 50MB
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -626,6 +591,5 @@ export default function Documents({ className = '' }: DocumentsProps) {
     );
   };
 
-  // Always return JSX, never return early after hooks
   return renderContent();
-}
+}s
