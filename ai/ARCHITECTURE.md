@@ -2,11 +2,17 @@ DCG.CO
  ┣ ai
  ┃ ┣ AI_WORKFLOW.md
  ┃ ┣ ARCHITECTURE.md
+ ┃ ┣ CART-API-GUIDE.md
+ ┃ ┣ CART-CHECKOUT-INTEGRATION.md
+ ┃ ┣ CART-COMPONENTS-GUIDE.md
+ ┃ ┣ CART-INTEGRATION-CHECKLIST.md
+ ┃ ┣ COLLECTIONS_TO_LANDING_WORKFLOW.md
  ┃ ┣ CONVENTIONS.md
  ┃ ┣ DEBUG_PLAYBOOK.md
  ┃ ┣ DECISIONS.md
  ┃ ┣ ENV_AND_SECRETS.md
  ┃ ┣ FAIRE_PRODUCT_UPLOAD_GUIDE.md
+ ┃ ┣ PRODUCT-404-DEBUG.md
  ┃ ┣ PRODUCT_UPLOAD_Product_With _Multi_Size.md
  ┃ ┣ PROJECT_OVERVIEW.md
  ┃ ┣ README.md
@@ -24,6 +30,8 @@ DCG.CO
  ┃ ┃ ┃ ┗ page.tsx
  ┃ ┃ ┣ layout.tsx
  ┃ ┃ ┗ smtp-message.tsx
+ ┃ ┣ (home)
+ ┃ ┃ ┗ page.tsx
  ┃ ┣ api
  ┃ ┃ ┣ analytics
  ┃ ┃ ┃ ┣ dashboard
@@ -123,6 +131,8 @@ DCG.CO
  ┃ ┃ ┃ ┃ ┣ [id]
  ┃ ┃ ┃ ┃ ┃ ┗ route.ts
  ┃ ┃ ┃ ┃ ┗ route.ts
+ ┃ ┃ ┃ ┣ sections
+ ┃ ┃ ┃ ┃ ┗ route.ts
  ┃ ┃ ┃ ┗ route.ts
  ┃ ┃ ┣ members
  ┃ ┃ ┃ ┗ route.ts
@@ -196,6 +206,9 @@ DCG.CO
  ┃ ┃ ┃ ┃ ┃ ┗ route.ts
  ┃ ┃ ┣ roles
  ┃ ┃ ┃ ┗ stats
+ ┃ ┃ ┃ ┃ ┗ route.ts
+ ┃ ┃ ┣ static-pages
+ ┃ ┃ ┃ ┗ [slug]
  ┃ ┃ ┃ ┃ ┗ route.ts
  ┃ ┃ ┣ supabase
  ┃ ┃ ┃ ┗ delete-product
@@ -417,6 +430,26 @@ DCG.CO
  ┃ ┃ ┃ ┃ ┃ ┃ ┗ invites.scss
  ┃ ┃ ┃ ┃ ┃ ┗ page.tsx
  ┃ ┃ ┃ ┃ ┣ landing
+ ┃ ┃ ┃ ┃ ┃ ┣ _components
+ ┃ ┃ ┃ ┃ ┃ ┃ ┣ CreateLandingSectionModal.tsx
+ ┃ ┃ ┃ ┃ ┃ ┃ ┣ CreateSectionModal.tsx
+ ┃ ┃ ┃ ┃ ┃ ┃ ┣ DeleteConfirmModal.tsx
+ ┃ ┃ ┃ ┃ ┃ ┃ ┣ EditSectionModal.tsx
+ ┃ ┃ ┃ ┃ ┃ ┃ ┣ ErrorAlert.tsx
+ ┃ ┃ ┃ ┃ ┃ ┃ ┣ landing.scss
+ ┃ ┃ ┃ ┃ ┃ ┃ ┣ LandingActionBar.tsx
+ ┃ ┃ ┃ ┃ ┃ ┃ ┣ LandingManager.tsx
+ ┃ ┃ ┃ ┃ ┃ ┃ ┣ LandingSearchBar.tsx
+ ┃ ┃ ┃ ┃ ┃ ┃ ┣ LandingSectionModal.tsx
+ ┃ ┃ ┃ ┃ ┃ ┃ ┣ LandingSectionsTable.tsx
+ ┃ ┃ ┃ ┃ ┃ ┃ ┣ LANDING_MANAGER_INSTALL.md
+ ┃ ┃ ┃ ┃ ┃ ┃ ┣ LANDING_SECTION_TYPES.md
+ ┃ ┃ ┃ ┃ ┃ ┃ ┣ LoadingState.tsx
+ ┃ ┃ ┃ ┃ ┃ ┃ ┣ SectionConfigForm.tsx
+ ┃ ┃ ┃ ┃ ┃ ┃ ┣ SortableSection.tsx
+ ┃ ┃ ┃ ┃ ┃ ┃ ┣ types.ts
+ ┃ ┃ ┃ ┃ ┃ ┃ ┗ useLandingSections.ts
+ ┃ ┃ ┃ ┃ ┃ ┗ page.tsx
  ┃ ┃ ┃ ┃ ┣ members
  ┃ ┃ ┃ ┃ ┃ ┣ _components
  ┃ ┃ ┃ ┃ ┃ ┃ ┗ members.scss
@@ -467,9 +500,11 @@ DCG.CO
  ┃ ┃ ┃ ┃ ┃ ┗ page.tsx
  ┃ ┃ ┃ ┃ ┣ static-pages
  ┃ ┃ ┃ ┃ ┃ ┣ _components
+ ┃ ┃ ┃ ┃ ┃ ┃ ┣ createPage.tsx
  ┃ ┃ ┃ ┃ ┃ ┃ ┣ DeleteConfirmModal.tsx
  ┃ ┃ ┃ ┃ ┃ ┃ ┣ ErrorAlert.tsx
  ┃ ┃ ┃ ┃ ┃ ┃ ┣ LoadingState.tsx
+ ┃ ┃ ┃ ┃ ┃ ┃ ┣ manageModal.tsx
  ┃ ┃ ┃ ┃ ┃ ┃ ┗ StaticPagesManager.tsx
  ┃ ┃ ┃ ┃ ┃ ┗ page.tsx
  ┃ ┃ ┃ ┃ ┣ tags
@@ -714,6 +749,7 @@ DCG.CO
  ┃ ┃ ┃ ┣ HomeButton.tsx
  ┃ ┃ ┃ ┣ input.tsx
  ┃ ┃ ┃ ┣ LogoutButton.tsx
+ ┃ ┃ ┃ ┣ nav.tsx
  ┃ ┃ ┃ ┣ ProfileButton.tsx
  ┃ ┃ ┃ ┣ ScheduleButton.tsx
  ┃ ┃ ┃ ┣ SettingsButton.tsx
@@ -735,6 +771,7 @@ DCG.CO
  ┃ ┃ ┃ ┣ accessibility
  ┃ ┃ ┃ ┃ ┗ accessibility.tsx
  ┃ ┃ ┃ ┣ cart
+ ┃ ┃ ┃ ┃ ┣ cart-context.tsx
  ┃ ┃ ┃ ┃ ┣ CartButton.tsx
  ┃ ┃ ┃ ┃ ┣ CartDrawer.tsx
  ┃ ┃ ┃ ┃ ┣ CartItem.tsx
@@ -757,7 +794,9 @@ DCG.CO
  ┃ ┃ ┃ ┣ sidebar-context.tsx
  ┃ ┃ ┃ ┗ use-profile-id.ts
  ┃ ┃ ┣ footer.tsx
- ┃ ┃ ┗ showcase-section.tsx
+ ┃ ┃ ┣ meta-theme-color.tsx
+ ┃ ┃ ┣ showcase-section.tsx
+ ┃ ┃ ┗ SwitchtoDarkMode.tsx
  ┃ ┣ profile
  ┃ ┃ ┣ AdminDelete.tsx
  ┃ ┃ ┣ Avatar.tsx
@@ -772,12 +811,23 @@ DCG.CO
  ┃ ┃ ┣ profile-settings.tsx
  ┃ ┃ ┗ SettingsToast.tsx
  ┃ ┣ shop
+ ┃ ┃ ┣ sections
+ ┃ ┃ ┃ ┣ CategoriesGridSection.tsx
+ ┃ ┃ ┃ ┣ HeroCarouselSection.tsx
+ ┃ ┃ ┃ ┣ ProductsGridSection.tsx
+ ┃ ┃ ┃ ┣ SectionRegistry.tsx
+ ┃ ┃ ┃ ┣ StaticHtmlSection.tsx
+ ┃ ┃ ┃ ┗ TopBannerSection.tsx
  ┃ ┃ ┣ _components
+ ┃ ┃ ┃ ┣ ClientInlineStaticPage.tsx
+ ┃ ┃ ┃ ┣ HeroCarousel.scss
  ┃ ┃ ┃ ┣ Herocarousel.tsx
+ ┃ ┃ ┃ ┣ InlineStaticPage.tsx
  ┃ ┃ ┃ ┣ IntroBar.module.scss
  ┃ ┃ ┃ ┣ LandingSkeleton.tsx
  ┃ ┃ ┃ ┣ ProductCard.tsx
  ┃ ┃ ┃ ┣ ShopByCategory.tsx
+ ┃ ┃ ┃ ┣ StaticPageShell.tsx
  ┃ ┃ ┃ ┣ top-banner.scss
  ┃ ┃ ┃ ┣ TopBanner.tsx
  ┃ ┃ ┃ ┣ useHeroSlides.ts
@@ -947,6 +997,7 @@ DCG.CO
  ┃ ┣ calendar-utils.ts
  ┃ ┣ use-click-outside.ts
  ┃ ┣ use-mobile.ts
+ ┃ ┣ use-viewport.ts
  ┃ ┣ useAnalyticsConsent.ts
  ┃ ┣ useAuth.ts
  ┃ ┣ useCalendarEvents.ts
@@ -1212,6 +1263,7 @@ DCG.CO
  ┃ ┗ visitors.service.ts
  ┣ style
  ┃ ┣ home.css
+ ┃ ┣ layout-tokens.css
  ┃ ┣ nav.css
  ┃ ┣ navigation.css
  ┃ ┣ styles.css

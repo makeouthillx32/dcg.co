@@ -46,9 +46,12 @@ function useScreenSize() {
 
 function getCookieConsentVariant(screenSize: "mobile" | "tablet" | "desktop") {
   switch (screenSize) {
-    case "mobile": return "small";
-    case "tablet": return "mini";
-    default: return "default";
+    case "mobile":
+      return "small";
+    case "tablet":
+      return "mini";
+    default:
+      return "default";
   }
 }
 
@@ -61,96 +64,92 @@ function setMetaTag(name: string, content: string) {
     tag.setAttribute("name", name);
     document.head.appendChild(tag);
   }
+
+  // iOS Safari can be stubborn; forcing a reset sometimes helps.
+  // (Safe no-op for other browsers)
+  tag.setAttribute("content", "");
   tag.setAttribute("content", content);
+
   console.log(`📝 Set meta[name="${name}"] content="${content}"`);
 }
 
-function toHex(color: string): string {
-  if (!color) return "";
-  if (color.startsWith("#")) return color;
-  
-  const div = document.createElement("div");
-  div.style.color = color;
-  document.body.appendChild(div);
-  const computed = getComputedStyle(div).color;
-  document.body.removeChild(div);
-  
-  const match = computed.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
-  if (!match) return color;
-  
-  const [, r, g, b] = match.map(Number);
+function rgbToHex(rgb: string): string {
+  const match = rgb.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  if (!match) return "";
+
+  const r = Number(match[1]);
+  const g = Number(match[2]);
+  const b = Number(match[3]);
+
   return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
 }
 
+/**
+ * ✅ CRITICAL: resolve var() chains by letting the browser compute them.
+ * We create a tiny probe element INSIDE the layout node so it inherits
+ * --lt-status-bar/--lt-bg, then read computed backgroundColor (rgb...).
+ */
+function getResolvedStatusBarRgb(layoutEl: HTMLElement) {
+  const probe = document.createElement("div");
+  probe.style.position = "absolute";
+  probe.style.left = "-9999px";
+  probe.style.top = "0";
+  probe.style.width = "1px";
+  probe.style.height = "1px";
+  probe.style.pointerEvents = "none";
+
+  // Prefer status-bar token, fallback to lt-bg
+  probe.style.backgroundColor = "var(--lt-status-bar, var(--lt-bg))";
+
+  layoutEl.appendChild(probe);
+  const rgb = getComputedStyle(probe).backgroundColor;
+  layoutEl.removeChild(probe);
+
+  return rgb;
+}
+
 function useMetaThemeColor(layout: "shop" | "dashboard" | "app", themeType: "light" | "dark") {
-  // ✅ CRITICAL FIX: Use useLayoutEffect instead of useEffect
-  // useLayoutEffect runs AFTER DOM updates but BEFORE browser paint
-  // This ensures headers are in the DOM when we try to read them
   useLayoutEffect(() => {
     console.log(`\n🚀 MetaThemeColor: layout="${layout}", theme="${themeType}"`);
-    
+
     let cancelled = false;
     let attempts = 0;
-    const maxAttempts = 20;
+    const maxAttempts = 30;
 
     const trySetColor = () => {
       if (cancelled) return;
-      
+
       attempts++;
       console.log(`  📍 Attempt ${attempts}/${maxAttempts}`);
 
-      // Try to find the element
       const el = document.querySelector<HTMLElement>(`[data-layout="${layout}"]`);
-      
       if (!el) {
         console.warn(`  ⚠️ Element [data-layout="${layout}"] not found yet`);
-        
-        if (attempts < maxAttempts) {
-          requestAnimationFrame(trySetColor);
-        } else {
-          console.error(`  ❌ Failed after ${maxAttempts} attempts`);
-        }
+        if (attempts < maxAttempts) requestAnimationFrame(trySetColor);
         return;
       }
 
-      // Element exists - read the CSS variable
-      const bgColor = getComputedStyle(el).getPropertyValue("--lt-bg").trim();
-      
-      console.log(`  ✅ Found element`);
-      console.log(`  📊 --lt-bg: "${bgColor}"`);
+      const rgb = getResolvedStatusBarRgb(el);
+      console.log(`  📊 Resolved status-bar rgb: "${rgb}"`);
 
-      // Check if CSS variable is resolved
-      if (!bgColor || bgColor.includes("var(")) {
-        console.warn(`  ⚠️ CSS not ready yet (unresolved var)`);
-        
-        if (attempts < maxAttempts) {
-          requestAnimationFrame(trySetColor);
-        }
+      if (!rgb || rgb === "transparent" || rgb === "rgba(0, 0, 0, 0)") {
+        console.warn(`  ⚠️ Color not ready yet or transparent`);
+        if (attempts < maxAttempts) requestAnimationFrame(trySetColor);
         return;
       }
 
-      // Normalize color format
-      let color = bgColor;
-      if (!color.startsWith("#") && !color.startsWith("rgb") && !color.startsWith("hsl(")) {
-        color = `hsl(${color})`;
-      }
-
-      // Convert to hex
-      const hexColor = toHex(color);
-      
+      const hexColor = rgbToHex(rgb);
       if (!hexColor) {
-        console.error(`  ❌ Failed to convert to hex: "${color}"`);
+        console.error(`  ❌ Failed to convert to hex: "${rgb}"`);
         return;
       }
 
       console.log(`  ✅ Final color: "${hexColor}"\n`);
-      
-      // Set the meta tags
+
       setMetaTag("theme-color", hexColor);
       setMetaTag("apple-mobile-web-app-status-bar-style", "black-translucent");
     };
 
-    // Start trying on next frame
     requestAnimationFrame(trySetColor);
 
     return () => {
@@ -192,7 +191,7 @@ function RootLayoutContent({ children }: { children: React.ReactNode }) {
   // Determine layout type
   const metaLayout = isDashboardPage ? "dashboard" : useAppHeader ? "app" : "shop";
 
-  // ✅ Call the iOS status bar hook (now uses useLayoutEffect internally)
+  // ✅ iOS status bar hook (resolved computed color via probe)
   useMetaThemeColor(metaLayout, themeType);
 
   useEffect(() => {
@@ -279,7 +278,7 @@ function RootLayoutContent({ children }: { children: React.ReactNode }) {
       {useAppHeader ? <AppHeader /> : showNav && <ShopHeader />}
 
       {children}
-      
+
       {!useAppHeader && showFooter && <Footer />}
       {!useAppHeader && showAccessibility && <AccessibilityOverlay />}
 
@@ -326,17 +325,16 @@ function RootLayoutContent({ children }: { children: React.ReactNode }) {
 
 // ─── Root Layout Wrapper ─────────────────────────────────
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        
+
+        {/* Optional: provide a default theme-color so iOS has something immediately */}
+        <meta name="theme-color" content="#000000" />
+
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="format-detection" content="telephone=no" />
 
@@ -356,8 +354,7 @@ export default function RootLayout({
               "@context": "https://schema.org",
               "@type": "Brand",
               name: "Desert Cowgirl",
-              description:
-                "Western-inspired pants and shirts with a warm, modern rustic aesthetic.",
+              description: "Western-inspired pants and shirts with a warm, modern rustic aesthetic.",
               url: "https://desertcowgirl.co/",
               logo: "https://desertcowgirl.co/logo.png",
               sameAs: [],
