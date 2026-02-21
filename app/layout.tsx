@@ -33,7 +33,6 @@ import { CartProvider } from "@/components/Layouts/overlays/cart/cart-context";
 // ✅ COOKIE-CACHED SCREEN SIZE (iOS-safe with fallbacks)
 function useScreenSize() {
   const [screenSize, setScreenSize] = useState<"mobile" | "tablet" | "desktop">(() => {
-    // SSR-safe with iOS error handling
     if (typeof window === "undefined") return "desktop";
     
     try {
@@ -42,16 +41,13 @@ function useScreenSize() {
         return cached;
       }
     } catch (e) {
-      // iOS cookie access can fail in private mode
       console.warn("Cookie access failed:", e);
     }
     
-    // Calculate from viewport
     try {
       const width = window.innerWidth;
       const size = width < 768 ? "mobile" : width < 1024 ? "tablet" : "desktop";
       
-      // Try to cache, but don't fail if it doesn't work
       try {
         setCookie("screenSize", size, { maxAge: 86400 });
       } catch (e) {
@@ -60,7 +56,6 @@ function useScreenSize() {
       
       return size;
     } catch (e) {
-      // Fallback if window.innerWidth fails
       return "desktop";
     }
   });
@@ -112,12 +107,11 @@ function useMetaThemeColor(layout: "shop" | "dashboard" | "app", themeType: "lig
       if (cancelled) return;
 
       const el = document.querySelector<HTMLElement>(`[data-layout="${layout}"]`);
-      if (!el) return; // Element renders synchronously now, if not found = wrong layout
+      if (!el) return;
 
       const bgColor = getComputedStyle(el).backgroundColor;
       if (!bgColor || bgColor === "transparent" || bgColor === "rgba(0, 0, 0, 0)") return;
 
-      // Convert RGB to hex
       const match = bgColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
       if (!match) return;
       
@@ -126,7 +120,6 @@ function useMetaThemeColor(layout: "shop" | "dashboard" | "app", themeType: "lig
 
       lastColor = hex;
 
-      // Update meta tags
       let meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
       if (!meta) {
         meta = document.createElement("meta");
@@ -143,16 +136,13 @@ function useMetaThemeColor(layout: "shop" | "dashboard" | "app", themeType: "lig
       }
       appleMeta.content = "default";
 
-      // Force repaint
       el.style.visibility = "hidden";
       el.offsetHeight;
       el.style.visibility = "visible";
     };
 
-    // Single execution
     updateStatusBar();
 
-    // Only watch theme toggle (class changes on html element)
     const observer = new MutationObserver((mutations) => {
       if (cancelled) return;
       const hasClassChange = mutations.some(m => m.attributeName === "class");
@@ -181,6 +171,7 @@ function classifyRoute(pathname: string) {
     isDashboardPage: lower.startsWith("/dashboard"),
     isProductsPage: lower.startsWith("/products"),
     isCollectionsPage: lower.startsWith("/collections"),
+    isPagesRoute: lower.startsWith("/pages"),
     isCheckoutRoute: lower.startsWith("/checkout") || lower.startsWith("/cart"),
     isProfileMeRoute: lower.startsWith("/profile/me"),
     isAuthPage: lower.startsWith("/sign-in") || lower.startsWith("/sign-up") || lower.startsWith("/forgot-password"),
@@ -188,6 +179,7 @@ function classifyRoute(pathname: string) {
                     !lower.startsWith("/tools") && 
                     !lower.startsWith("/dashboard") && 
                     !lower.startsWith("/products") &&
+                    !lower.startsWith("/pages") &&
                     !lower.startsWith("/auth"),
   };
 }
@@ -202,7 +194,7 @@ function RootLayoutContent({ children }: { children: React.ReactNode }) {
 
   // ✅ SINGLE ROUTE CLASSIFICATION
   const route = classifyRoute(pathname);
-  const isShopRoute = route.isHome || route.isProductsPage || route.isCollectionsPage || route.isCategoryPage;
+  const isShopRoute = route.isHome || route.isProductsPage || route.isCollectionsPage || route.isCategoryPage || route.isPagesRoute;
   const useAppHeader = route.isCheckoutRoute || route.isProfileMeRoute;
   const metaLayout = route.isDashboardPage ? "dashboard" : useAppHeader ? "app" : "shop";
 
@@ -227,7 +219,7 @@ function RootLayoutContent({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (!route.isAuthPage && !route.isDashboardPage) {
-      setCookie("lastPage", pathname, { path: "/", maxAge: 86400 }); // 24h
+      setCookie("lastPage", pathname, { path: "/", maxAge: 86400 });
     }
   }, [pathname, route.isAuthPage, route.isDashboardPage]);
 
@@ -236,28 +228,24 @@ function RootLayoutContent({ children }: { children: React.ReactNode }) {
     if (typeof window === "undefined" || route.isAuthPage) return;
 
     try {
-      // Skip first load
       const isFirstLoad = !sessionStorage.getItem("analyticsInit");
       if (isFirstLoad) {
         sessionStorage.setItem("analyticsInit", "1");
         return;
       }
 
-      // Debounce duplicate tracks
       const lastUrl = sessionStorage.getItem("lastTrackedUrl");
       if (lastUrl === pathname) return;
       
       sessionStorage.setItem("lastTrackedUrl", pathname);
     } catch (e) {
       // iOS private mode - sessionStorage might fail
-      // Continue without deduplication
     }
 
     analytics.onRouteChange(window.location.href);
 
     const pageCategory = route.isHome ? "landing" : route.isToolsPage ? "tools" : route.isDashboardPage ? "dashboard" : "general";
 
-    // Use setTimeout fallback if requestIdleCallback not available (older iOS)
     const scheduleTracking = () => {
       analytics.trackEvent("navigation", {
         category: "user_flow",
