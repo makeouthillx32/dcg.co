@@ -10,6 +10,7 @@ import { Theme } from "@/types/theme";
 import { defaultThemeId, getThemeById, getAvailableThemeIds } from "@/themes";
 import { dynamicFontManager } from "@/lib/dynamicFontManager";
 import { transitionTheme, smoothThemeToggle } from "@/utils/themeTransitions";
+import { authLogger } from "@/lib/authLogger";
 
 interface EnhancedThemeContextType {
   themeType: "light" | "dark";
@@ -293,6 +294,15 @@ export const Providers: React.FC<{
       console.log('[Provider] 🔄 Fetching session client-side...');
       supabase.auth.getSession().then(({ data: { session: fetchedSession } }) => {
         console.log('[Provider] ✅ Session fetched:', fetchedSession ? 'authenticated' : 'not authenticated');
+        
+        // ✅ LOG SESSION RESTORATION
+        if (fetchedSession?.user) {
+          authLogger.memberSessionRestored(
+            fetchedSession.user.id,
+            fetchedSession.user.email || ''
+          );
+        }
+        
         setInitialSession(fetchedSession);
         setSessionFetched(true);
       });

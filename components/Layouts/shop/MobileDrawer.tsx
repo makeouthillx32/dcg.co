@@ -5,6 +5,7 @@ import { MdExpandMore, MdChevronRight, MdArrowForwardIos } from "react-icons/md"
 import { X } from "lucide-react";
 import Link from "next/link";
 import type { NavNode as UnifiedNavNode } from "@/lib/navigation";
+import { useAuth } from "@/app/provider";
 import "./_components/Mobile.scss";
 
 // Simplified nav node for mobile rendering
@@ -17,7 +18,6 @@ type NavNode = {
 };
 
 interface MobileDrawerProps {
-  session: any;
   onClose: () => void;
 }
 
@@ -50,7 +50,10 @@ function transformNavTree(nodes: UnifiedNavNode[]): NavNode[] {
     }));
 }
 
-export default function MobileDrawer({ session, onClose }: MobileDrawerProps) {
+export default function MobileDrawer({ onClose }: MobileDrawerProps) {
+  // ✅ USE AUTH HOOK TO GET REAL-TIME SESSION
+  const { session } = useAuth();
+  
   const menuRef = useRef<HTMLDivElement>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [isClosing, setIsClosing] = useState(false);
@@ -139,6 +142,9 @@ export default function MobileDrawer({ session, onClose }: MobileDrawerProps) {
     window.location.href = "/profile/me";
     handleClose();
   };
+
+  // ✅ LOG SESSION STATE FOR DEBUGGING
+  console.log('[MobileDrawer] Session state:', session ? 'authenticated' : 'not authenticated');
 
   return (
     <div
