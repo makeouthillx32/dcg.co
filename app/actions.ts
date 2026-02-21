@@ -4,7 +4,6 @@ import { headers, cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
 import { encodedRedirect } from "@/utils/utils";
 import { sendNotification } from "@/lib/notifications";
-import { authLogger } from "@/lib/authLogger";
 
 const VALID_ROLES = ["admin", "member", "guest"] as const;
 type ValidRole = (typeof VALID_ROLES)[number];
@@ -203,13 +202,6 @@ export const signUpAction = async (formData: FormData) => {
   const hasSession = !!data.session;
 
   if (hasSession) {
-    // ✅ LOG MEMBER SIGN UP
-    authLogger.memberSignUp(userId, email, {
-      firstName,
-      lastName,
-      source: 'email_signup'
-    });
-    
     await populateUserCookies(userId, false);
     const lastPage = await getAndClearLastPage();
     return redirect(`${lastPage}?refresh=true`);
@@ -248,13 +240,6 @@ export const signInAction = async (formData: FormData) => {
   }
 
   console.log("[Auth] ✅ Supabase sign-in successful, session created");
-
-  // ✅ LOG MEMBER SIGN IN
-  authLogger.memberSignIn(
-    data.user.id,
-    data.user.email || '',
-    remember
-  );
 
   // Populate user-specific cookies (role, permissions, etc.)
   await populateUserCookies(data.user.id, remember);
@@ -323,23 +308,13 @@ export const signOutAction = async () => {
   const supabase = await createClient();
   const store = await cookies();
 
-  // ✅ GET SESSION BEFORE DELETING - for logging
-  const { data: { session } } = await supabase.auth.getSession();
-  
-  if (session?.user) {
-    authLogger.memberSignOut(
-      session.user.id,
-      session.user.email || ''
-    );
-  }
-
   // Delete user-specific cookies
   store.delete("userRole");
   store.delete("userRoleUserId");
   store.delete("userDisplayName");
   store.delete("userPermissions");
   store.delete("rememberMe");
-  store.delete("lastPage");
+  store.delete("lastPage"); // ✅ Always clear lastPage on sign out
 
   console.log("[Auth] 🚪 Signing out and redirecting to home");
   
