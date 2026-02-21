@@ -1,12 +1,22 @@
 // app/provider.tsx
 "use client";
 
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { createBrowserClient } from "@supabase/ssr";
 import type { Session, User } from "@supabase/auth-helpers-nextjs";
-import { SessionContextProvider, useSessionContext } from "@supabase/auth-helpers-react";
+import {
+  SessionContextProvider,
+  useSessionContext,
+} from "@supabase/auth-helpers-react";
 import { setCookie, getCookie, iosSessionHelpers } from "@/lib/cookieUtils";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { Theme } from "@/types/theme";
 import { defaultThemeId, getThemeById, getAvailableThemeIds } from "@/themes";
 import { dynamicFontManager } from "@/lib/dynamicFontManager";
@@ -22,11 +32,14 @@ interface EnhancedThemeContextType {
   availableThemes: string[];
 }
 
-const ThemeContext = createContext<EnhancedThemeContextType | undefined>(undefined);
+const ThemeContext = createContext<EnhancedThemeContextType | undefined>(
+  undefined
+);
 
 export const useTheme = () => {
   const context = useContext(ThemeContext);
-  if (context === undefined) throw new Error("useTheme must be used within a ThemeProvider");
+  if (context === undefined)
+    throw new Error("useTheme must be used within a ThemeProvider");
   return context;
 };
 
@@ -41,7 +54,8 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (context === undefined) throw new Error("useAuth must be used within an AuthProvider");
+  if (context === undefined)
+    throw new Error("useAuth must be used within an AuthProvider");
   return context;
 };
 
@@ -94,7 +108,8 @@ function InternalAuthProvider({
       const publicPrefixes = ["/products", "/collections", "/auth"];
 
       const isPublicRoute =
-        publicRoutes.includes(pathname) || publicPrefixes.some((prefix) => pathname.startsWith(prefix));
+        publicRoutes.includes(pathname) ||
+        publicPrefixes.some((prefix) => pathname.startsWith(prefix));
 
       if (!isPublicRoute) {
         console.log(`[Provider] Redirecting to sign-in from: ${pathname}`);
@@ -106,7 +121,9 @@ function InternalAuthProvider({
   }, [session, isLoading, pathname, router]);
 
   return (
-    <AuthContext.Provider value={{ user, session: session ?? null, isLoading, refreshSession }}>
+    <AuthContext.Provider
+      value={{ user, session: session ?? null, isLoading, refreshSession }}
+    >
       <IOSSessionManager>{children}</IOSSessionManager>
     </AuthContext.Provider>
   );
@@ -122,6 +139,8 @@ export const Providers: React.FC<{
   session?: Session | null;
 }> = ({ children, session }) => {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const searchKey = searchParams.toString();
 
   const [themeType, setThemeType] = useState<"light" | "dark">("light");
   const [themeId, setThemeIdState] = useState<string>(defaultThemeId);
@@ -130,11 +149,16 @@ export const Providers: React.FC<{
 
   // ✅ Create browser client ONCE (don’t recreate each render)
   const supabase = useMemo(() => {
-    return createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+    return createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
   }, []);
 
   // ✅ Session bootstrap + live syncing
-  const [initialSession, setInitialSession] = useState<Session | null>(session ?? null);
+  const [initialSession, setInitialSession] = useState<Session | null>(
+    session ?? null
+  );
   const [sessionFetched, setSessionFetched] = useState(!!session);
   const [sessionVersion, setSessionVersion] = useState(0);
 
@@ -175,7 +199,8 @@ export const Providers: React.FC<{
   };
 
   const toggleTheme = async (element?: HTMLElement) => {
-    const themeChangeCallback = () => setThemeType((prev) => (prev === "light" ? "dark" : "light"));
+    const themeChangeCallback = () =>
+      setThemeType((prev) => (prev === "light" ? "dark" : "light"));
     if (element) await smoothThemeToggle(element, themeChangeCallback);
     else await transitionTheme(themeChangeCallback);
   };
@@ -203,12 +228,17 @@ export const Providers: React.FC<{
         if (savedThemeId) {
           const theme = await getThemeById(savedThemeId);
           setThemeIdState(theme ? savedThemeId : defaultThemeId);
-          if (!theme) console.warn(`⚠️ Saved theme ${savedThemeId} not found, using default`);
+          if (!theme)
+            console.warn(
+              `⚠️ Saved theme ${savedThemeId} not found, using default`
+            );
         }
 
         const savedThemeType = localStorage.getItem("theme") || getCookie("theme");
         if (!savedThemeType) {
-          const systemPrefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+          const systemPrefersDark = window
+            .matchMedia("(prefers-color-scheme: dark)")
+            .matches;
           setThemeType(systemPrefersDark ? "dark" : "light");
         } else {
           setThemeType(savedThemeType as "light" | "dark");
@@ -267,17 +297,23 @@ export const Providers: React.FC<{
     };
 
     applyTheme();
-  }, [themeType, themeId, mounted, availableThemes]); // keep your deps
+  }, [themeType, themeId, mounted, availableThemes]);
 
   const syncSession = useCallback(async () => {
     const {
       data: { session: fetchedSession },
     } = await supabase.auth.getSession();
 
-    console.log("[Provider] 🔁 Synced session:", fetchedSession ? "authenticated" : "not authenticated");
+    console.log(
+      "[Provider] 🔁 Synced session:",
+      fetchedSession ? "authenticated" : "not authenticated"
+    );
 
     if (fetchedSession?.user) {
-      authLogger.memberSessionRestored(fetchedSession.user.id, fetchedSession.user.email || "");
+      authLogger.memberSessionRestored(
+        fetchedSession.user.id,
+        fetchedSession.user.email || ""
+      );
     }
 
     setInitialSession(fetchedSession);
@@ -295,10 +331,30 @@ export const Providers: React.FC<{
     }
   }, [sessionFetched, syncSession]);
 
-  // ✅ Sync on navigation (server action redirects change pathname)
+  // ✅ Sync on navigation OR query changes (server actions often only change query)
   useEffect(() => {
     if (sessionFetched) syncSession();
-  }, [pathname, sessionFetched, syncSession]);
+  }, [pathname, searchKey, sessionFetched, syncSession]);
+
+  // ✅ Poll burst after route/search changes to catch cookie writes without hard refresh
+  useEffect(() => {
+    if (!sessionFetched) return;
+
+    let cancelled = false;
+    let tries = 0;
+
+    const tick = async () => {
+      tries += 1;
+      await syncSession();
+      if (!cancelled && tries < 4) setTimeout(tick, 500);
+    };
+
+    tick();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [pathname, searchKey, sessionFetched, syncSession]);
 
   // ✅ Sync on focus/visibility (mobile Safari)
   useEffect(() => {
