@@ -1,11 +1,10 @@
 // components/Layouts/shop/Header.tsx
 "use client";
 
-import React, { useEffect } from "react";
+import React from "react";
 import { Menu, User } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useTheme, useAuth, useIOSSessionRefresh } from "@/app/provider";
+import { useTheme, useAuth } from "@/app/provider"; // ✅ Use useAuth from provider
 import SwitchtoDarkMode from "@/components/Layouts/SwitchtoDarkMode";
 import DesktopNav from "@/components/Layouts/shop/DesktopNav";
 
@@ -14,27 +13,18 @@ interface HeaderProps {
 }
 
 export function Header({ onMenuClick }: HeaderProps = {}) {
-  const pathname = usePathname();
-
-  // ✅ real-time session (but server-action auth needs a refresh trigger)
-  const { session } = useAuth();
-  const { refreshSession } = useIOSSessionRefresh();
+  const { session } = useAuth(); // ✅ FIXED: Use auth from provider
   const { themeType } = useTheme();
-
-  // ✅ KEY FIX:
-  // When you come back from /sign-in (server action redirect),
-  // force a client-side session refresh so the header updates without hard refresh.
-  useEffect(() => {
-    refreshSession();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname]);
 
   const handleAccountClick = () => {
     window.location.href = "/profile/me";
   };
 
+  // ✅ Add logging to debug
+  console.log('[Header] Session state:', session ? 'authenticated' : 'not authenticated');
+
   return (
-    <header
+    <header 
       data-layout="shop"
       className="header-container bg-[var(--lt-bg)] text-[var(--lt-fg)] border-b border-[var(--lt-border)]"
     >
@@ -55,7 +45,11 @@ export function Header({ onMenuClick }: HeaderProps = {}) {
         <div className="header-logo">
           <Link href="/" className="logo-link focus:ring-primary">
             <img
-              src={themeType === "dark" ? "/images/home/dartlogowhite.svg" : "/images/home/dartlogo.svg"}
+              src={
+                themeType === "dark"
+                  ? "/images/home/dartlogowhite.svg"
+                  : "/images/home/dartlogo.svg"
+              }
               alt="DART Logo"
               className="logo-image"
             />
@@ -69,6 +63,7 @@ export function Header({ onMenuClick }: HeaderProps = {}) {
 
         {/* RIGHT: Auth + Theme */}
         <div className="header-actions">
+          {/* Desktop Auth */}
           <div className="header-auth">
             {!session ? (
               <Link
@@ -76,7 +71,10 @@ export function Header({ onMenuClick }: HeaderProps = {}) {
                 className="auth-button text-[var(--lt-fg)] hover:text-[var(--lt-fg)] focus:ring-primary"
                 aria-label="Sign in"
               >
+                {/* Mobile: text */}
                 <span className="md:hidden">Sign In</span>
+
+                {/* Desktop: icon */}
                 <span className="hidden md:inline-flex items-center">
                   <User className="w-5 h-5" aria-hidden="true" />
                 </span>
@@ -88,7 +86,10 @@ export function Header({ onMenuClick }: HeaderProps = {}) {
                 type="button"
                 aria-label="Account"
               >
+                {/* Mobile: text */}
                 <span className="md:hidden">Account</span>
+
+                {/* Desktop: icon */}
                 <span className="hidden md:inline-flex items-center text-[var(--lt-fg)] hover:text-primary transition-colors">
                   <User className="w-5 h-5" aria-hidden="true" />
                 </span>
@@ -96,6 +97,7 @@ export function Header({ onMenuClick }: HeaderProps = {}) {
             )}
           </div>
 
+          {/* Theme Switcher */}
           <div className="theme-switcher text-[var(--lt-fg)] hover:text-primary transition-colors">
             <SwitchtoDarkMode />
           </div>
