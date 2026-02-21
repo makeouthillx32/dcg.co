@@ -4,9 +4,8 @@
 import React from "react";
 import { Menu, User } from "lucide-react";
 import Link from "next/link";
-import { useTheme } from "@/app/provider";
+import { useTheme, useAuth } from "@/app/provider";
 import SwitchtoDarkMode from "@/components/Layouts/SwitchtoDarkMode";
-import useLoginSession from "@/lib/useLoginSession";
 import DesktopNav from "@/components/Layouts/shop/DesktopNav";
 
 interface HeaderProps {
@@ -14,7 +13,8 @@ interface HeaderProps {
 }
 
 export function Header({ onMenuClick }: HeaderProps = {}) {
-  const session = useLoginSession();
+  // ✅ real-time session (updates immediately after sign-in/sign-out)
+  const { session } = useAuth();
   const { themeType } = useTheme();
 
   const handleAccountClick = () => {
@@ -22,7 +22,7 @@ export function Header({ onMenuClick }: HeaderProps = {}) {
   };
 
   return (
-    <header 
+    <header
       data-layout="shop"
       className="header-container bg-[var(--lt-bg)] text-[var(--lt-fg)] border-b border-[var(--lt-border)]"
     >
