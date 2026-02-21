@@ -1,4 +1,4 @@
-// components/documents/ContextMenu/index.tsx - Enhanced with Public Folder & File Sharing
+// components/documents/ContextMenu/index.tsx - Enhanced with Public Folder & File Sharing + Copy URL
 'use client';
 
 import React, { useEffect, useRef, useCallback } from 'react';
@@ -9,6 +9,7 @@ import {
   Code, 
   Eye, 
   Link, 
+  Link2,
   Star,
   Download,
   Edit,
@@ -88,6 +89,10 @@ export default function ContextMenu({
       case 'generateCode':
         if (publicSlug) onGenerateCode?.(publicSlug);
         break;
+      case 'copy-url':
+        // This will be handled by the parent component to open the modal
+        onAction('copy-url', documentItem.id);
+        break;
       default:
         onAction(actionId, documentItem.id);
     }
@@ -158,6 +163,21 @@ export default function ContextMenu({
       actions.push({ id: 'sep1', label: '', icon: null, separator: true });
     }
 
+    // === COPY URL ACTION (Files Only) ===
+    
+    if (isFile) {
+      actions.push({
+        id: 'copy-url',
+        label: 'Copy URL',
+        icon: <Link2 className="h-4 w-4" />,
+        shortcut: '⌘C',
+        highlighted: true
+      });
+
+      // Separator after Copy URL
+      actions.push({ id: 'sep-url', label: '', icon: null, separator: true });
+    }
+
     // === PUBLIC FOLDER ACTIONS ===
 
     if (isFolder) {
@@ -214,7 +234,7 @@ export default function ContextMenu({
       const shareActions: MenuAction[] = [
         {
           id: 'copyFileUrl',
-          label: 'Copy File URL',
+          label: 'Copy Storage URL',
           icon: <Link className="h-4 w-4" />,
           shortcut: '⌘L'
         }
@@ -434,7 +454,7 @@ export default function ContextMenu({
               action.dangerous
                 ? 'text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20'
                 : action.highlighted
-                ? 'text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20'
+                ? 'text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 font-medium'
                 : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
             } ${
               action.disabled

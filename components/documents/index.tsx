@@ -13,6 +13,7 @@ import ContextMenu from './ContextMenu';
 import Preview from './Preview';
 import FavoritesBar from './FavoritesBar';
 import FileGrid from './FileGrid';
+import CopyUrlModal from './CopyUrlModal';
 import { Upload, X } from 'lucide-react';
 
 interface DocumentsProps {
@@ -42,6 +43,10 @@ export default function Documents({ className = '' }: DocumentsProps) {
   const [isSearching, setIsSearching] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
   const [dragOverUploadZone, setDragOverUploadZone] = useState(false);
+  
+  // Copy URL Modal state
+  const [showCopyUrlModal, setShowCopyUrlModal] = useState(false);
+  const [copyUrlDocument, setCopyUrlDocument] = useState<any>(null);
   
   // Additional state for toolbar functionality
   const [sortBy, setSortBy] = useState<'name' | 'date' | 'size' | 'type'>('name');
@@ -222,6 +227,11 @@ export default function Documents({ className = '' }: DocumentsProps) {
       
       try {
         switch (action) {
+          case 'copy-url':
+            // Open Copy URL Modal
+            setCopyUrlDocument(document);
+            setShowCopyUrlModal(true);
+            break;
           case 'preview':
             setPreviewDocument(documentId);
             break;
@@ -586,10 +596,22 @@ export default function Documents({ className = '' }: DocumentsProps) {
               </div>
             </div>
           )}
+
+          {/* Copy URL Modal */}
+          {showCopyUrlModal && copyUrlDocument && (
+            <CopyUrlModal
+              isOpen={showCopyUrlModal}
+              document={copyUrlDocument}
+              onClose={() => {
+                setShowCopyUrlModal(false);
+                setCopyUrlDocument(null);
+              }}
+            />
+          )}
         </main>
       </DragDropUpload>
     );
   };
 
   return renderContent();
-} 
+}
