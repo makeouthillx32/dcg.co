@@ -1,6 +1,5 @@
 // app/layout.tsx - BLAZING FAST - Zero Loops, Cookie Cache, Lazy Load
-// ✅ REMOVED "use client" - Root layout is now a server component that fetches session
-// The client logic is moved to RootLayoutContent which is wrapped by ClientLayoutWrapper
+"use client";
 
 import { useEffect, useLayoutEffect, useState, lazy, Suspense } from "react";
 import { usePathname } from "next/navigation";
@@ -34,6 +33,7 @@ import { CartProvider } from "@/components/Layouts/overlays/cart/cart-context";
 // ✅ COOKIE-CACHED SCREEN SIZE (iOS-safe with fallbacks)
 function useScreenSize() {
   const [screenSize, setScreenSize] = useState<"mobile" | "tablet" | "desktop">(() => {
+    // SSR-safe with iOS error handling
     if (typeof window === "undefined") return "desktop";
     
     try {
@@ -42,13 +42,16 @@ function useScreenSize() {
         return cached;
       }
     } catch (e) {
+      // iOS cookie access can fail in private mode
       console.warn("Cookie access failed:", e);
     }
     
+    // Calculate from viewport
     try {
       const width = window.innerWidth;
       const size = width < 768 ? "mobile" : width < 1024 ? "tablet" : "desktop";
       
+      // Try to cache, but don't fail if it doesn't work
       try {
         setCookie("screenSize", size, { maxAge: 86400 });
       } catch (e) {
@@ -57,6 +60,7 @@ function useScreenSize() {
       
       return size;
     } catch (e) {
+      // Fallback if window.innerWidth fails
       return "desktop";
     }
   });
@@ -108,11 +112,12 @@ function useMetaThemeColor(layout: "shop" | "dashboard" | "app", themeType: "lig
       if (cancelled) return;
 
       const el = document.querySelector<HTMLElement>(`[data-layout="${layout}"]`);
-      if (!el) return;
+      if (!el) return; // Element renders synchronously now, if not found = wrong layout
 
       const bgColor = getComputedStyle(el).backgroundColor;
       if (!bgColor || bgColor === "transparent" || bgColor === "rgba(0, 0, 0, 0)") return;
 
+      // Convert RGB to hex
       const match = bgColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
       if (!match) return;
       
@@ -121,6 +126,7 @@ function useMetaThemeColor(layout: "shop" | "dashboard" | "app", themeType: "lig
 
       lastColor = hex;
 
+      // Update meta tags
       let meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
       if (!meta) {
         meta = document.createElement("meta");
@@ -137,13 +143,16 @@ function useMetaThemeColor(layout: "shop" | "dashboard" | "app", themeType: "lig
       }
       appleMeta.content = "default";
 
+      // Force repaint
       el.style.visibility = "hidden";
       el.offsetHeight;
       el.style.visibility = "visible";
     };
 
+    // Single execution
     updateStatusBar();
 
+    // Only watch theme toggle (class changes on html element)
     const observer = new MutationObserver((mutations) => {
       if (cancelled) return;
       const hasClassChange = mutations.some(m => m.attributeName === "class");
@@ -172,7 +181,6 @@ function classifyRoute(pathname: string) {
     isDashboardPage: lower.startsWith("/dashboard"),
     isProductsPage: lower.startsWith("/products"),
     isCollectionsPage: lower.startsWith("/collections"),
-    isPagesRoute: lower.startsWith("/pages"),
     isCheckoutRoute: lower.startsWith("/checkout") || lower.startsWith("/cart"),
     isProfileMeRoute: lower.startsWith("/profile/me"),
     isAuthPage: lower.startsWith("/sign-in") || lower.startsWith("/sign-up") || lower.startsWith("/forgot-password"),
@@ -180,14 +188,11 @@ function classifyRoute(pathname: string) {
                     !lower.startsWith("/tools") && 
                     !lower.startsWith("/dashboard") && 
                     !lower.startsWith("/products") &&
-                    !lower.startsWith("/pages") &&
                     !lower.startsWith("/auth"),
   };
 }
 
-// ─── Root Layout Content (Client Component) ─────────────────────────────────
-
-"use client";
+// ─── Root Layout Content ─────────────────────────────────
 
 function RootLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -197,7 +202,7 @@ function RootLayoutContent({ children }: { children: React.ReactNode }) {
 
   // ✅ SINGLE ROUTE CLASSIFICATION
   const route = classifyRoute(pathname);
-  const isShopRoute = route.isHome || route.isProductsPage || route.isCollectionsPage || route.isCategoryPage || route.isPagesRoute;
+  const isShopRoute = route.isHome || route.isProductsPage || route.isCollectionsPage || route.isCategoryPage;
   const useAppHeader = route.isCheckoutRoute || route.isProfileMeRoute;
   const metaLayout = route.isDashboardPage ? "dashboard" : useAppHeader ? "app" : "shop";
 
@@ -222,7 +227,7 @@ function RootLayoutContent({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (!route.isAuthPage && !route.isDashboardPage) {
-      setCookie("lastPage", pathname, { path: "/", maxAge: 86400 });
+      setCookie("lastPage", pathname, { path: "/", maxAge: 86400 }); // 24h
     }
   }, [pathname, route.isAuthPage, route.isDashboardPage]);
 
@@ -231,24 +236,28 @@ function RootLayoutContent({ children }: { children: React.ReactNode }) {
     if (typeof window === "undefined" || route.isAuthPage) return;
 
     try {
+      // Skip first load
       const isFirstLoad = !sessionStorage.getItem("analyticsInit");
       if (isFirstLoad) {
         sessionStorage.setItem("analyticsInit", "1");
         return;
       }
 
+      // Debounce duplicate tracks
       const lastUrl = sessionStorage.getItem("lastTrackedUrl");
       if (lastUrl === pathname) return;
       
       sessionStorage.setItem("lastTrackedUrl", pathname);
     } catch (e) {
       // iOS private mode - sessionStorage might fail
+      // Continue without deduplication
     }
 
     analytics.onRouteChange(window.location.href);
 
     const pageCategory = route.isHome ? "landing" : route.isToolsPage ? "tools" : route.isDashboardPage ? "dashboard" : "general";
 
+    // Use setTimeout fallback if requestIdleCallback not available (older iOS)
     const scheduleTracking = () => {
       analytics.trackEvent("navigation", {
         category: "user_flow",
@@ -389,34 +398,9 @@ function RootLayoutContent({ children }: { children: React.ReactNode }) {
   );
 }
 
-// ─── Client Layout Wrapper ─────────────────────────────────
+// ─── Root Layout Wrapper ─────────────────────────────────
 
-"use client";
-
-function ClientLayoutWrapper({ 
-  children, 
-  session 
-}: { 
-  children: React.ReactNode;
-  session: any;
-}) {
-  return (
-    <Providers session={session}>
-      <RootLayoutContent>{children}</RootLayoutContent>
-    </Providers>
-  );
-}
-
-// ─── Root Layout (Server Component) ─────────────────────────────────
-
-export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  // ✅ CRITICAL FIX: Fetch session server-side
-  const { createServerClient } = await import("@/utils/supabase/server");
-  const supabase = await createServerClient();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -451,10 +435,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         />
       </head>
       <body className="min-h-screen font-[var(--font-sans)]" suppressHydrationWarning>
-        {/* ✅ CRITICAL FIX: Pass session to client wrapper */}
-        <ClientLayoutWrapper session={session}>
-          {children}
-        </ClientLayoutWrapper>
+        <Providers>
+          <RootLayoutContent>{children}</RootLayoutContent>
+        </Providers>
       </body>
     </html>
   );

@@ -192,6 +192,8 @@ export const signInAction = async (formData: FormData) => {
   const password = formData.get("password")?.toString() || "";
   const remember = formData.get("remember") === "true";
 
+  console.log("[Auth] 🔐 Sign-in attempt:", { email, remember });
+
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
@@ -201,12 +203,23 @@ export const signInAction = async (formData: FormData) => {
   }
 
   if (!data.user?.id) {
+    console.error("[Auth] ❌ No user ID in response");
     return encodedRedirect("error", "/sign-in", "Authentication failed");
   }
 
+  if (!data.session) {
+    console.error("[Auth] ❌ No session in response");
+    return encodedRedirect("error", "/sign-in", "Session creation failed");
+  }
+
+  console.log("[Auth] ✅ Supabase sign-in successful, session created");
+
+  // Populate user-specific cookies (role, permissions, etc.)
   await populateUserCookies(data.user.id, remember);
 
   const lastPage = await getAndClearLastPage();
+  console.log("[Auth] ✅ Redirecting to:", lastPage);
+  
   return redirect(`${lastPage}?refresh=true`);
 };
 
@@ -268,12 +281,17 @@ export const signOutAction = async () => {
   const supabase = await createClient();
   const store = await cookies();
 
+  // Delete user-specific cookies
   store.delete("userRole");
   store.delete("userRoleUserId");
   store.delete("userDisplayName");
   store.delete("userPermissions");
   store.delete("rememberMe");
 
+  console.log("[Auth] 🚪 Signing out");
+  
+  // Sign out from Supabase (this handles auth cookie deletion via middleware)
   await supabase.auth.signOut();
+  
   return redirect("/sign-in");
 };
