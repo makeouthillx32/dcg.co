@@ -342,7 +342,7 @@ function RootLayoutContent({ children }: { children: React.ReactNode }) {
                 className="fixed bottom-0 left-0 top-0 z-50 w-[min(86vw,360px)] overflow-y-auto border-r border-[var(--lt-border)] bg-[var(--lt-bg)] shadow-[var(--lt-shadow)] lg:hidden"
                 data-layout="shop"
               >
-                <MobileDrawer session={null} onClose={() => setMobileMenuOpen(false)} />
+                <MobileDrawer onClose={() => setMobileMenuOpen(false)} />
               </div>
             </>
           )}
