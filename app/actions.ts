@@ -45,10 +45,37 @@ const getAndClearLastPage = async (): Promise<string> => {
   const store = await cookies();
   const lastPageCookie = store.getAll().find((c) => c.name === "lastPage");
   let lastPage = lastPageCookie?.value || "/";
+  
+  // Delete the cookie immediately
   store.delete("lastPage");
-  const excludedPages = ["/sign-in", "/sign-up", "/forgot-password"];
-  const pageWithoutHash = lastPage.split("#")[0];
-  if (excludedPages.includes(pageWithoutHash)) lastPage = "/";
+  
+  // ✅ COMPREHENSIVE list of pages that should redirect to home instead
+  const excludedPages = [
+    "/sign-in", 
+    "/sign-up", 
+    "/forgot-password",
+    "/reset-password",
+    "/auth/callback",
+    "/auth/callback/oauth",
+    "/auth/logout"
+  ];
+  
+  const excludedPrefixes = ["/dashboard", "/settings", "/protected"];
+  
+  // Remove hash/query params for checking
+  const pageWithoutHash = lastPage.split("#")[0].split("?")[0];
+  
+  // Check if page is excluded
+  const isExcluded = excludedPages.includes(pageWithoutHash) || 
+                     excludedPrefixes.some(prefix => pageWithoutHash.startsWith(prefix));
+  
+  if (isExcluded) {
+    console.log("[Auth] ⚠️ Excluded page in lastPage cookie:", lastPage, "→ redirecting to /");
+    lastPage = "/";
+  } else {
+    console.log("[Auth] ✅ Valid lastPage from cookie:", lastPage);
+  }
+  
   return lastPage;
 };
 
@@ -287,11 +314,13 @@ export const signOutAction = async () => {
   store.delete("userDisplayName");
   store.delete("userPermissions");
   store.delete("rememberMe");
+  store.delete("lastPage"); // ✅ Always clear lastPage on sign out
 
-  console.log("[Auth] 🚪 Signing out");
+  console.log("[Auth] 🚪 Signing out and redirecting to home");
   
   // Sign out from Supabase (this handles auth cookie deletion via middleware)
   await supabase.auth.signOut();
   
-  return redirect("/sign-in");
+  // ✅ Always redirect to home after sign out
+  return redirect("/");
 };

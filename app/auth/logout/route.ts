@@ -1,23 +1,29 @@
 import { NextResponse } from "next/server";
-import { createServerActionClient } from "@supabase/auth-helpers-nextjs";
+import { createClient } from "@/utils/supabase/server";
 import { cookies } from "next/headers";
 
 export async function GET() {
   // Create Supabase client
-  const supabase = createServerActionClient({ cookies });
+  const supabase = await createClient();
 
-  // Log out
+  // Sign out from Supabase
   await supabase.auth.signOut();
 
-  // Await the store, then get all cookies from it
+  // ✅ Await cookies() before accessing methods (Next.js 15)
   const store = await cookies();
-  const allCookies = store.getAll(); // returns an array of { name, value, ... }
-  const lastPageCookie = allCookies.find((c) => c.name === "lastPage");
+  
+  // Delete ALL auth-related cookies
+  store.delete("userRole");
+  store.delete("userRoleUserId");
+  store.delete("userDisplayName");
+  store.delete("userPermissions");
+  store.delete("rememberMe");
+  store.delete("lastPage"); // ✅ CRITICAL: Always clear lastPage on logout
 
-  // Fallback to "/"
-  const lastPage = lastPageCookie?.value || "/";
+  console.log("[Auth] 🚪 Logged out, redirecting to home");
 
-  // Build final redirect
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://schedual-five.vercel.app";
-  return NextResponse.redirect(new URL(lastPage, baseUrl));
+  // ✅ ALWAYS redirect to home after logout (never use lastPage)
+  // This prevents getting stuck on /sign-in
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+  return NextResponse.redirect(new URL("/", baseUrl));
 }
