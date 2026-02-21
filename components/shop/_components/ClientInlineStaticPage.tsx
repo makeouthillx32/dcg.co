@@ -19,11 +19,6 @@ type StaticPageData = {
   version?: number | null;
 };
 
-/**
- * Client component that fetches a static page via API and renders it inline
- * Use this when you need to embed static page content in a client component
- * Renders raw HTML directly without any wrapper to preserve exact styling
- */
 export function ClientInlineStaticPage({
   slug,
   compact = true,
@@ -35,7 +30,6 @@ export function ClientInlineStaticPage({
 
   useEffect(() => {
     async function fetchPage() {
-      // Validate slug before fetching
       if (!slug || slug === 'undefined') {
         console.error('[ClientInlineStaticPage] Invalid slug:', slug);
         setError('Invalid page slug');
@@ -69,19 +63,15 @@ export function ClientInlineStaticPage({
     fetchPage();
   }, [slug]);
 
-  // Show skeleton while loading (matches landing page style)
   if (loading) {
     return (
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 pb-16">
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Left card skeleton */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="rounded-lg bg-gray-800 aspect-[4/3] p-8 animate-pulse">
             <div className="h-10 bg-gray-700 rounded w-3/4 mb-4"></div>
             <div className="h-6 bg-gray-700 rounded w-full mb-2"></div>
             <div className="h-6 bg-gray-700 rounded w-2/3"></div>
           </div>
-          
-          {/* Right card skeleton */}
           <div className="rounded-lg border border-[var(--border)] bg-[var(--card)] aspect-[4/3] p-8 animate-pulse">
             <div className="h-4 bg-gray-200 rounded w-3/4 mx-auto mb-4"></div>
             <div className="w-40 h-40 bg-gray-200 rounded-lg mx-auto mb-4"></div>
@@ -93,7 +83,6 @@ export function ClientInlineStaticPage({
     );
   }
 
-  // Show nothing on error (seamless)
   if (error) {
     if (process.env.NODE_ENV === 'development') {
       console.error('[ClientInlineStaticPage] Error:', error, 'Slug:', slug);
@@ -101,17 +90,21 @@ export function ClientInlineStaticPage({
     return null;
   }
 
-  // Don't render anything if page doesn't exist
   if (!page) {
     return null;
   }
 
-  // Render HTML directly within the section/container, without adding extra grid wrapper
-  // The HTML content should already include the grid structure
   return (
     <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 pb-16">
       {page.content_format === 'html' ? (
-        <div dangerouslySetInnerHTML={{ __html: page.content }} />
+        <div 
+          className="static-page-content"
+          style={{
+            fontFamily: 'var(--font-family-base)',
+            color: 'var(--foreground)',
+          }}
+          dangerouslySetInnerHTML={{ __html: page.content }} 
+        />
       ) : (
         <div className="prose prose-slate max-w-none">
           {page.content}

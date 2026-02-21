@@ -344,3 +344,17 @@ select:focus {
   background-repeat: no-repeat;
   background-position: 12px 11px;
 }
+/* globals.css or app/globals.css */
+
+.static-page-wrapper {
+  /* Ensure all children can access CSS variables */
+  --foreground: hsl(var(--foreground));
+  --primary: hsl(var(--primary));
+  --primary-foreground: hsl(var(--primary-foreground));
+  --radius: var(--radius);
+}
+
+.static-page-wrapper * {
+  /* Inherit font family to all nested elements */
+  font-family: inherit;
+}
