@@ -9,6 +9,7 @@ import { ChatsCard } from "./_components/chats-card";
 import { OverviewCardsGroup } from "./_components/overview-cards";
 import { OverviewCardsSkeleton } from "./_components/overview-cards/skeleton";
 import { RegionLabels } from "./_components/region-labels";
+import { requireAdmin } from "@/lib/adminGuard";
 
 type PropsType = {
   searchParams: Promise<{
@@ -17,6 +18,9 @@ type PropsType = {
 };
 
 export default async function Home({ searchParams }: PropsType) {
+  // ✅ ADMIN PROTECTION - Only admins can access this dashboard
+  const { user, profile } = await requireAdmin();
+
   const { selected_time_frame } = await searchParams;
   const extractTimeFrame = createTimeFrameExtractor(selected_time_frame);
 
