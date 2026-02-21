@@ -16,7 +16,7 @@ import {
   useSessionContext,
 } from "@supabase/auth-helpers-react";
 import { setCookie, getCookie, iosSessionHelpers } from "@/lib/cookieUtils";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import type { Theme } from "@/types/theme";
 import { defaultThemeId, getThemeById, getAvailableThemeIds } from "@/themes";
 import { dynamicFontManager } from "@/lib/dynamicFontManager";
@@ -82,9 +82,7 @@ function InternalAuthProvider({
   const pathname = usePathname();
 
   const refreshSession = () => {
-    // keep your existing iOS behavior
     iosSessionHelpers.refreshSession();
-    // also force our provider sync, so headers update without reload
     onRefreshRequested?.();
     console.log("[Provider] 🔄 Manual session refresh triggered");
   };
@@ -139,15 +137,13 @@ export const Providers: React.FC<{
   session?: Session | null;
 }> = ({ children, session }) => {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const searchKey = searchParams.toString();
 
   const [themeType, setThemeType] = useState<"light" | "dark">("light");
   const [themeId, setThemeIdState] = useState<string>(defaultThemeId);
   const [mounted, setMounted] = useState(false);
   const [availableThemes, setAvailableThemes] = useState<string[]>([]);
 
-  // ✅ Create browser client ONCE (don’t recreate each render)
+  // ✅ Create browser client ONCE
   const supabase = useMemo(() => {
     return createBrowserClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -161,6 +157,9 @@ export const Providers: React.FC<{
   );
   const [sessionFetched, setSessionFetched] = useState(!!session);
   const [sessionVersion, setSessionVersion] = useState(0);
+
+  // ✅ Track querystring WITHOUT useSearchParams (prevents prerender crash)
+  const [searchKey, setSearchKey] = useState<string>("");
 
   const getTheme = async (id?: string): Promise<Theme | null> => {
     const targetId = id || themeId;
@@ -224,7 +223,8 @@ export const Providers: React.FC<{
       setMounted(true);
 
       const initializeTheme = async () => {
-        const savedThemeId = localStorage.getItem("themeId") || getCookie("themeId");
+        const savedThemeId =
+          localStorage.getItem("themeId") || getCookie("themeId");
         if (savedThemeId) {
           const theme = await getThemeById(savedThemeId);
           setThemeIdState(theme ? savedThemeId : defaultThemeId);
@@ -234,7 +234,8 @@ export const Providers: React.FC<{
             );
         }
 
-        const savedThemeType = localStorage.getItem("theme") || getCookie("theme");
+        const savedThemeType =
+          localStorage.getItem("theme") || getCookie("theme");
         if (!savedThemeType) {
           const systemPrefersDark = window
             .matchMedia("(prefers-color-scheme: dark)")
@@ -323,6 +324,19 @@ export const Providers: React.FC<{
     setSessionVersion((v) => v + 1);
   }, [supabase]);
 
+  // ✅ Keep searchKey synced client-side (no useSearchParams)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const update = () => setSearchKey(window.location.search || "");
+
+    // set now + whenever browser history changes
+    update();
+    window.addEventListener("popstate", update);
+
+    return () => window.removeEventListener("popstate", update);
+  }, [pathname]);
+
   // ✅ Initial session sync
   useEffect(() => {
     if (!sessionFetched) {
@@ -331,7 +345,7 @@ export const Providers: React.FC<{
     }
   }, [sessionFetched, syncSession]);
 
-  // ✅ Sync on navigation OR query changes (server actions often only change query)
+  // ✅ Sync on navigation OR query changes
   useEffect(() => {
     if (sessionFetched) syncSession();
   }, [pathname, searchKey, sessionFetched, syncSession]);
