@@ -1,27 +1,26 @@
-// app/api/documents/upload/route.ts - ENHANCED WITH IMAGE RESOLUTION
+// app/api/documents/upload/route.ts - FIXED VERSION
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
+import sharp from 'sharp';
 
-// Helper to extract image dimensions from File
+// Helper to extract image dimensions from File using sharp (server-side)
 async function getImageDimensions(file: File): Promise<{ width: number; height: number } | null> {
   if (!file.type.startsWith('image/')) return null;
   
-  return new Promise((resolve) => {
-    const img = new Image();
-    const url = URL.createObjectURL(file);
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    const metadata = await sharp(buffer).metadata();
     
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      resolve({ width: img.width, height: img.height });
-    };
+    if (metadata.width && metadata.height) {
+      return { width: metadata.width, height: metadata.height };
+    }
     
-    img.onerror = () => {
-      URL.revokeObjectURL(url);
-      resolve(null);
-    };
-    
-    img.src = url;
-  });
+    return null;
+  } catch (error) {
+    console.error('Failed to extract image dimensions:', error);
+    return null;
+  }
 }
 
 export async function POST(req: NextRequest) {
