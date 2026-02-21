@@ -283,7 +283,7 @@ export const Providers: React.FC<{
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
 
-  // ✅ CRITICAL  FIX: Fetch session client-side if not provided as prop
+  // ✅ CRITICAL FIX: Fetch session client-side if not provided as prop
   // This handles the case where layout.tsx is a client component and can't fetch server-side
   const [initialSession, setInitialSession] = useState<Session | null>(session ?? null);
   const [sessionFetched, setSessionFetched] = useState(!!session);
