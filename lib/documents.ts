@@ -1,166 +1,403 @@
-// lib/document-urls.ts
+// lib/documents.ts
 /**
- * Document URL Utilities
+ * Document & Image Helper Utilities
  * 
- * Generate and copy different URL formats for documents.
+ * Fully dynamic - works with any folder structure, no hardcoding.
+ * Automatically discovers files and generates URLs.
  */
 
-import { getDocumentUrl } from './documents';
+import { createClient } from '@/utils/supabase/server';
+import { createBrowserClient } from '@/utils/supabase/client';
 
-export type UrlFormat = 'cdn' | 'id' | 'slug' | 'direct';
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const BUCKET_NAME = 'documents';
 
-/**
- * Slugify a filename for pretty URLs
- */
-export function slugifyFileName(fileName: string): string {
-  return fileName
-    .toLowerCase()
-    .replace(/\.[^/.]+$/, '') // Remove extension
-    .replace(/[_\s]+/g, '-')  // Replace _ and spaces with -
-    .replace(/[^a-z0-9-]/g, '') // Remove non-alphanumeric except -
-    .replace(/-+/g, '-')        // Replace multiple - with single -
-    .replace(/^-|-$/g, '');     // Remove leading/trailing -
+if (!SUPABASE_URL) {
+  console.warn('⚠️ NEXT_PUBLIC_SUPABASE_URL is not set');
 }
 
 /**
- * Generate all available URL formats for a document
+ * Type definitions
  */
-export function generateDocumentUrls(document: {
+export interface DocumentRecord {
   id: string;
   name: string;
   path: string;
-  parent_path?: string | null;
-  storage_path?: string | null;
-  mime_type?: string | null;
-}) {
-  const baseUrl = typeof window !== 'undefined' 
-    ? window.location.origin 
-    : process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3001';
+  parent_path: string | null;
+  type: 'file' | 'folder';
+  mime_type: string | null;
+  size_bytes: number | null;
+  storage_path: string | null;
+  bucket_name: string;
+  is_public: boolean;
+  public_slug: string | null;
+  is_public_folder: boolean;
+  tags?: string[] | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Get the public URL for a file in Supabase Storage
+ * 
+ * @param storagePath - The storage_path from your documents table
+ * @returns Full public URL to the file
+ * 
+ * @example
+ * const url = getDocumentUrl("public/1771635350827-Roper_106.avif");
+ * // Returns: https://xyz.supabase.co/storage/v1/object/public/documents/public/1771635350827-Roper_106.avif
+ */
+export function getDocumentUrl(storagePath?: string | null): string {
+  if (!storagePath) return '';
   
-  const urls: Record<UrlFormat, { url: string; label: string; description: string }> = {
-    cdn: {
-      url: `${baseUrl}/cdn/${document.path}`,
-      label: 'CDN Path',
-      description: 'Clean path - works like /public folder'
-    },
-    id: {
-      url: `${baseUrl}/u/doc/${document.id}`,
-      label: 'Document ID',
-      description: 'Permanent link by UUID - never breaks'
-    },
-    slug: {
-      url: `${baseUrl}/u/img/${slugifyFileName(document.name)}`,
-      label: 'Pretty Slug',
-      description: 'SEO-friendly URL for images'
-    },
-    direct: {
-      url: document.storage_path ? getDocumentUrl(document.storage_path) : '',
-      label: 'Direct Supabase',
-      description: 'Direct Supabase storage URL'
-    }
+  // Remove leading slash if present
+  const cleanPath = storagePath.startsWith('/') ? storagePath.slice(1) : storagePath;
+  
+  return `${SUPABASE_URL}/storage/v1/object/public/${BUCKET_NAME}/${cleanPath}`;
+}
+
+/**
+ * Get all documents in a specific folder (server-side)
+ * 
+ * @param folderPath - Folder path (e.g., "public/", "images/")
+ * @returns Array of documents with URLs
+ * 
+ * @example
+ * const publicImages = await getDocumentsByFolder("public/");
+ * publicImages.forEach(img => console.log(img.url));
+ */
+export async function getDocumentsByFolder(folderPath: string) {
+  const supabase = await createClient();
+  
+  const normalizedPath = folderPath.endsWith('/') ? folderPath : `${folderPath}/`;
+  
+  const { data: documents, error } = await supabase
+    .from('documents')
+    .select('*')
+    .eq('parent_path', normalizedPath)
+    .is('deleted_at', null)
+    .order('name');
+  
+  if (error) {
+    console.error('Error fetching documents:', error);
+    return [];
+  }
+  
+  return (documents || []).map(doc => ({
+    ...doc,
+    url: doc.storage_path ? getDocumentUrl(doc.storage_path) : null,
+    dimensions: getDimensionsFromTags(doc.tags),
+    resolution: getResolution(doc.tags),
+  }));
+}
+
+/**
+ * Get all documents in a specific folder (client-side)
+ * 
+ * @param folderPath - Folder path (e.g., "public/", "images/")
+ * @returns Array of documents with URLs
+ */
+export async function getDocumentsByFolderClient(folderPath: string) {
+  const supabase = createBrowserClient();
+  
+  const normalizedPath = folderPath.endsWith('/') ? folderPath : `${folderPath}/`;
+  
+  const { data: documents, error } = await supabase
+    .from('documents')
+    .select('*')
+    .eq('parent_path', normalizedPath)
+    .is('deleted_at', null)
+    .order('name');
+  
+  if (error) {
+    console.error('Error fetching documents:', error);
+    return [];
+  }
+  
+  return (documents || []).map(doc => ({
+    ...doc,
+    url: doc.storage_path ? getDocumentUrl(doc.storage_path) : null,
+    dimensions: getDimensionsFromTags(doc.tags),
+    resolution: getResolution(doc.tags),
+  }));
+}
+
+/**
+ * Get a single document by ID (server-side)
+ * 
+ * @param documentId - Document UUID
+ * @returns Document with URL or null
+ */
+export async function getDocumentById(documentId: string) {
+  const supabase = await createClient();
+  
+  const { data: document, error } = await supabase
+    .from('documents')
+    .select('*')
+    .eq('id', documentId)
+    .is('deleted_at', null)
+    .single();
+  
+  if (error || !document) {
+    console.error('Error fetching document:', error);
+    return null;
+  }
+  
+  return {
+    ...document,
+    url: document.storage_path ? getDocumentUrl(document.storage_path) : null,
+    dimensions: getDimensionsFromTags(document.tags),
+    resolution: getResolution(document.tags),
+  };
+}
+
+/**
+ * Get a single document by ID (client-side)
+ */
+export async function getDocumentByIdClient(documentId: string) {
+  const supabase = createBrowserClient();
+  
+  const { data: document, error } = await supabase
+    .from('documents')
+    .select('*')
+    .eq('id', documentId)
+    .is('deleted_at', null)
+    .single();
+  
+  if (error || !document) {
+    console.error('Error fetching document:', error);
+    return null;
+  }
+  
+  return {
+    ...document,
+    url: document.storage_path ? getDocumentUrl(document.storage_path) : null,
+    dimensions: getDimensionsFromTags(document.tags),
+    resolution: getResolution(document.tags),
+  };
+}
+
+/**
+ * Get all public folders (server-side)
+ * 
+ * @returns Array of public folders
+ */
+export async function getPublicFolders() {
+  const supabase = await createClient();
+  
+  const { data: folders, error } = await supabase
+    .from('documents')
+    .select('*')
+    .eq('type', 'folder')
+    .eq('is_public_folder', true)
+    .is('deleted_at', null)
+    .order('name');
+  
+  if (error) {
+    console.error('Error fetching public folders:', error);
+    return [];
+  }
+  
+  return folders || [];
+}
+
+/**
+ * Get all folders (server-side)
+ * 
+ * @returns Array of all folders
+ */
+export async function getAllFolders() {
+  const supabase = await createClient();
+  
+  const { data: folders, error } = await supabase
+    .from('documents')
+    .select('*')
+    .eq('type', 'folder')
+    .is('deleted_at', null)
+    .order('name');
+  
+  if (error) {
+    console.error('Error fetching folders:', error);
+    return [];
+  }
+  
+  return folders || [];
+}
+
+/**
+ * Get all images in a folder (server-side)
+ * Filters for image mime types only
+ * 
+ * @param folderPath - Folder path
+ * @returns Array of image documents with URLs
+ */
+export async function getImagesByFolder(folderPath: string) {
+  const documents = await getDocumentsByFolder(folderPath);
+  return documents.filter(doc => isImage(doc.mime_type));
+}
+
+/**
+ * Get all images in a folder (client-side)
+ */
+export async function getImagesByFolderClient(folderPath: string) {
+  const documents = await getDocumentsByFolderClient(folderPath);
+  return documents.filter(doc => isImage(doc.mime_type));
+}
+
+/**
+ * Find a document by name in a folder (server-side)
+ * 
+ * @param folderPath - Folder to search in
+ * @param fileName - File name to find
+ * @returns Document with URL or null
+ */
+export async function findDocumentByName(folderPath: string, fileName: string) {
+  const documents = await getDocumentsByFolder(folderPath);
+  return documents.find(doc => doc.name === fileName) || null;
+}
+
+/**
+ * Check if a file is an image based on mime type
+ */
+export function isImage(mimeType?: string | null): boolean {
+  if (!mimeType) return false;
+  return mimeType.startsWith('image/');
+}
+
+/**
+ * Check if a file is a PDF
+ */
+export function isPDF(mimeType?: string | null): boolean {
+  return mimeType === 'application/pdf';
+}
+
+/**
+ * Check if a file is a video
+ */
+export function isVideo(mimeType?: string | null): boolean {
+  if (!mimeType) return false;
+  return mimeType.startsWith('video/');
+}
+
+/**
+ * Check if a file is a document (Word, Excel, etc.)
+ */
+export function isDocument(mimeType?: string | null): boolean {
+  if (!mimeType) return false;
+  return (
+    mimeType.includes('word') ||
+    mimeType.includes('excel') ||
+    mimeType.includes('spreadsheet') ||
+    mimeType.includes('presentation') ||
+    mimeType === 'application/pdf'
+  );
+}
+
+/**
+ * Get file extension from mime type
+ */
+export function getExtensionFromMimeType(mimeType?: string | null): string {
+  if (!mimeType) return '';
+  
+  const mimeToExt: Record<string, string> = {
+    'image/jpeg': 'jpg',
+    'image/png': 'png',
+    'image/gif': 'gif',
+    'image/webp': 'webp',
+    'image/avif': 'avif',
+    'image/svg+xml': 'svg',
+    'application/pdf': 'pdf',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'pptx',
+    'video/mp4': 'mp4',
+    'video/webm': 'webm',
+    'audio/mpeg': 'mp3',
+    'audio/wav': 'wav',
   };
   
-  // Only include slug URL for images
-  if (!document.mime_type?.startsWith('image/')) {
-    delete urls.slug;
-  }
-  
-  return urls;
+  return mimeToExt[mimeType] || '';
 }
 
 /**
- * Copy URL to clipboard
+ * Format file size for display
  */
-export async function copyUrlToClipboard(url: string): Promise<boolean> {
-  try {
-    if (navigator.clipboard && window.isSecureContext) {
-      await navigator.clipboard.writeText(url);
-      return true;
-    } else {
-      // Fallback for older browsers
-      const textArea = document.createElement('textarea');
-      textArea.value = url;
-      textArea.style.position = 'fixed';
-      textArea.style.left = '-999999px';
-      document.body.appendChild(textArea);
-      textArea.focus();
-      textArea.select();
-      
-      try {
-        document.execCommand('copy');
-        textArea.remove();
-        return true;
-      } catch (err) {
-        textArea.remove();
-        return false;
-      }
+export function formatFileSize(bytes?: number | null): string {
+  if (!bytes || bytes === 0) return '0 B';
+  
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+}
+
+/**
+ * Parse image dimensions from tags
+ * Tags are stored as: ["width:1920", "height:1080", "resolution:1920x1080"]
+ */
+export function getDimensionsFromTags(tags?: string[] | null): { width: number; height: number } | null {
+  if (!tags || tags.length === 0) return null;
+  
+  let width = 0;
+  let height = 0;
+  
+  tags.forEach(tag => {
+    if (tag.startsWith('width:')) {
+      width = parseInt(tag.split(':')[1], 10);
     }
-  } catch (err) {
-    console.error('Failed to copy URL:', err);
-    return false;
-  }
-}
-
-/**
- * Generate HTML img tag for easy copying
- */
-export function generateImageTag(document: {
-  id: string;
-  name: string;
-  path: string;
-  parent_path?: string | null;
-  storage_path?: string | null;
-}, format: UrlFormat = 'cdn'): string {
-  const urls = generateDocumentUrls(document);
-  const url = urls[format]?.url || urls.cdn.url;
-  
-  return `<img src="${url}" alt="${document.name.replace(/\.[^/.]+$/, '')}" />`;
-}
-
-/**
- * Generate markdown image syntax
- */
-export function generateMarkdownImage(document: {
-  id: string;
-  name: string;
-  path: string;
-  parent_path?: string | null;
-  storage_path?: string | null;
-}, format: UrlFormat = 'cdn'): string {
-  const urls = generateDocumentUrls(document);
-  const url = urls[format]?.url || urls.cdn.url;
-  
-  return `![${document.name.replace(/\.[^/.]+$/, '')}](${url})`;
-}
-
-/**
- * Copy multiple formats at once (useful for developers)
- */
-export function generateAllFormatsText(document: {
-  id: string;
-  name: string;
-  path: string;
-  parent_path?: string | null;
-  storage_path?: string | null;
-  mime_type?: string | null;
-}): string {
-  const urls = generateDocumentUrls(document);
-  
-  let text = `# ${document.name}\n\n`;
-  
-  Object.entries(urls).forEach(([key, value]) => {
-    text += `**${value.label}**\n`;
-    text += `${value.url}\n`;
-    text += `_${value.description}_\n\n`;
+    if (tag.startsWith('height:')) {
+      height = parseInt(tag.split(':')[1], 10);
+    }
   });
   
-  if (document.mime_type?.startsWith('image/')) {
-    text += `**HTML**\n`;
-    text += `${generateImageTag(document, 'cdn')}\n\n`;
-    
-    text += `**Markdown**\n`;
-    text += `${generateMarkdownImage(document, 'cdn')}\n`;
+  if (width && height) {
+    return { width, height };
   }
   
-  return text;
+  return null;
+}
+
+/**
+ * Get resolution string from tags
+ * Returns something like "1920x1080" or null
+ */
+export function getResolution(tags?: string[] | null): string | null {
+  if (!tags || tags.length === 0) return null;
+  
+  const resolutionTag = tags.find(tag => tag.startsWith('resolution:'));
+  if (resolutionTag) {
+    return resolutionTag.split(':')[1];
+  }
+  
+  const dimensions = getDimensionsFromTags(tags);
+  if (dimensions) {
+    return `${dimensions.width}x${dimensions.height}`;
+  }
+  
+  return null;
+}
+
+/**
+ * Get file category based on mime type
+ * Returns: 'image' | 'video' | 'document' | 'audio' | 'other'
+ */
+export function getFileCategory(mimeType?: string | null): string {
+  if (!mimeType) return 'other';
+  
+  if (isImage(mimeType)) return 'image';
+  if (isVideo(mimeType)) return 'video';
+  if (isDocument(mimeType)) return 'document';
+  if (mimeType.startsWith('audio/')) return 'audio';
+  
+  return 'other';
+}
+
+/**
+ * Generate srcset for responsive images
+ * Useful for Next.js Image or responsive img tags
+ */
+export function generateSrcSet(storagePath: string, widths: number[]): string {
+  const baseUrl = getDocumentUrl(storagePath);
+  return widths.map(w => `${baseUrl} ${w}w`).join(', ');
 }
