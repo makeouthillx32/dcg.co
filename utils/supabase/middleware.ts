@@ -1,16 +1,12 @@
-// utils/supabase/middleware.ts
 import { type NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
 export async function middleware(req: NextRequest) {
-  let res = NextResponse.next();
+  let res = NextResponse.next({ request: req });
 
   const invite = req.nextUrl.searchParams.get("invite");
   if (invite) {
-    res.cookies.set("invite", invite, {
-      path: "/",
-      maxAge: 60 * 10,
-    });
+    res.cookies.set("invite", invite, { path: "/", maxAge: 60 * 10 });
   }
 
   const supabase = createServerClient(
@@ -20,9 +16,10 @@ export async function middleware(req: NextRequest) {
       cookies: {
         getAll: () => req.cookies.getAll(),
         setAll: (cookies) => {
-          cookies.forEach(({ name, value, options }) =>
-            res.cookies.set(name, value, options)
-          );
+          cookies.forEach(({ name, value, options }) => {
+            req.cookies.set(name, value);
+            res.cookies.set(name, value, options);
+          });
         },
       },
     }
@@ -47,4 +44,8 @@ export async function middleware(req: NextRequest) {
   return res;
 }
 
-// ❌ REMOVED: export const config = { ... }
+export const config = {
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+  ],
+};
