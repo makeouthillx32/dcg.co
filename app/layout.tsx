@@ -279,6 +279,20 @@ function RootLayoutContent({ children }: { children: React.ReactNode }) {
       setTimeout(scheduleTracking, 0);
     }
   }, [pathname, route]);
+  // ✅ HANDLE LOGOUT - Force page reload to clear all state
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('logout') === 'true') {
+      // Remove the param from URL
+      params.delete('logout');
+      const newUrl = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
+      
+      // Force full page reload to clear all React state
+      window.location.replace(newUrl);
+    }
+  }, []);
 
   // ✅ Dashboard layout
   if (route.isDashboardPage) {

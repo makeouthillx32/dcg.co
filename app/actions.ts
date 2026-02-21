@@ -346,6 +346,9 @@ export const signOutAction = async () => {
   // Sign out from Supabase (this handles auth cookie deletion via middleware)
   await supabase.auth.signOut();
   
-  // ✅ Always redirect to home after sign out (not sign-in)
-  return redirect("/");
+  // ✅ Add small delay to ensure cookies are cleared before redirect
+  await new Promise(resolve => setTimeout(resolve, 100));
+  
+  // ✅ Redirect with logout flag to trigger full page reload
+  return redirect("/?logout=true");
 };
