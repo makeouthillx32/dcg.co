@@ -321,6 +321,6 @@ export const signOutAction = async () => {
   // Sign out from Supabase (this handles auth cookie deletion via middleware)
   await supabase.auth.signOut();
   
-  // ✅ Always redirect to home after sign out
+  // ✅ Always redirect to home after sign out (not sign-in)
   return redirect("/");
 };

@@ -92,12 +92,11 @@ function InternalAuthProvider({ children }: { children: React.ReactNode }) {
       ];
       
       // ✅ Also check if path starts with public prefixes
-      const publicPrefixes = ["/products", "/collections", "/auth", "/pages"];
+      const publicPrefixes = ["/products", "/collections", "/auth"];
       
       const isPublicRoute = publicRoutes.includes(pathname) || 
                            publicPrefixes.some(prefix => pathname.startsWith(prefix));
       
-      // ✅ CRITICAL FIX: Don't redirect if already on a public route
       if (!isPublicRoute) {
         console.log(`[Provider] Redirecting to sign-in from: ${pathname}`);
         router.push("/sign-in");
