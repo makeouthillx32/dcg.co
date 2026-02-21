@@ -1,5 +1,6 @@
 // app/layout.tsx - BLAZING FAST - Zero Loops, Cookie Cache, Lazy Load
-"use client";
+// ✅ REMOVED "use client" - Root layout is now a server component that fetches session
+// The client logic is moved to RootLayoutContent which is wrapped by ClientLayoutWrapper
 
 import { useEffect, useLayoutEffect, useState, lazy, Suspense } from "react";
 import { usePathname } from "next/navigation";
@@ -184,7 +185,9 @@ function classifyRoute(pathname: string) {
   };
 }
 
-// ─── Root Layout Content ─────────────────────────────────
+// ─── Root Layout Content (Client Component) ─────────────────────────────────
+
+"use client";
 
 function RootLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -386,9 +389,34 @@ function RootLayoutContent({ children }: { children: React.ReactNode }) {
   );
 }
 
-// ─── Root Layout Wrapper ─────────────────────────────────
+// ─── Client Layout Wrapper ─────────────────────────────────
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+"use client";
+
+function ClientLayoutWrapper({ 
+  children, 
+  session 
+}: { 
+  children: React.ReactNode;
+  session: any;
+}) {
+  return (
+    <Providers session={session}>
+      <RootLayoutContent>{children}</RootLayoutContent>
+    </Providers>
+  );
+}
+
+// ─── Root Layout (Server Component) ─────────────────────────────────
+
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // ✅ CRITICAL FIX: Fetch session server-side
+  const { createServerClient } = await import("@/utils/supabase/server");
+  const supabase = await createServerClient();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -423,9 +451,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className="min-h-screen font-[var(--font-sans)]" suppressHydrationWarning>
-        <Providers>
-          <RootLayoutContent>{children}</RootLayoutContent>
-        </Providers>
+        {/* ✅ CRITICAL FIX: Pass session to client wrapper */}
+        <ClientLayoutWrapper session={session}>
+          {children}
+        </ClientLayoutWrapper>
       </body>
     </html>
   );
