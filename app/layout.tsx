@@ -4,7 +4,7 @@
 import { useEffect, useLayoutEffect, useState, lazy, Suspense } from "react";
 import { usePathname } from "next/navigation";
 import { Providers } from "./provider";
-import { useTheme } from "./provider";
+import { useTheme, useAuth } from "./provider"; // ✅ Added useAuth
 import { Header as ShopHeader } from "@/components/Layouts/shop/Header";
 import { Header as AppHeader } from "@/components/Layouts/app/nav";
 import { Header as DashboardHeader } from "@/components/Layouts/dashboard";
@@ -198,6 +198,7 @@ function RootLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { themeType } = useTheme();
+  const { session } = useAuth(); // ✅ ADDED: Get session for MobileDrawer key
   const screenSize = useScreenSize();
 
   // ✅ SINGLE ROUTE CLASSIFICATION
@@ -342,7 +343,11 @@ function RootLayoutContent({ children }: { children: React.ReactNode }) {
                 className="fixed bottom-0 left-0 top-0 z-50 w-[min(86vw,360px)] overflow-y-auto border-r border-[var(--lt-border)] bg-[var(--lt-bg)] shadow-[var(--lt-shadow)] lg:hidden"
                 data-layout="shop"
               >
-                <MobileDrawer onClose={() => setMobileMenuOpen(false)} />
+                {/* ✅ ADDED KEY: Forces re-render when session changes */}
+                <MobileDrawer 
+                  key={session?.user?.id || 'guest'}
+                  onClose={() => setMobileMenuOpen(false)} 
+                />
               </div>
             </>
           )}
