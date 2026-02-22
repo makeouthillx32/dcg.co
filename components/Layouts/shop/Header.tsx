@@ -1,10 +1,10 @@
 // components/Layouts/shop/Header.tsx
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import { Menu, User } from "lucide-react";
 import Link from "next/link";
-import { useTheme, useAuth } from "@/app/provider"; // ✅ Use useAuth from provider
+import { useTheme, useAuth } from "@/app/provider";
 import SwitchtoDarkMode from "@/components/Layouts/SwitchtoDarkMode";
 import DesktopNav from "@/components/Layouts/shop/DesktopNav";
 
@@ -13,12 +13,29 @@ interface HeaderProps {
 }
 
 export function Header({ onMenuClick }: HeaderProps = {}) {
-  const { session } = useAuth(); // ✅ FIXED: Use auth from provider
+  const { session, refreshSession } = useAuth(); // ✅ Get refreshSession
   const { themeType } = useTheme();
 
   const handleAccountClick = () => {
     window.location.href = "/profile/me";
   };
+
+  // ✅ Listen for signin/logout query params and refresh session
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('signin') || params.has('logout')) {
+      console.log('[Header] Auth state changed via query param, refreshing session...');
+      refreshSession();
+      
+      // Clean up URL
+      params.delete('signin');
+      params.delete('logout');
+      const newUrl = params.toString() 
+        ? `${window.location.pathname}?${params.toString()}`
+        : window.location.pathname;
+      window.history.replaceState({}, '', newUrl);
+    }
+  }, [refreshSession]);
 
   // ✅ Add logging to debug
   console.log('[Header] Session state:', session ? 'authenticated' : 'not authenticated');
