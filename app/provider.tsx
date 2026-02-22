@@ -1,11 +1,21 @@
 "use client";
-import React, { createContext, useContext, useEffect, useState } from "react";
+
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { createBrowserClient } from "@supabase/ssr";
 import type { Session, User } from "@supabase/auth-helpers-nextjs";
-import { SessionContextProvider, useSessionContext } from "@supabase/auth-helpers-react";
+import {
+  SessionContextProvider,
+  useSessionContext,
+} from "@supabase/auth-helpers-react";
 import { setCookie, getCookie, iosSessionHelpers } from "@/lib/cookieUtils";
-import { usePathname, useRouter } from "next/navigation";
-import { Theme } from "@/types/theme"; 
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import type { Theme } from "@/types/theme";
 import { defaultThemeId, getThemeById, getAvailableThemeIds } from "@/themes";
 import { dynamicFontManager } from "@/lib/dynamicFontManager";
 import { transitionTheme, smoothThemeToggle } from "@/utils/themeTransitions";
@@ -20,11 +30,14 @@ interface EnhancedThemeContextType {
   availableThemes: string[];
 }
 
-const ThemeContext = createContext<EnhancedThemeContextType | undefined>(undefined);
+const ThemeContext = createContext<EnhancedThemeContextType | undefined>(
+  undefined
+);
 
 export const useTheme = () => {
   const context = useContext(ThemeContext);
-  if (context === undefined) throw new Error("useTheme must be used within a ThemeProvider");
+  if (context === undefined)
+    throw new Error("useTheme must be used within a ThemeProvider");
   return context;
 };
 
@@ -39,14 +52,15 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (context === undefined) throw new Error("useAuth must be used within an AuthProvider");
+  if (context === undefined)
+    throw new Error("useAuth must be used within an AuthProvider");
   return context;
 };
 
 function IOSSessionManager({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const cleanup = iosSessionHelpers.setupIOSHandlers();
-    console.log('[Provider] 🍎 iOS session persistence initialized');
+    console.log("[Provider] 🍎 iOS session persistence initialized");
     return cleanup;
   }, []);
   return <>{children}</>;
@@ -57,19 +71,33 @@ function InternalAuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const router = useRouter();
   const pathname = usePathname();
+
   const refreshSession = () => {
     iosSessionHelpers.refreshSession();
-    console.log('[Provider] 🔄 Manual session refresh triggered');
+    console.log("[Provider] 🔄 Manual session refresh triggered");
   };
+
   useEffect(() => {
     if (session?.user) setUser(session.user);
     else setUser(null);
   }, [session]);
+
   useEffect(() => {
     if (!isLoading && !session) {
-      const publicRoutes = ["/", "/sign-in", "/sign-up", "/forgot-password", "/reset-password", "/auth/callback", "/auth/callback/oauth"];
+      const publicRoutes = [
+        "/",
+        "/sign-in",
+        "/sign-up",
+        "/forgot-password",
+        "/reset-password",
+        "/auth/callback",
+        "/auth/callback/oauth",
+      ];
       const publicPrefixes = ["/products", "/collections", "/auth"];
-      const isPublicRoute = publicRoutes.includes(pathname) || publicPrefixes.some(prefix => pathname.startsWith(prefix));
+      const isPublicRoute =
+        publicRoutes.includes(pathname) ||
+        publicPrefixes.some((prefix) => pathname.startsWith(prefix));
+
       if (!isPublicRoute) {
         console.log(`[Provider] Redirecting to sign-in from: ${pathname}`);
         router.push("/sign-in");
@@ -78,6 +106,7 @@ function InternalAuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
   }, [session, isLoading, pathname, router]);
+
   return (
     <AuthContext.Provider value={{ user, session, isLoading, refreshSession }}>
       <IOSSessionManager>{children}</IOSSessionManager>
@@ -90,17 +119,27 @@ export function useIOSSessionRefresh() {
   return { refreshSession };
 }
 
-export const Providers: React.FC<{ children: React.ReactNode; session?: Session | null }> = ({ children, session }) => {
+export const Providers: React.FC<{
+  children: React.ReactNode;
+  session?: Session | null;
+}> = ({ children, session }) => {
   const [themeType, setThemeType] = useState<"light" | "dark">("light");
   const [themeId, setThemeIdState] = useState<string>(defaultThemeId);
   const [mounted, setMounted] = useState(false);
   const [availableThemes, setAvailableThemes] = useState<string[]>([]);
+
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
   const getTheme = async (id?: string): Promise<Theme | null> => {
     const targetId = id || themeId;
     try {
       const theme = await getThemeById(targetId);
       if (!theme) {
-        console.warn(`⚠️ Theme ${targetId} not found, falling back to default`);
+        console.warn(
+          `⚠️ Theme ${targetId} not found, falling back to default`
+        );
         return await getThemeById(defaultThemeId);
       }
       return theme;
@@ -109,6 +148,7 @@ export const Providers: React.FC<{ children: React.ReactNode; session?: Session 
       return await getThemeById(defaultThemeId);
     }
   };
+
   const setThemeId = async (id: string, element?: HTMLElement) => {
     const themeChangeCallback = async () => {
       try {
@@ -125,14 +165,19 @@ export const Providers: React.FC<{ children: React.ReactNode; session?: Session 
         console.error(`❌ Error setting theme ${id}:`, error);
       }
     };
+
     if (element) await smoothThemeToggle(element, themeChangeCallback);
     else await transitionTheme(themeChangeCallback);
   };
+
   const toggleTheme = async (element?: HTMLElement) => {
-    const themeChangeCallback = () => { setThemeType((prev) => (prev === "light" ? "dark" : "light")); };
+    const themeChangeCallback = () => {
+      setThemeType((prev) => (prev === "light" ? "dark" : "light"));
+    };
     if (element) await smoothThemeToggle(element, themeChangeCallback);
     else await transitionTheme(themeChangeCallback);
   };
+
   useEffect(() => {
     const loadAvailableThemes = async () => {
       try {
@@ -146,32 +191,44 @@ export const Providers: React.FC<{ children: React.ReactNode; session?: Session 
     };
     loadAvailableThemes();
   }, []);
+
   useEffect(() => {
     if (typeof window !== "undefined") {
       setMounted(true);
+
       const initializeTheme = async () => {
-        const savedThemeId = localStorage.getItem("themeId") || getCookie("themeId");
+        const savedThemeId =
+          localStorage.getItem("themeId") || getCookie("themeId");
         if (savedThemeId) {
           const theme = await getThemeById(savedThemeId);
           if (theme) setThemeIdState(savedThemeId);
           else {
-            console.warn(`⚠️ Saved theme ${savedThemeId} not found, using default`);
+            console.warn(
+              `⚠️ Saved theme ${savedThemeId} not found, using default`
+            );
             setThemeIdState(defaultThemeId);
           }
         }
-        const savedThemeType = localStorage.getItem("theme") || getCookie("theme");
+
+        const savedThemeType =
+          localStorage.getItem("theme") || getCookie("theme");
         if (!savedThemeType) {
-          const systemPrefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+          const systemPrefersDark = window.matchMedia(
+            "(prefers-color-scheme: dark)"
+          ).matches;
           setThemeType(systemPrefersDark ? "dark" : "light");
         } else {
           setThemeType(savedThemeType as "light" | "dark");
         }
       };
+
       initializeTheme();
     }
   }, []);
+
   useEffect(() => {
     if (!mounted || availableThemes.length === 0) return;
+
     const applyTheme = async () => {
       try {
         const theme = await getTheme();
@@ -179,24 +236,32 @@ export const Providers: React.FC<{ children: React.ReactNode; session?: Session 
           console.error("❌ No theme available to apply");
           return;
         }
+
         console.log(`🎨 Applying theme: ${theme.name} (${themeType} mode)`);
         const variables = themeType === "dark" ? theme.dark : theme.light;
+
         const html = document.documentElement;
         html.classList.remove("light", "dark");
-        availableThemes.forEach(id => html.classList.remove(`theme-${id}`));
+        availableThemes.forEach((id) => html.classList.remove(`theme-${id}`));
         html.classList.add(themeType);
         html.classList.add(`theme-${themeId}`);
+
         console.log(`🔧 Applying ${Object.keys(variables).length} CSS variables`);
         for (const [key, value] of Object.entries(variables)) {
           html.style.setProperty(key, value);
         }
+
         try {
           console.log(`🔤 Auto-loading fonts from CSS variables...`);
           await dynamicFontManager.autoLoadFontsFromCSS();
         } catch (error) {
-          console.error('❌ Failed to auto-load fonts:', error);
+          console.error("❌ Failed to auto-load fonts:", error);
         }
-        if (theme.typography?.trackingNormal) document.body.style.letterSpacing = theme.typography.trackingNormal;
+
+        if (theme.typography?.trackingNormal) {
+          document.body.style.letterSpacing = theme.typography.trackingNormal;
+        }
+
         localStorage.setItem("theme", themeType);
         setCookie("theme", themeType, { path: "/", maxAge: 31536000 });
         console.log(`✅ Theme applied: ${theme.name} (${themeType})`);
@@ -204,35 +269,103 @@ export const Providers: React.FC<{ children: React.ReactNode; session?: Session 
         console.error("❌ Error applying theme:", error);
       }
     };
+
     applyTheme();
   }, [themeType, themeId, mounted, availableThemes]);
-  const supabase = createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
-  const [initialSession, setInitialSession] = useState<Session | null>(session ?? null);
+
+  // ✅ memoize the supabase client (critical for iOS/PWA + redirects)
+  const supabase = useMemo(() => {
+    return createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+  }, []);
+
+  const [initialSession, setInitialSession] = useState<Session | null>(
+    session ?? null
+  );
   const [sessionFetched, setSessionFetched] = useState(!!session);
+
+  // ✅ force a session re-sync after server-action redirects like ?signin=true
+  useEffect(() => {
+    const signin = searchParams.get("signin") === "true";
+    const logout = searchParams.get("logout") === "true";
+    if (!signin && !logout) return;
+
+    (async () => {
+      console.log("[Provider] 🔁 Query-triggered session sync:", {
+        signin,
+        logout,
+      });
+
+      iosSessionHelpers.refreshSession();
+
+      const { data } = await supabase.auth.getSession();
+      const nextSession = data.session ?? null;
+
+      console.log(
+        "[Provider] ✅ Session sync result:",
+        nextSession ? "authenticated" : "not authenticated"
+      );
+
+      setInitialSession(nextSession);
+      setSessionFetched(true);
+
+      const next = new URLSearchParams(searchParams.toString());
+      next.delete("signin");
+      next.delete("logout");
+      const qs = next.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname);
+    })().catch((e) => console.error("[Provider] ❌ Session sync failed:", e));
+  }, [searchParams, pathname, router, supabase]);
+
   useEffect(() => {
     if (!sessionFetched) {
-      console.log('[Provider] 🔄 Fetching session client-side...');
+      console.log("[Provider] 🔄 Fetching session client-side...");
       supabase.auth.getSession().then(({ data: { session: fetchedSession } }) => {
-        console.log('[Provider] ✅ Session fetched:', fetchedSession ? 'authenticated' : 'not authenticated');
+        console.log(
+          "[Provider] ✅ Session fetched:",
+          fetchedSession ? "authenticated" : "not authenticated"
+        );
         if (fetchedSession?.user) {
-          authLogger.memberSessionRestored(fetchedSession.user.id, fetchedSession.user.email || '');
+          authLogger.memberSessionRestored(
+            fetchedSession.user.id,
+            fetchedSession.user.email || ""
+          );
         }
         setInitialSession(fetchedSession);
         setSessionFetched(true);
       });
     }
-  }, [sessionFetched, supabase.auth]);
+  }, [sessionFetched, supabase]);
+
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
-      console.log('[Provider] 🔄 Auth state changed:', newSession ? 'authenticated' : 'not authenticated');
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      console.log(
+        "[Provider] 🔄 Auth state changed:",
+        newSession ? "authenticated" : "not authenticated"
+      );
       setInitialSession(newSession);
     });
+
     return () => subscription.unsubscribe();
-  }, [supabase.auth]);
+  }, [supabase]);
+
   return (
     <SessionContextProvider supabaseClient={supabase} initialSession={initialSession}>
       <InternalAuthProvider>
-        <ThemeContext.Provider value={{ themeType, toggleTheme, themeId, setThemeId, getTheme, availableThemes }}>
+        <ThemeContext.Provider
+          value={{
+            themeType,
+            toggleTheme,
+            themeId,
+            setThemeId,
+            getTheme,
+            availableThemes,
+          }}
+        >
           {children}
         </ThemeContext.Provider>
       </InternalAuthProvider>
