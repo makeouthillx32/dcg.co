@@ -104,7 +104,7 @@ export const signUpAction = async (formData: FormData) => {
     await populateUserCookies(userId, false);
     await new Promise(resolve => setTimeout(resolve, 100));
     const lastPage = await getAndClearLastPage();
-    return redirect(`${lastPage}?signin=true`);
+    return redirect(lastPage);
   }
   return encodedRedirect("success", "/sign-in", "Account created. Please check your email to verify, then sign in.");
 };
@@ -135,11 +135,8 @@ export const signInAction = async (formData: FormData) => {
   const lastPage = await getAndClearLastPage();
   console.log("[Auth] ✅ Redirecting to:", lastPage);
   
-  // Force server components to re-fetch data after sign-in
-  const { revalidatePath } = await import('next/cache');
-  revalidatePath('/', 'layout'); // Revalidates all pages that use root layout
-  
-  return redirect(`${lastPage}?signin=true`);
+  // Simple redirect - auth state listeners in components will handle UI updates
+  return redirect(lastPage);
 };
 
 export const forgotPasswordAction = async (formData: FormData) => {
@@ -182,5 +179,5 @@ export const signOutAction = async () => {
   console.log("[Auth] 🚪 Signing out and redirecting to home");
   await supabase.auth.signOut();
   await new Promise(resolve => setTimeout(resolve, 100));
-  return redirect("/?logout=true");
+  return redirect("/");
 };
