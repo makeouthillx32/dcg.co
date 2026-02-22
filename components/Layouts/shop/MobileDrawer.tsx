@@ -5,6 +5,7 @@ import { MdExpandMore, MdChevronRight, MdArrowForwardIos } from "react-icons/md"
 import { X } from "lucide-react";
 import Link from "next/link";
 import type { NavNode as UnifiedNavNode } from "@/lib/navigation";
+import { useAuth } from "@/app/provider"; // ✅ read session from your auth context
 import "./_components/Mobile.scss";
 
 // Simplified nav node for mobile rendering
@@ -17,7 +18,6 @@ type NavNode = {
 };
 
 interface MobileDrawerProps {
-  session: any;
   onClose: () => void;
 }
 
@@ -27,10 +27,7 @@ interface MobileDrawerProps {
  */
 function transformNavTree(nodes: UnifiedNavNode[]): NavNode[] {
   return nodes
-    .filter((node) => {
-      // Only show categories and collections in mobile nav
-      return node.type === "category" || node.type === "collection";
-    })
+    .filter((node) => node.type === "category" || node.type === "collection")
     .map((node) => ({
       key: node.key,
       label: node.label,
@@ -44,13 +41,13 @@ function transformNavTree(nodes: UnifiedNavNode[]): NavNode[] {
               label: child.label,
               href: child.href,
               routeType: child.routeType,
-              // Don't include grandchildren in mobile for simplicity
             }))
         : undefined,
     }));
 }
 
-export default function MobileDrawer({ session, onClose }: MobileDrawerProps) {
+export default function MobileDrawer({ onClose }: MobileDrawerProps) {
+  const { session } = useAuth(); // ✅ always stays in sync with Header
   const menuRef = useRef<HTMLDivElement>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [isClosing, setIsClosing] = useState(false);
@@ -63,11 +60,11 @@ export default function MobileDrawer({ session, onClose }: MobileDrawerProps) {
 
     (async () => {
       try {
-        const res = await fetch("/api/navigation/tree", { 
+        const res = await fetch("/api/navigation/tree", {
           cache: "no-store",
-          next: { revalidate: 300 } // 5 minutes
+          next: { revalidate: 300 }, // 5 minutes
         });
-        
+
         if (!res.ok) {
           console.error("Navigation fetch failed:", res.status);
           setLoading(false);
@@ -75,7 +72,7 @@ export default function MobileDrawer({ session, onClose }: MobileDrawerProps) {
         }
 
         const json = await res.json();
-        
+
         if (!json?.nodes) {
           console.error("Invalid navigation response:", json);
           setLoading(false);
@@ -90,9 +87,7 @@ export default function MobileDrawer({ session, onClose }: MobileDrawerProps) {
         }
       } catch (e) {
         console.error("Navigation fetch error:", e);
-        if (!cancelled) {
-          setLoading(false);
-        }
+        if (!cancelled) setLoading(false);
       }
     })();
 
@@ -108,6 +103,7 @@ export default function MobileDrawer({ session, onClose }: MobileDrawerProps) {
         handleClose();
       }
     };
+
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -125,14 +121,8 @@ export default function MobileDrawer({ session, onClose }: MobileDrawerProps) {
     }, 400);
   };
 
-  const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, routeType: string) => {
-    if (routeType === "hash") {
-      // Hash navigation - let browser handle it
-      handleClose();
-    } else {
-      // Real route - Next.js Link will handle it
-      handleClose();
-    }
+  const handleNavClick = (_e: React.MouseEvent<HTMLAnchorElement>, _routeType: string) => {
+    handleClose();
   };
 
   const handleAccountClick = () => {
@@ -143,9 +133,7 @@ export default function MobileDrawer({ session, onClose }: MobileDrawerProps) {
   return (
     <div
       ref={menuRef}
-      className={`drawer-content ${
-        isClosing ? "animate-slide-up" : "animate-slide-down"
-      }`}
+      className={`drawer-content ${isClosing ? "animate-slide-up" : "animate-slide-down"}`}
     >
       {/* ===== Top Bar ===== */}
       <div className="drawer-topbar">
@@ -164,25 +152,16 @@ export default function MobileDrawer({ session, onClose }: MobileDrawerProps) {
 
       <div className="mobile-menu-container">
         {loading ? (
-          // Loading skeleton
-          <div className="px-4 py-6 text-center text-sm">
-            Loading navigation...
-          </div>
+          <div className="px-4 py-6 text-center text-sm">Loading navigation...</div>
         ) : navTree.length === 0 ? (
-          // Empty state
-          <div className="px-4 py-6 text-center text-sm">
-            No categories available
-          </div>
+          <div className="px-4 py-6 text-center text-sm">No categories available</div>
         ) : (
-          // Navigation items
           navTree.map((node) => (
             <div key={node.key} className="mobile-section">
-              {/* Section top divider */}
               <div className="drawer-divider-horizontal" />
 
               <div className="mobile-menu-item">
                 {node.routeType === "hash" ? (
-                  // Hash navigation (static pages)
                   <a
                     href={node.href}
                     onClick={(e) => handleNavClick(e, node.routeType)}
@@ -191,7 +170,6 @@ export default function MobileDrawer({ session, onClose }: MobileDrawerProps) {
                     {node.label}
                   </a>
                 ) : (
-                  // Real route (categories/collections)
                   <Link
                     href={node.href}
                     onClick={(e) => handleNavClick(e, node.routeType)}
@@ -201,7 +179,6 @@ export default function MobileDrawer({ session, onClose }: MobileDrawerProps) {
                   </Link>
                 )}
 
-                {/* Vertical divider before icon */}
                 <div className="drawer-divider-vertical" />
 
                 {node.children?.length ? (
@@ -211,11 +188,7 @@ export default function MobileDrawer({ session, onClose }: MobileDrawerProps) {
                     aria-label={`Toggle ${node.label}`}
                     type="button"
                   >
-                    {expanded === node.key ? (
-                      <MdExpandMore size={20} />
-                    ) : (
-                      <MdChevronRight size={20} />
-                    )}
+                    {expanded === node.key ? <MdExpandMore size={20} /> : <MdChevronRight size={20} />}
                   </button>
                 ) : (
                   <span className="menu-icon-slot" aria-hidden="true">
@@ -224,7 +197,6 @@ export default function MobileDrawer({ session, onClose }: MobileDrawerProps) {
                 )}
               </div>
 
-              {/* Submenu */}
               {node.children?.length && expanded === node.key && (
                 <div className="mobile-submenu">
                   {node.children.map((child) => (
@@ -259,19 +231,11 @@ export default function MobileDrawer({ session, onClose }: MobileDrawerProps) {
 
         <div className="mobile-auth-section">
           {!session ? (
-            <Link
-              href="/sign-in"
-              onClick={handleClose}
-              className="auth-button"
-            >
+            <Link href="/sign-in" onClick={handleClose} className="auth-button">
               Sign In
             </Link>
           ) : (
-            <button
-              onClick={handleAccountClick}
-              className="auth-button"
-              type="button"
-            >
+            <button onClick={handleAccountClick} className="auth-button" type="button">
               Account
             </button>
           )}
