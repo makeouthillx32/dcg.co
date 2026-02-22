@@ -1,3 +1,4 @@
+// components/Layouts/shop/MobileDrawer.tsx
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
@@ -6,7 +7,7 @@ import { X } from "lucide-react";
 import Link from "next/link";
 import type { NavNode as UnifiedNavNode } from "@/lib/navigation";
 import { useAuth } from "@/app/provider";
-import { supabase } from "@/lib/supabaseClient";
+import { useSessionContext } from "@supabase/auth-helpers-react"; // ✅ USE THIS INSTEAD
 import "./_components/Mobile.scss";
 
 // Simplified nav node for mobile rendering
@@ -49,25 +50,32 @@ function transformNavTree(nodes: UnifiedNavNode[]): NavNode[] {
 
 export default function MobileDrawer({ onClose }: MobileDrawerProps) {
   const { session, refreshSession } = useAuth();
+  const { supabaseClient } = useSessionContext(); // ✅ Get the SAME client that SessionContextProvider uses
   const menuRef = useRef<HTMLDivElement>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [isClosing, setIsClosing] = useState(false);
   const [navTree, setNavTree] = useState<NavNode[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // ✅ Listen for Supabase auth state changes (sign-in, sign-out, token refresh)
+  // ✅ NOW listen to the CORRECT Supabase client instance
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession) => {
-      console.log('[MobileDrawer] Auth event:', event, 'Session:', !!newSession);
+    console.log('[MobileDrawer] Setting up auth listener');
+    
+    const { data: { subscription } } = supabaseClient.auth.onAuthStateChange((event, newSession) => {
+      console.log('[MobileDrawer] Auth event:', event, 'Session exists:', !!newSession);
       
-      // Refresh the session in our auth context
-      refreshSession();
+      // Only call refreshSession for actual auth changes
+      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
+        console.log('[MobileDrawer] Triggering session refresh due to', event);
+        refreshSession();
+      }
     });
 
     return () => {
+      console.log('[MobileDrawer] Cleaning up auth listener');
       subscription.unsubscribe();
     };
-  }, [refreshSession]);
+  }, [supabaseClient, refreshSession]);
 
   // Fetch navigation tree from API
   useEffect(() => {
