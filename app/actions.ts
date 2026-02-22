@@ -134,6 +134,11 @@ export const signInAction = async (formData: FormData) => {
   await new Promise(resolve => setTimeout(resolve, 100));
   const lastPage = await getAndClearLastPage();
   console.log("[Auth] ✅ Redirecting to:", lastPage);
+  
+  // Force server components to re-fetch data after sign-in
+  const { revalidatePath } = await import('next/cache');
+  revalidatePath('/', 'layout'); // Revalidates all pages that use root layout
+  
   return redirect(`${lastPage}?signin=true`);
 };
 
