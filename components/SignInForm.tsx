@@ -5,7 +5,7 @@ import Link from "next/link";
 import SignInWithGoogle from "@/components/ui/SignInWithGoogle";
 import { Mail, Lock } from "lucide-react";
 
-import { signInAction } from "@/app/actions";
+import { signInAction } from "@/actions/auth/actions";
 import { FormMessage, Message } from "@/components/form-message";
 import { SubmitButton } from "@/components/submit-button";
 

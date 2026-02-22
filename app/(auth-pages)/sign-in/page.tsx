@@ -2,7 +2,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 
-import { signInAction } from "@/app/actions";
+import { signInAction } from "@/actions/auth";
 import { FormMessage, Message } from "@/components/form-message";
 import { SubmitButton } from "@/components/submit-button";
 import { Input } from "@/components/Layouts/app/input";

@@ -7,7 +7,7 @@ import InputGroup from "../FormElements/InputGroup";
 import { Checkbox } from "../FormElements/checkbox";
 import { useTheme } from "@/app/provider";
 import { Loader2 } from "lucide-react";
-import { signInAction } from "@/app/actions";
+import { signInAction } from"@/actions/auth/actions";
 
 export default function SigninWithPassword() {
   const { themeType } = useTheme();
