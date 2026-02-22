@@ -8,7 +8,22 @@ import { sendNotification } from "@/lib/notifications";
 import { authLogger } from "@/lib/authLogger";
 
 import type { ProfileUpsertRow } from "./types";
-import { getAndClearLastPage, populateUserCookies } from "./cookies";
+import { getAndClearLastPage, populateUserCookies, clearAuthCookies } from "./cookies";
+
+/**
+ * IMPORTANT RULES (Next Server Actions):
+ * - This file MUST export ONLY async functions.
+ * - Do NOT export constants/helpers/types from this file.
+ * - If you need helpers, put them in ./cookies.ts or ./types.ts (no "use server" there).
+ */
+
+const safeOrigin = async (): Promise<string> => {
+  const headerList = await headers();
+  const origin = headerList.get("origin") || "";
+  // If origin is missing (rare in prod), fallback to public site URL if you have it.
+  if (origin) return origin;
+  return (process.env.NEXT_PUBLIC_SITE_URL || "https://desertcowgirl.co").replace(/\/$/, "");
+};
 
 export const signUpAction = async (formData: FormData) => {
   const email = formData.get("email")?.toString().trim() || "";
@@ -24,8 +39,7 @@ export const signUpAction = async (formData: FormData) => {
   }
 
   const supabase = await createClient();
-  const headerList = await headers();
-  const origin = headerList.get("origin") || "";
+  const origin = await safeOrigin();
 
   const { data, error } = await supabase.auth.signUp({
     email,
@@ -67,11 +81,17 @@ export const signUpAction = async (formData: FormData) => {
     console.error("[Auth] ⚠️ Notification failed:", err);
   }
 
-  const hasSession = !!data.session;
-  if (hasSession) {
-    authLogger.memberSignUp(userId, email, { firstName, lastName, source: "email_signup" });
+  // If Supabase gave us a session immediately (email confirm disabled), we can redirect back.
+  if (data.session) {
+    authLogger.memberSignUp(userId, email, {
+      firstName,
+      lastName,
+      source: "email_signup",
+    });
+
     await populateUserCookies(userId, false);
     await new Promise((resolve) => setTimeout(resolve, 100));
+
     const lastPage = await getAndClearLastPage();
     return redirect(lastPage);
   }
@@ -119,19 +139,20 @@ export const signInAction = async (formData: FormData) => {
 };
 
 export const forgotPasswordAction = async (formData: FormData) => {
-  const email = formData.get("email")?.toString();
-  const supabase = await createClient();
-  const origin = (await headers()).get("origin");
+  const email = formData.get("email")?.toString()?.trim();
   const callbackUrl = formData.get("callbackUrl")?.toString();
-
   if (!email) return encodedRedirect("error", "/forgot-password", "Email is required");
 
+  const supabase = await createClient();
+  const origin = await safeOrigin();
+
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    // keep your existing flow
     redirectTo: `${origin}/auth/callback?redirect_to=/protected/reset-password`,
   });
 
   if (error) {
-    console.error("❌ Forgot password error:", error.message);
+    console.error("[Auth] ❌ Forgot password error:", error.message);
     return encodedRedirect("error", "/forgot-password", "Could not reset password");
   }
 
@@ -141,11 +162,15 @@ export const forgotPasswordAction = async (formData: FormData) => {
 
 export const resetPasswordAction = async (formData: FormData) => {
   const supabase = await createClient();
-  const password = formData.get("password") as string;
-  const confirmPassword = formData.get("confirmPassword") as string;
+  const password = (formData.get("password") as string) || "";
+  const confirmPassword = (formData.get("confirmPassword") as string) || "";
 
   if (!password || !confirmPassword) {
-    return encodedRedirect("error", "/protected/reset-password", "Password and confirm password are required");
+    return encodedRedirect(
+      "error",
+      "/protected/reset-password",
+      "Password and confirm password are required"
+    );
   }
   if (password !== confirmPassword) {
     return encodedRedirect("error", "/protected/reset-password", "Passwords do not match");
@@ -160,21 +185,29 @@ export const resetPasswordAction = async (formData: FormData) => {
 export const signOutAction = async () => {
   const supabase = await createClient();
   const store = await cookies();
+
   const {
     data: { session },
   } = await supabase.auth.getSession();
 
   if (session?.user) authLogger.memberSignOut(session.user.id, session.user.email || "");
 
-  store.delete("userRole");
-  store.delete("userRoleUserId");
-  store.delete("userDisplayName");
-  store.delete("userPermissions");
-  store.delete("rememberMe");
-  store.delete("lastPage");
+  // Prefer one place that deletes all auth cookies (keeps this file clean)
+  // but still hard-delete in case helper is missing.
+  try {
+    await clearAuthCookies();
+  } catch {
+    store.delete("userRole");
+    store.delete("userRoleUserId");
+    store.delete("userDisplayName");
+    store.delete("userPermissions");
+    store.delete("rememberMe");
+    store.delete("lastPage");
+  }
 
   console.log("[Auth] 🚪 Signing out and redirecting to home");
   await supabase.auth.signOut();
   await new Promise((resolve) => setTimeout(resolve, 100));
+
   return redirect("/");
 };
