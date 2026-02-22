@@ -198,6 +198,15 @@ function RootLayoutContent({ children }: { children: React.ReactNode }) {
       window.location.replace(newUrl);
     }
   }, []);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('signin') === 'true') {
+      params.delete('signin');
+      const newUrl = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
+      window.location.replace(newUrl);
+    }
+  }, []);
   if (route.isDashboardPage) {
     return (
       <SidebarProvider>

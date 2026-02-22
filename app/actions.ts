@@ -102,8 +102,9 @@ export const signUpAction = async (formData: FormData) => {
   if (hasSession) {
     authLogger.memberSignUp(userId, email, { firstName, lastName, source: 'email_signup' });
     await populateUserCookies(userId, false);
+    await new Promise(resolve => setTimeout(resolve, 100));
     const lastPage = await getAndClearLastPage();
-    return redirect(lastPage);
+    return redirect(`${lastPage}?signin=true`);
   }
   return encodedRedirect("success", "/sign-in", "Account created. Please check your email to verify, then sign in.");
 };
@@ -130,9 +131,10 @@ export const signInAction = async (formData: FormData) => {
   console.log("[Auth] ✅ Supabase sign-in successful, session created");
   authLogger.memberSignIn(data.user.id, data.user.email || '', remember);
   await populateUserCookies(data.user.id, remember);
+  await new Promise(resolve => setTimeout(resolve, 100));
   const lastPage = await getAndClearLastPage();
   console.log("[Auth] ✅ Redirecting to:", lastPage);
-  return redirect(lastPage);
+  return redirect(`${lastPage}?signin=true`);
 };
 
 export const forgotPasswordAction = async (formData: FormData) => {
