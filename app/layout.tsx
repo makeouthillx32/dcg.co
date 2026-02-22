@@ -1,31 +1,24 @@
 // app/layout.tsx (SERVER)
-// ✅ no "use client"
-
-import type { Metadata } from "next";
-import { Providers } from "./provider";
-import { createServerClient } from "@/utils/supabase/server"; // <-- keep your real path
 
 import "./globals.css";
 import "@/css/satoshi.css";
 import "flatpickr/dist/flatpickr.min.css";
 import "jsvectormap/dist/jsvectormap.css";
 
-const defaultUrl = process.env.VERCEL_URL
-  ? `https://${process.env.VERCEL_URL}`
-  : "http://localhost:3000";
+import { Providers } from "./provider";
 
-export const metadata: Metadata = {
-  metadataBase: new URL(defaultUrl),
-  title: "Desert Cowgirl",
-  description: "Western boutique clothing and accessories",
-};
+// ✅ use your real path (this is the one you've been using)
+import { createClient } from "@/utils/supabase/server";
+
+// ✅ RootShell lives in app/page.tsx (existing file), not a new file
+import { RootShell } from "./page";
 
 export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const supabase = await createServerClient();
+  const supabase = await createClient();
   const {
     data: { session },
   } = await supabase.auth.getSession();
@@ -42,11 +35,7 @@ export default async function RootLayout({
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <link rel="manifest" href="/manifest.json" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link
-          rel="preconnect"
-          href="https://fonts.gstatic.com"
-          crossOrigin=""
-        />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         <link rel="canonical" href="https://desertcowgirl.co/" />
         <script
           type="application/ld+json"
@@ -65,11 +54,11 @@ export default async function RootLayout({
         />
       </head>
 
-      <body
-        className="min-h-screen font-[var(--font-sans)]"
-        suppressHydrationWarning
-      >
-        <Providers initialSession={session}>{children}</Providers>
+      <body className="min-h-screen font-[var(--font-sans)]" suppressHydrationWarning>
+        <Providers initialSession={session}>
+          {/* ✅ page-level shell is an EXISTING component living in app/page.tsx */}
+          <RootShell session={session}>{children}</RootShell>
+        </Providers>
       </body>
     </html>
   );
