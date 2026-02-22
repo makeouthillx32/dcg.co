@@ -10,17 +10,9 @@ import { authLogger } from "@/lib/authLogger";
 import type { ProfileUpsertRow } from "./types";
 import { getAndClearLastPage, populateUserCookies, clearAuthCookies } from "./cookies";
 
-/**
- * IMPORTANT RULES (Next Server Actions):
- * - This file MUST export ONLY async functions.
- * - Do NOT export constants/helpers/types from this file.
- * - If you need helpers, put them in ./cookies.ts or ./types.ts (no "use server" there).
- */
-
 const safeOrigin = async (): Promise<string> => {
   const headerList = await headers();
   const origin = headerList.get("origin") || "";
-  // If origin is missing (rare in prod), fallback to public site URL if you have it.
   if (origin) return origin;
   return (process.env.NEXT_PUBLIC_SITE_URL || "https://desertcowgirl.co").replace(/\/$/, "");
 };
@@ -31,12 +23,8 @@ export const signUpAction = async (formData: FormData) => {
   const firstName = formData.get("first_name")?.toString().trim() || "";
   const lastName = formData.get("last_name")?.toString().trim() || "";
 
-  if (!email || !password) {
-    return encodedRedirect("error", "/sign-up", "Email and password are required.");
-  }
-  if (!firstName || !lastName) {
-    return encodedRedirect("error", "/sign-up", "First and last name are required.");
-  }
+  if (!email || !password) return encodedRedirect("error", "/sign-up", "Email and password are required.");
+  if (!firstName || !lastName) return encodedRedirect("error", "/sign-up", "First and last name are required.");
 
   const supabase = await createClient();
   const origin = await safeOrigin();
@@ -81,26 +69,15 @@ export const signUpAction = async (formData: FormData) => {
     console.error("[Auth] ⚠️ Notification failed:", err);
   }
 
-  // If Supabase gave us a session immediately (email confirm disabled), we can redirect back.
   if (data.session) {
-    authLogger.memberSignUp(userId, email, {
-      firstName,
-      lastName,
-      source: "email_signup",
-    });
-
+    authLogger.memberSignUp(userId, email, { firstName, lastName, source: "email_signup" });
     await populateUserCookies(userId, false);
-    await new Promise((resolve) => setTimeout(resolve, 100));
-
+    await new Promise((r) => setTimeout(r, 100));
     const lastPage = await getAndClearLastPage();
     return redirect(lastPage);
   }
 
-  return encodedRedirect(
-    "success",
-    "/sign-in",
-    "Account created. Please check your email to verify, then sign in."
-  );
+  return encodedRedirect("success", "/sign-in", "Account created. Please check your email to verify, then sign in.");
 };
 
 export const signInAction = async (formData: FormData) => {
@@ -113,48 +90,33 @@ export const signInAction = async (formData: FormData) => {
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
-  if (error) {
-    console.error("[Auth] ❌ Sign-in failed:", error.message);
-    return encodedRedirect("error", "/sign-in", error.message);
-  }
-  if (!data.user?.id) {
-    console.error("[Auth] ❌ No user ID in response");
-    return encodedRedirect("error", "/sign-in", "Authentication failed");
-  }
-  if (!data.session) {
-    console.error("[Auth] ❌ No session in response");
-    return encodedRedirect("error", "/sign-in", "Session creation failed");
-  }
+  if (error) return encodedRedirect("error", "/sign-in", error.message);
+  if (!data.user?.id) return encodedRedirect("error", "/sign-in", "Authentication failed");
+  if (!data.session) return encodedRedirect("error", "/sign-in", "Session creation failed");
 
-  console.log("[Auth] ✅ Supabase sign-in successful, session created");
   authLogger.memberSignIn(data.user.id, data.user.email || "", remember);
 
   await populateUserCookies(data.user.id, remember);
-  await new Promise((resolve) => setTimeout(resolve, 100));
+  await new Promise((r) => setTimeout(r, 100));
 
   const lastPage = await getAndClearLastPage();
-  console.log("[Auth] ✅ Redirecting to:", lastPage);
-
   return redirect(lastPage);
 };
 
 export const forgotPasswordAction = async (formData: FormData) => {
   const email = formData.get("email")?.toString()?.trim();
   const callbackUrl = formData.get("callbackUrl")?.toString();
+
   if (!email) return encodedRedirect("error", "/forgot-password", "Email is required");
 
   const supabase = await createClient();
   const origin = await safeOrigin();
 
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    // keep your existing flow
     redirectTo: `${origin}/auth/callback?redirect_to=/protected/reset-password`,
   });
 
-  if (error) {
-    console.error("[Auth] ❌ Forgot password error:", error.message);
-    return encodedRedirect("error", "/forgot-password", "Could not reset password");
-  }
+  if (error) return encodedRedirect("error", "/forgot-password", "Could not reset password");
 
   if (callbackUrl) return redirect(callbackUrl);
   return encodedRedirect("success", "/forgot-password", "Check your email for a link to reset your password.");
@@ -166,11 +128,7 @@ export const resetPasswordAction = async (formData: FormData) => {
   const confirmPassword = (formData.get("confirmPassword") as string) || "";
 
   if (!password || !confirmPassword) {
-    return encodedRedirect(
-      "error",
-      "/protected/reset-password",
-      "Password and confirm password are required"
-    );
+    return encodedRedirect("error", "/protected/reset-password", "Password and confirm password are required");
   }
   if (password !== confirmPassword) {
     return encodedRedirect("error", "/protected/reset-password", "Passwords do not match");
@@ -192,22 +150,17 @@ export const signOutAction = async () => {
 
   if (session?.user) authLogger.memberSignOut(session.user.id, session.user.email || "");
 
-  // Prefer one place that deletes all auth cookies (keeps this file clean)
-  // but still hard-delete in case helper is missing.
-  try {
-    await clearAuthCookies();
-  } catch {
-    store.delete("userRole");
-    store.delete("userRoleUserId");
-    store.delete("userDisplayName");
-    store.delete("userPermissions");
-    store.delete("rememberMe");
-    store.delete("lastPage");
-  }
+  await clearAuthCookies();
 
-  console.log("[Auth] 🚪 Signing out and redirecting to home");
+  // (extra safety) if Next cookies store behaves oddly in some env, keep a fallback
+  store.delete("userRole");
+  store.delete("userRoleUserId");
+  store.delete("userDisplayName");
+  store.delete("userPermissions");
+  store.delete("rememberMe");
+  store.delete("lastPage");
+
   await supabase.auth.signOut();
-  await new Promise((resolve) => setTimeout(resolve, 100));
-
+  await new Promise((r) => setTimeout(r, 100));
   return redirect("/");
 };

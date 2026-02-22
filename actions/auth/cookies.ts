@@ -1,9 +1,19 @@
-"use server";
-
 import { headers, cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
-import type { CookieOptions, ProfileCookieRow } from "./types";
-import { normalizeRole } from "./types";
+import type { CookieOptions, ProfileCookieRow, ValidRole } from "./types";
+import { VALID_ROLES } from "./types";
+
+const EXCLUDED_LASTPAGE = [
+  "/sign-in",
+  "/sign-up",
+  "/forgot-password",
+  "/reset-password",
+  "/auth/callback",
+  "/auth/callback/oauth",
+  "/auth/logout",
+];
+
+const EXCLUDED_PREFIXES = ["/dashboard", "/settings", "/protected"];
 
 export const getCookieOptions = async (remember: boolean): Promise<CookieOptions> => {
   const headerList = await headers();
@@ -22,34 +32,24 @@ export const getCookieOptions = async (remember: boolean): Promise<CookieOptions
 export const getAndClearLastPage = async (): Promise<string> => {
   const store = await cookies();
   const lastPageCookie = store.getAll().find((c) => c.name === "lastPage");
+
   let lastPage = lastPageCookie?.value || "/";
-
   store.delete("lastPage");
-
-  const excludedPages = [
-    "/sign-in",
-    "/sign-up",
-    "/forgot-password",
-    "/reset-password",
-    "/auth/callback",
-    "/auth/callback/oauth",
-    "/auth/logout",
-  ];
-  const excludedPrefixes = ["/dashboard", "/settings", "/protected"];
 
   const pageWithoutHash = lastPage.split("#")[0].split("?")[0];
   const isExcluded =
-    excludedPages.includes(pageWithoutHash) ||
-    excludedPrefixes.some((prefix) => pageWithoutHash.startsWith(prefix));
+    EXCLUDED_LASTPAGE.includes(pageWithoutHash) ||
+    EXCLUDED_PREFIXES.some((prefix) => pageWithoutHash.startsWith(prefix));
 
-  if (isExcluded) {
-    console.log("[Auth] ⚠️ Excluded page in lastPage cookie:", lastPage, "→ redirecting to /");
-    lastPage = "/";
-  } else {
-    console.log("[Auth] ✅ Valid lastPage from cookie:", lastPage);
-  }
+  if (isExcluded) lastPage = "/";
 
   return lastPage;
+};
+
+export const normalizeRole = (role: unknown): ValidRole => {
+  if (typeof role !== "string") return "member";
+  if ((VALID_ROLES as readonly string[]).includes(role)) return role as ValidRole;
+  return "member";
 };
 
 export const populateUserCookies = async (userId: string, remember = false) => {
@@ -84,11 +84,7 @@ export const populateUserCookies = async (userId: string, remember = false) => {
     });
 
     if (!rolePermissions.error && rolePermissions.data) {
-      const permissionsData = {
-        timestamp: Date.now(),
-        permissions: rolePermissions.data,
-        role,
-      };
+      const permissionsData = { timestamp: Date.now(), permissions: rolePermissions.data, role };
       store.set("userPermissions", JSON.stringify(permissionsData), {
         ...cookieOptions,
         maxAge: 5 * 60,
@@ -99,4 +95,14 @@ export const populateUserCookies = async (userId: string, remember = false) => {
   } catch (error) {
     console.error("[Auth] ❌ Cookie population failed:", error);
   }
+};
+
+export const clearAuthCookies = async () => {
+  const store = await cookies();
+  store.delete("userRole");
+  store.delete("userRoleUserId");
+  store.delete("userDisplayName");
+  store.delete("userPermissions");
+  store.delete("rememberMe");
+  store.delete("lastPage");
 };
