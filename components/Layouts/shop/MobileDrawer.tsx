@@ -6,6 +6,7 @@ import { X } from "lucide-react";
 import Link from "next/link";
 import type { NavNode as UnifiedNavNode } from "@/lib/navigation";
 import { useAuth } from "@/app/provider";
+import { supabase } from "@/lib/supabaseClient";
 import "./_components/Mobile.scss";
 
 // Simplified nav node for mobile rendering
@@ -47,20 +48,25 @@ function transformNavTree(nodes: UnifiedNavNode[]): NavNode[] {
 }
 
 export default function MobileDrawer({ onClose }: MobileDrawerProps) {
-  const { session, refreshSession } = useAuth(); // ✅ Get refreshSession
+  const { session, refreshSession } = useAuth();
   const menuRef = useRef<HTMLDivElement>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [isClosing, setIsClosing] = useState(false);
   const [navTree, setNavTree] = useState<NavNode[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // ✅ Listen for signin/logout query params and refresh session
+  // ✅ Listen for Supabase auth state changes (sign-in, sign-out, token refresh)
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.has('signin') || params.has('logout')) {
-      console.log('[MobileDrawer] Auth state changed, refreshing session...');
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession) => {
+      console.log('[MobileDrawer] Auth event:', event, 'Session:', !!newSession);
+      
+      // Refresh the session in our auth context
       refreshSession();
-    }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, [refreshSession]);
 
   // Fetch navigation tree from API
