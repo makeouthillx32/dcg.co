@@ -21,10 +21,12 @@ export const metadata: Metadata = {
 export default async function SignInPage({
   searchParams,
 }: {
-  searchParams: Message;
+  searchParams: Promise<Message>; // ✅ Next.js 15: searchParams is now a Promise
 }) {
+  const resolvedSearchParams = await searchParams; // ✅ must be awaited
+
   // ✅ pull lastPage cookie so the server action can redirect you back
-  const cookieStore = cookies();
+  const cookieStore = await cookies(); // ✅ Next.js 15: cookies() is now async
   const lastPage = cookieStore.get("lastPage")?.value;
 
   // ✅ default fallback
@@ -120,7 +122,7 @@ export default async function SignInPage({
           Sign in
         </SubmitButton>
 
-        <FormMessage message={searchParams} />
+        <FormMessage message={resolvedSearchParams} />
       </form>
 
       <p className="mt-6 text-center text-sm text-[hsl(var(--muted-foreground))] font-[var(--font-sans)] leading-[1.5]">
@@ -135,11 +137,11 @@ export default async function SignInPage({
 
       <p className="mt-4 text-center text-xs text-[hsl(var(--muted-foreground))] font-[var(--font-sans)] leading-[1.5]">
         By signing in, you agree to our{" "}
-        <Link href="/terms" className="underline hover:text-[hsl(var(--sidebar-primary))]">
+        <Link href="/terms" className="underline hover:text-[hsl(var(--sidebar-primary))] transition-colors">
           Terms
         </Link>{" "}
         and{" "}
-        <Link href="/privacy" className="underline hover:text-[hsl(var(--sidebar-primary))]">
+        <Link href="/privacy" className="underline hover:text-[hsl(var(--sidebar-primary))] transition-colors">
           Privacy Policy
         </Link>
         .

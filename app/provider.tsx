@@ -77,7 +77,14 @@ function InternalAuthProvider({
   useEffect(() => {
     if (session?.user) setUser(session.user);
     else setUser(null);
-  }, [session]);
+
+    // ✅ FIX: Force Next.js to re-render the full component tree whenever auth state
+    // changes. Without this, components like MobileDrawer that read `session` from
+    // AuthContext don't re-render after sign-in/sign-out because the custom window
+    // event fires before they've mounted their listener (post-navigation). router.refresh()
+    // re-syncs server components and flushes the updated session through the entire tree.
+    router.refresh();
+  }, [session, router]);
 
   useEffect(() => {
     if (!isLoading && !session) {
@@ -323,11 +330,6 @@ export const Providers: React.FC<{ children: React.ReactNode; session?: Session 
           })
         );
       }
-
-      // Optional: if you have server components reading cookies, this helps them update immediately
-      // if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
-      //   router.refresh();
-      // }
     });
 
     return () => subscription.unsubscribe();
