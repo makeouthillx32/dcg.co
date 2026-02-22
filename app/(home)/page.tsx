@@ -1,6 +1,6 @@
 // app/page.tsx
-import Home from "@/components/shop/Home";
 import type { Metadata } from "next";
+import HomePage from "@/components/shop/Landing";
 
 export const metadata: Metadata = {
   title: "Home | Desert Cowgirl",
@@ -37,8 +37,8 @@ export const metadata: Metadata = {
 
 export default function Page() {
   return (
-    <div>
-      <Home />
-    </div>
+    <main className="flex-grow">
+      <HomePage />
+    </main>
   );
 }

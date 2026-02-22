@@ -4,13 +4,32 @@
 import { useEffect, useState } from "react";
 import { SectionComponents, type SectionRow } from "./sections/SectionRegistry";
 import { LandingSkeleton } from "./_components/LandingSkeleton";
+import useThemeCookie from "@/lib/useThemeCookie";
 
 export default function HomePage() {
+  // Logic migrated from Home.tsx to keep page.tsx a Server Component
+  useThemeCookie();
+
   const [sections, setSections] = useState<SectionRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Handle smooth scrolling for hash links (e.g., #contact)
+    const scrollToHash = () => {
+      const id = window.location.hash.replace("#", "");
+      if (!id) return;
+
+      requestAnimationFrame(() => {
+        const el = document.getElementById(id);
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    };
+
+    scrollToHash();
+    window.addEventListener("hashchange", scrollToHash);
+
+    // Fetch landing page sections
     async function fetchSections() {
       try {
         const res = await fetch('/api/landing/sections');
@@ -30,6 +49,8 @@ export default function HomePage() {
     }
     
     fetchSections();
+
+    return () => window.removeEventListener("hashchange", scrollToHash);
   }, []);
 
   if (loading) {

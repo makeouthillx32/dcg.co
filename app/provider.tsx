@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { createBrowserClient } from "@supabase/ssr";
 import type { Session, User } from "@supabase/auth-helpers-nextjs";
-import { SessionContextProvider, useSessionContext } from "@supabase/auth-helpers-react";
+import { SessionContextProvider } from "@supabase/auth-helpers-react";
 import { setCookie, getCookie, iosSessionHelpers } from "@/lib/cookieUtils";
 import { usePathname, useRouter } from "next/navigation";
 import { Theme } from "@/types/theme";
@@ -56,21 +56,21 @@ function IOSSessionManager({ children }: { children: React.ReactNode }) {
 function InternalAuthProvider({
   children,
   forceRefreshSession,
+  session,
+  isLoading,
 }: {
   children: React.ReactNode;
   forceRefreshSession: () => void;
+  session: Session | null;
+  isLoading: boolean;
 }) {
-  const { session, isLoading } = useSessionContext();
   const [user, setUser] = useState<User | null>(null);
   const router = useRouter();
   const pathname = usePathname();
 
   const refreshSession = () => {
-    // Keep your iOS helper…
     iosSessionHelpers.refreshSession();
     console.log("[Provider] 🔄 Manual session refresh triggered (iosSessionHelpers)");
-
-    // …but ALSO force a real Supabase session pull via Providers() state
     forceRefreshSession();
   };
 
@@ -247,7 +247,9 @@ export const Providers: React.FC<{ children: React.ReactNode; session?: Session 
           console.error("❌ Failed to auto-load fonts:", error);
         }
 
-        if (theme.typography?.trackingNormal) document.body.style.letterSpacing = theme.typography.trackingNormal;
+        if (theme.typography?.trackingNormal) {
+          document.body.style.letterSpacing = theme.typography.trackingNormal;
+        }
 
         localStorage.setItem("theme", themeType);
         setCookie("theme", themeType, { path: "/", maxAge: 31536000 });
@@ -265,7 +267,6 @@ export const Providers: React.FC<{ children: React.ReactNode; session?: Session 
   // AUTH / SESSION FIXES
   // -------------------------
 
-  // ✅ Memoize Supabase client so it does NOT recreate per render
   const supabase = useMemo(() => {
     return createBrowserClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -274,28 +275,28 @@ export const Providers: React.FC<{ children: React.ReactNode; session?: Session 
   }, []);
 
   const [initialSession, setInitialSession] = useState<Session | null>(session ?? null);
+  const [liveSession, setLiveSession] = useState<Session | null>(session ?? null);
   const [sessionFetched, setSessionFetched] = useState(!!session);
+
+  const isAuthLoading = !sessionFetched;
 
   const forceRefreshSession = () => {
     supabase.auth
       .getSession()
       .then(({ data: { session: fetchedSession } }) => {
-        console.log(
-          "[Provider] ✅ Forced session fetched:",
-          fetchedSession ? "authenticated" : "not authenticated"
-        );
+        console.log("[Provider] ✅ Forced session fetched:", fetchedSession ? "authenticated" : "not authenticated");
 
         if (fetchedSession?.user) {
           authLogger.memberSessionRestored(fetchedSession.user.id, fetchedSession.user.email || "");
         }
 
         setInitialSession(fetchedSession);
+        setLiveSession(fetchedSession);
         setSessionFetched(true);
       })
       .catch((e) => console.error("[Provider] ❌ Forced session fetch failed:", e));
   };
 
-  // ✅ Initial client-side session fetch (once)
   useEffect(() => {
     if (!sessionFetched) {
       console.log("[Provider] 🔄 Fetching session client-side...");
@@ -304,28 +305,34 @@ export const Providers: React.FC<{ children: React.ReactNode; session?: Session 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionFetched]);
 
-  // ✅ Keep state in sync when Supabase broadcasts auth changes
   useEffect(() => {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, newSession) => {
       console.log("[Provider] 🔄 Auth state changed:", event, newSession ? "authenticated" : "not authenticated");
+
       setInitialSession(newSession);
+      setLiveSession(newSession);
       setSessionFetched(true);
-      
-      // ✅ Broadcast auth changes to all components via custom event
-      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
+
+      if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "TOKEN_REFRESHED") {
         console.log("[Provider] 📢 Broadcasting auth event to components:", event);
-        window.dispatchEvent(new CustomEvent('supabase-auth-change', { 
-          detail: { event, session: newSession } 
-        }));
+        window.dispatchEvent(
+          new CustomEvent("supabase-auth-change", {
+            detail: { event, session: newSession },
+          })
+        );
       }
+
+      // Optional: if you have server components reading cookies, this helps them update immediately
+      // if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
+      //   router.refresh();
+      // }
     });
 
     return () => subscription.unsubscribe();
   }, [supabase]);
 
-  // ✅ iOS/PWA: when returning to the app (pageshow / tab focus), refresh session immediately
   useEffect(() => {
     const onVisible = () => {
       if (document.visibilityState === "visible") {
@@ -353,8 +360,21 @@ export const Providers: React.FC<{ children: React.ReactNode; session?: Session 
 
   return (
     <SessionContextProvider supabaseClient={supabase} initialSession={initialSession}>
-      <InternalAuthProvider forceRefreshSession={forceRefreshSession}>
-        <ThemeContext.Provider value={{ themeType, toggleTheme, themeId, setThemeId, getTheme, availableThemes }}>
+      <InternalAuthProvider
+        forceRefreshSession={forceRefreshSession}
+        session={liveSession}
+        isLoading={isAuthLoading}
+      >
+        <ThemeContext.Provider
+          value={{
+            themeType,
+            toggleTheme,
+            themeId,
+            setThemeId,
+            getTheme,
+            availableThemes,
+          }}
+        >
           {children}
         </ThemeContext.Provider>
       </InternalAuthProvider>

@@ -1,6 +1,7 @@
 // app/(auth-pages)/sign-in/page.tsx
 import Link from "next/link";
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 
 import { signInAction } from "@/actions/auth";
 import { FormMessage, Message } from "@/components/form-message";
@@ -10,7 +11,6 @@ import { Label } from "@/components/ui/label";
 import SignInWithGoogle from "@/components/ui/SignInWithGoogle";
 import { Mail, Lock } from "lucide-react";
 
-// ✅ ADD
 import { AuthBreadcrumbs } from "@/components/Auth/AuthBreadcrumbs";
 
 export const metadata: Metadata = {
@@ -23,16 +23,21 @@ export default async function SignInPage({
 }: {
   searchParams: Message;
 }) {
+  // ✅ pull lastPage cookie so the server action can redirect you back
+  const cookieStore = cookies();
+  const lastPage = cookieStore.get("lastPage")?.value;
+
+  // ✅ default fallback
+  const redirectTo = lastPage && lastPage.startsWith("/") ? lastPage : "/";
+
   return (
     <div className="mx-auto w-full max-w-md rounded-[var(--radius)] bg-[hsl(var(--card))] shadow-[var(--shadow-xl)] p-6 md:p-8">
-      {/* ✅ ADD */}
       <AuthBreadcrumbs current="Sign in" />
 
       <h1 className="text-2xl md:text-3xl font-[var(--font-serif)] font-bold text-center text-[hsl(var(--sidebar-primary))] mb-6 leading-[1.2]">
         Welcome Back
       </h1>
 
-      {/* ✅ hard-center wrapper so button cannot drift */}
       <div className="w-full flex justify-center">
         <div className="w-full max-w-[520px]">
           <SignInWithGoogle />
@@ -48,6 +53,9 @@ export default async function SignInPage({
       </div>
 
       <form className="space-y-5" action={signInAction}>
+        {/* ✅ tell the server action where to send the user after sign-in */}
+        <input type="hidden" name="redirectTo" value={redirectTo} />
+
         <div className="space-y-2">
           <Label htmlFor="email" className="font-[var(--font-sans)] text-[hsl(var(--foreground))]">
             Email
@@ -68,10 +76,7 @@ export default async function SignInPage({
         </div>
 
         <div className="space-y-2">
-          <Label
-            htmlFor="password"
-            className="font-[var(--font-sans)] text-[hsl(var(--foreground))]"
-          >
+          <Label htmlFor="password" className="font-[var(--font-sans)] text-[hsl(var(--foreground))]">
             Password
           </Label>
           <div className="relative">
@@ -89,7 +94,6 @@ export default async function SignInPage({
           </div>
         </div>
 
-        {/* ✅ name must be "remember" to match signInAction */}
         <div className="flex items-center justify-between">
           <label className="flex items-center gap-2 text-sm font-[var(--font-sans)] text-[hsl(var(--muted-foreground))]">
             <input
@@ -116,7 +120,6 @@ export default async function SignInPage({
           Sign in
         </SubmitButton>
 
-        {/* ✅ Keep this for now; we'll convert it to toast-only next */}
         <FormMessage message={searchParams} />
       </form>
 
