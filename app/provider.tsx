@@ -308,10 +308,18 @@ export const Providers: React.FC<{ children: React.ReactNode; session?: Session 
   useEffect(() => {
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, newSession) => {
-      console.log("[Provider] 🔄 Auth state changed:", newSession ? "authenticated" : "not authenticated");
+    } = supabase.auth.onAuthStateChange((event, newSession) => {
+      console.log("[Provider] 🔄 Auth state changed:", event, newSession ? "authenticated" : "not authenticated");
       setInitialSession(newSession);
       setSessionFetched(true);
+      
+      // ✅ Broadcast auth changes to all components via custom event
+      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
+        console.log("[Provider] 📢 Broadcasting auth event to components:", event);
+        window.dispatchEvent(new CustomEvent('supabase-auth-change', { 
+          detail: { event, session: newSession } 
+        }));
+      }
     });
 
     return () => subscription.unsubscribe();

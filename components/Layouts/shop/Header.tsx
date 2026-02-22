@@ -13,28 +13,33 @@ interface HeaderProps {
 }
 
 export function Header({ onMenuClick }: HeaderProps = {}) {
-  const { session, refreshSession } = useAuth(); // ✅ Get refreshSession
+  const { session, refreshSession } = useAuth();
   const { themeType } = useTheme();
 
   const handleAccountClick = () => {
     window.location.href = "/profile/me";
   };
 
-  // ✅ Listen for signin/logout query params and refresh session
+  // ✅ Listen to custom auth events from Provider
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.has('signin') || params.has('logout')) {
-      console.log('[Header] Auth state changed via query param, refreshing session...');
-      refreshSession();
+    console.log('[Header] Setting up auth listener');
+    
+    const handleAuthChange = (e: Event) => {
+      const { event, session } = (e as CustomEvent).detail;
+      console.log('[Header] Auth event received:', event, 'Session exists:', !!session);
       
-      // Clean up URL
-      params.delete('signin');
-      params.delete('logout');
-      const newUrl = params.toString() 
-        ? `${window.location.pathname}?${params.toString()}`
-        : window.location.pathname;
-      window.history.replaceState({}, '', newUrl);
-    }
+      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
+        console.log('[Header] Triggering refreshSession()');
+        refreshSession();
+      }
+    };
+
+    window.addEventListener('supabase-auth-change', handleAuthChange);
+
+    return () => {
+      console.log('[Header] Cleaning up auth listener');
+      window.removeEventListener('supabase-auth-change', handleAuthChange);
+    };
   }, [refreshSession]);
 
   // ✅ Add logging to debug

@@ -61,21 +61,23 @@ export default function MobileDrawer({ onClose }: MobileDrawerProps) {
   useEffect(() => {
     console.log('[MobileDrawer] Setting up auth listener');
     
-    const { data: { subscription } } = supabaseClient.auth.onAuthStateChange((event, newSession) => {
-      console.log('[MobileDrawer] Auth event:', event, 'Session exists:', !!newSession);
+    const handleAuthChange = (e: Event) => {
+      const { event, session } = (e as CustomEvent).detail;
+      console.log('[MobileDrawer] Auth event received:', event, 'Session exists:', !!session);
       
-      // Only call refreshSession for actual auth changes
       if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
-        console.log('[MobileDrawer] Triggering session refresh due to', event);
+        console.log('[MobileDrawer] Triggering refreshSession()');
         refreshSession();
       }
-    });
+    };
+
+    window.addEventListener('supabase-auth-change', handleAuthChange);
 
     return () => {
       console.log('[MobileDrawer] Cleaning up auth listener');
-      subscription.unsubscribe();
+      window.removeEventListener('supabase-auth-change', handleAuthChange);
     };
-  }, [supabaseClient, refreshSession]);
+  }, [refreshSession]);
 
   // Fetch navigation tree from API
   useEffect(() => {
