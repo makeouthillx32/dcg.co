@@ -1,13 +1,6 @@
-// app/provider.tsx
 "use client";
 
-import React, {
-  createContext,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { createBrowserClient } from "@supabase/ssr";
 import type { Session, User } from "@supabase/auth-helpers-nextjs";
 import { SessionContextProvider, useSessionContext } from "@supabase/auth-helpers-react";
@@ -73,8 +66,11 @@ function InternalAuthProvider({
   const pathname = usePathname();
 
   const refreshSession = () => {
+    // Keep your iOS helper…
     iosSessionHelpers.refreshSession();
     console.log("[Provider] 🔄 Manual session refresh triggered (iosSessionHelpers)");
+
+    // …but ALSO force a real Supabase session pull via Providers() state
     forceRefreshSession();
   };
 
@@ -115,14 +111,18 @@ function InternalAuthProvider({
   );
 }
 
-export function Providers({
+export function useIOSSessionRefresh() {
+  const { refreshSession } = useAuth();
+  return { refreshSession };
+}
+
+export const Providers: React.FC<{ children: React.ReactNode; session?: Session | null }> = ({
   children,
-  initialSession,
-}: {
-  children: React.ReactNode;
-  initialSession: Session | null;
-}) {
-  // THEME
+  session,
+}) => {
+  // -------------------------
+  // THEME STATE (unchanged)
+  // -------------------------
   const [themeType, setThemeType] = useState<"light" | "dark">("light");
   const [themeId, setThemeIdState] = useState<string>(defaultThemeId);
   const [mounted, setMounted] = useState(false);
@@ -132,21 +132,32 @@ export function Providers({
     const targetId = id || themeId;
     try {
       const theme = await getThemeById(targetId);
-      if (!theme) return await getThemeById(defaultThemeId);
+      if (!theme) {
+        console.warn(`⚠️ Theme ${targetId} not found, falling back to default`);
+        return await getThemeById(defaultThemeId);
+      }
       return theme;
-    } catch {
+    } catch (error) {
+      console.error(`❌ Error getting theme ${targetId}:`, error);
       return await getThemeById(defaultThemeId);
     }
   };
 
   const setThemeId = async (id: string, element?: HTMLElement) => {
     const themeChangeCallback = async () => {
-      const theme = await getThemeById(id);
-      if (!theme) return;
-
-      setThemeIdState(id);
-      localStorage.setItem("themeId", id);
-      setCookie("themeId", id, { path: "/", maxAge: 31536000 });
+      try {
+        const theme = await getThemeById(id);
+        if (theme) {
+          setThemeIdState(id);
+          localStorage.setItem("themeId", id);
+          setCookie("themeId", id, { path: "/", maxAge: 31536000 });
+          console.log(`🎨 Theme changed to: ${theme.name} (${id})`);
+        } else {
+          console.warn(`⚠️ Theme ${id} not found in database`);
+        }
+      } catch (error) {
+        console.error(`❌ Error setting theme ${id}:`, error);
+      }
     };
 
     if (element) await smoothThemeToggle(element, themeChangeCallback);
@@ -154,70 +165,107 @@ export function Providers({
   };
 
   const toggleTheme = async (element?: HTMLElement) => {
-    const themeChangeCallback = () => setThemeType((p) => (p === "light" ? "dark" : "light"));
+    const themeChangeCallback = () => {
+      setThemeType((prev) => (prev === "light" ? "dark" : "light"));
+    };
+
     if (element) await smoothThemeToggle(element, themeChangeCallback);
     else await transitionTheme(themeChangeCallback);
   };
 
   useEffect(() => {
-    (async () => {
+    const loadAvailableThemes = async () => {
       try {
         const themeIds = await getAvailableThemeIds();
         setAvailableThemes(themeIds);
-      } catch {
+        console.log(`📚 Loaded ${themeIds.length} available themes:`, themeIds);
+      } catch (error) {
+        console.error("❌ Error loading available themes:", error);
         setAvailableThemes([defaultThemeId]);
       }
-    })();
+    };
+    loadAvailableThemes();
   }, []);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    setMounted(true);
+    if (typeof window !== "undefined") {
+      setMounted(true);
 
-    (async () => {
-      const savedThemeId = localStorage.getItem("themeId") || getCookie("themeId");
-      if (savedThemeId) {
-        const theme = await getThemeById(savedThemeId);
-        setThemeIdState(theme ? savedThemeId : defaultThemeId);
-      }
+      const initializeTheme = async () => {
+        const savedThemeId = localStorage.getItem("themeId") || getCookie("themeId");
+        if (savedThemeId) {
+          const theme = await getThemeById(savedThemeId);
+          if (theme) setThemeIdState(savedThemeId);
+          else {
+            console.warn(`⚠️ Saved theme ${savedThemeId} not found, using default`);
+            setThemeIdState(defaultThemeId);
+          }
+        }
 
-      const savedThemeType = localStorage.getItem("theme") || getCookie("theme");
-      if (!savedThemeType) {
-        const systemPrefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-        setThemeType(systemPrefersDark ? "dark" : "light");
-      } else {
-        setThemeType(savedThemeType as "light" | "dark");
-      }
-    })();
+        const savedThemeType = localStorage.getItem("theme") || getCookie("theme");
+        if (!savedThemeType) {
+          const systemPrefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+          setThemeType(systemPrefersDark ? "dark" : "light");
+        } else {
+          setThemeType(savedThemeType as "light" | "dark");
+        }
+      };
+
+      initializeTheme();
+    }
   }, []);
 
   useEffect(() => {
     if (!mounted || availableThemes.length === 0) return;
 
-    (async () => {
-      const theme = await getTheme();
-      if (!theme) return;
-
-      const variables = themeType === "dark" ? theme.dark : theme.light;
-      const html = document.documentElement;
-
-      html.classList.remove("light", "dark");
-      availableThemes.forEach((id) => html.classList.remove(`theme-${id}`));
-      html.classList.add(themeType);
-      html.classList.add(`theme-${themeId}`);
-
-      for (const [key, value] of Object.entries(variables)) html.style.setProperty(key, value);
-
+    const applyTheme = async () => {
       try {
-        await dynamicFontManager.autoLoadFontsFromCSS();
-      } catch {}
+        const theme = await getTheme();
+        if (!theme) {
+          console.error("❌ No theme available to apply");
+          return;
+        }
 
-      localStorage.setItem("theme", themeType);
-      setCookie("theme", themeType, { path: "/", maxAge: 31536000 });
-    })();
+        console.log(`🎨 Applying theme: ${theme.name} (${themeType} mode)`);
+        const variables = themeType === "dark" ? theme.dark : theme.light;
+        const html = document.documentElement;
+
+        html.classList.remove("light", "dark");
+        availableThemes.forEach((id) => html.classList.remove(`theme-${id}`));
+        html.classList.add(themeType);
+        html.classList.add(`theme-${themeId}`);
+
+        console.log(`🔧 Applying ${Object.keys(variables).length} CSS variables`);
+        for (const [key, value] of Object.entries(variables)) {
+          html.style.setProperty(key, value);
+        }
+
+        try {
+          console.log(`🔤 Auto-loading fonts from CSS variables...`);
+          await dynamicFontManager.autoLoadFontsFromCSS();
+        } catch (error) {
+          console.error("❌ Failed to auto-load fonts:", error);
+        }
+
+        if (theme.typography?.trackingNormal) document.body.style.letterSpacing = theme.typography.trackingNormal;
+
+        localStorage.setItem("theme", themeType);
+        setCookie("theme", themeType, { path: "/", maxAge: 31536000 });
+
+        console.log(`✅ Theme applied: ${theme.name} (${themeType})`);
+      } catch (error) {
+        console.error("❌ Error applying theme:", error);
+      }
+    };
+
+    applyTheme();
   }, [themeType, themeId, mounted, availableThemes]);
 
-  // AUTH / SESSION
+  // -------------------------
+  // AUTH / SESSION FIXES
+  // -------------------------
+
+  // ✅ Memoize Supabase client so it does NOT recreate per render
   const supabase = useMemo(() => {
     return createBrowserClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -225,52 +273,77 @@ export function Providers({
     );
   }, []);
 
-  const [clientSession, setClientSession] = useState<Session | null>(initialSession);
-  const [sessionFetched, setSessionFetched] = useState(!!initialSession);
+  const [initialSession, setInitialSession] = useState<Session | null>(session ?? null);
+  const [sessionFetched, setSessionFetched] = useState(!!session);
 
   const forceRefreshSession = () => {
     supabase.auth
       .getSession()
-      .then(({ data: { session } }) => {
-        if (session?.user) authLogger.memberSessionRestored(session.user.id, session.user.email || "");
-        setClientSession(session);
+      .then(({ data: { session: fetchedSession } }) => {
+        console.log(
+          "[Provider] ✅ Forced session fetched:",
+          fetchedSession ? "authenticated" : "not authenticated"
+        );
+
+        if (fetchedSession?.user) {
+          authLogger.memberSessionRestored(fetchedSession.user.id, fetchedSession.user.email || "");
+        }
+
+        setInitialSession(fetchedSession);
         setSessionFetched(true);
       })
-      .catch(() => {});
+      .catch((e) => console.error("[Provider] ❌ Forced session fetch failed:", e));
   };
 
+  // ✅ Initial client-side session fetch (once)
   useEffect(() => {
-    if (!sessionFetched) forceRefreshSession();
+    if (!sessionFetched) {
+      console.log("[Provider] 🔄 Fetching session client-side...");
+      forceRefreshSession();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionFetched]);
 
+  // ✅ Keep state in sync when Supabase broadcasts auth changes
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession) => {
-      setClientSession(newSession);
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, newSession) => {
+      console.log("[Provider] 🔄 Auth state changed:", event, newSession ? "authenticated" : "not authenticated");
+      setInitialSession(newSession);
       setSessionFetched(true);
-
-      if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "TOKEN_REFRESHED") {
-        window.dispatchEvent(new CustomEvent("supabase-auth-change", { detail: { event, session: newSession } }));
+      
+      // ✅ Broadcast auth changes to all components via custom event
+      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
+        console.log("[Provider] 📢 Broadcasting auth event to components:", event);
+        window.dispatchEvent(new CustomEvent('supabase-auth-change', { 
+          detail: { event, session: newSession } 
+        }));
       }
     });
 
     return () => subscription.unsubscribe();
   }, [supabase]);
 
+  // ✅ iOS/PWA: when returning to the app (pageshow / tab focus), refresh session immediately
   useEffect(() => {
     const onVisible = () => {
       if (document.visibilityState === "visible") {
+        console.log("[Provider] 👀 visibilitychange => refreshing session");
         iosSessionHelpers.refreshSession();
         forceRefreshSession();
       }
     };
+
     const onPageShow = () => {
+      console.log("[Provider] 📲 pageshow => refreshing session");
       iosSessionHelpers.refreshSession();
       forceRefreshSession();
     };
 
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("pageshow", onPageShow);
+
     return () => {
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("pageshow", onPageShow);
@@ -279,7 +352,7 @@ export function Providers({
   }, [supabase]);
 
   return (
-    <SessionContextProvider supabaseClient={supabase} initialSession={clientSession ?? undefined}>
+    <SessionContextProvider supabaseClient={supabase} initialSession={initialSession}>
       <InternalAuthProvider forceRefreshSession={forceRefreshSession}>
         <ThemeContext.Provider value={{ themeType, toggleTheme, themeId, setThemeId, getTheme, availableThemes }}>
           {children}
@@ -287,4 +360,4 @@ export function Providers({
       </InternalAuthProvider>
     </SessionContextProvider>
   );
-}
+};
