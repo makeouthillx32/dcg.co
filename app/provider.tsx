@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { createBrowserClient } from "@supabase/ssr";
 import type { Session, User } from "@supabase/auth-helpers-nextjs";
 import { SessionContextProvider } from "@supabase/auth-helpers-react";
@@ -287,6 +287,11 @@ export const Providers: React.FC<{ children: React.ReactNode; session?: Session 
 
   const isAuthLoading = !sessionFetched;
 
+  // ✅ FIX: Tracks when we're in a post-login ?refresh=true window.
+  // Prevents a null INITIAL_SESSION fired by onAuthStateChange from clobbering
+  // the session we're about to fetch via forceRefreshSession() after the 200ms delay.
+  const pendingRefreshRef = useRef(false);
+
   const forceRefreshSession = () => {
     supabase.auth
       .getSession()
@@ -305,20 +310,26 @@ export const Providers: React.FC<{ children: React.ReactNode; session?: Session 
   };
 
   // ✅ FIX: After email sign-in, signInAction redirects with ?refresh=true.
-  // This effect detects that flag on mount and immediately calls forceRefreshSession()
-  // so the session is populated in AuthContext before the user can open the mobile drawer.
-  // Without this, the drawer renders "Sign In" because the async onAuthStateChange
-  // fires after the component tree has already painted with session = null.
+  // We strip the param immediately, then wait 200ms before calling forceRefreshSession()
+  // so the Supabase browser client has time to finish parsing the sb-* auth cookies.
+  // Without the delay, getSession() races against cookie initialization and returns null.
+  // The pendingRefreshRef prevents a null INITIAL_SESSION from onAuthStateChange from
+  // overwriting state during this window.
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     if (params.get("refresh") === "true") {
       console.log("[Provider] 🔑 ?refresh=true detected — forcing immediate session sync");
-      forceRefreshSession();
-      // Strip the param from the URL so it doesn't persist or show to the user
+      pendingRefreshRef.current = true;
+      // Strip the param immediately so it doesn't show in the URL
       params.delete("refresh");
       const newUrl = window.location.pathname + (params.toString() ? "?" + params.toString() : "");
       window.history.replaceState({}, "", newUrl);
+      // Delay gives the Supabase browser client time to parse cookies before getSession() is called
+      setTimeout(() => {
+        pendingRefreshRef.current = false;
+        forceRefreshSession();
+      }, 200);
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -335,6 +346,14 @@ export const Providers: React.FC<{ children: React.ReactNode; session?: Session 
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, newSession) => {
       console.log("[Provider] 🔄 Auth state changed:", event, newSession ? "authenticated" : "not authenticated");
+
+      // ✅ FIX: Don't let a null INITIAL_SESSION overwrite state during a post-login
+      // ?refresh=true window. The Supabase client fires INITIAL_SESSION before it has
+      // fully parsed the auth cookies, so we wait for forceRefreshSession() to resolve instead.
+      if (event === "INITIAL_SESSION" && !newSession && pendingRefreshRef.current) {
+        console.log("[Provider] ⏳ Skipping null INITIAL_SESSION — post-login refresh pending");
+        return;
+      }
 
       setInitialSession(newSession);
       setLiveSession(newSession);
