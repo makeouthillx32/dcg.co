@@ -1,5 +1,10 @@
-// components/Auth/SigninWithPassword.tsx - Updated to use server actions with Remember Me
+// components/Auth/SigninWithPassword.tsx
+// ✅ Client-side sign-in: calls supabase.auth.signInWithPassword() directly in the browser
+// so onAuthStateChange fires SIGNED_IN natively — exactly like logout fires SIGNED_OUT.
+// This means MobileDrawer, Header, and all auth-aware components update instantly
+// without any ?refresh=true hack or race conditions.
 "use client";
+
 import { EmailIcon, PasswordIcon } from "@/assets/icons";
 import Link from "next/link";
 import React, { useState } from "react";
@@ -7,12 +12,16 @@ import InputGroup from "../FormElements/InputGroup";
 import { Checkbox } from "../FormElements/checkbox";
 import { useTheme } from "@/app/provider";
 import { Loader2 } from "lucide-react";
-import { signInAction } from"@/actions/auth/actions";
+import { createBrowserClient } from "@supabase/ssr";
+import { useRouter } from "next/navigation";
+import { populateCookiesAction } from "@/actions/auth/actions";
+import { getLastPageForRedirect } from "@/lib/cookieUtils";
 
 export default function SigninWithPassword() {
   const { themeType } = useTheme();
   const isDark = themeType === "dark";
-  
+  const router = useRouter();
+
   const [data, setData] = useState({
     email: process.env.NEXT_PUBLIC_DEMO_USER_MAIL || "",
     password: process.env.NEXT_PUBLIC_DEMO_USER_PASS || "",
@@ -20,40 +29,63 @@ export default function SigninWithPassword() {
   });
 
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const supabase = React.useMemo(
+    () =>
+      createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      ),
+    []
+  );
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setData({
-      ...data,
-      [e.target.name]: e.target.value,
-    });
+    setData({ ...data, [e.target.name]: e.target.value });
   };
 
   const handleRememberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setData({
-      ...data,
-      remember: e.target.checked,
-    });
-    console.log('[SignIn] Remember me:', e.target.checked);
+    setData({ ...data, remember: e.target.checked });
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
+    setError(null);
 
     try {
-      console.log('[SignIn] Submitting with remember me:', data.remember);
-      
-      // Create FormData with all fields including remember
-      const formData = new FormData();
-      formData.append('email', data.email);
-      formData.append('password', data.password);
-      formData.append('remember', data.remember.toString());
+      // ✅ Sign in from the browser — this fires onAuthStateChange("SIGNED_IN")
+      // which propagates through the entire Provider → MobileDrawer → Header chain
+      // identically to how signOut fires SIGNED_OUT. No page reload needed.
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: data.email,
+        password: data.password,
+      });
 
-      // Call your server action
-      await signInAction(formData);
-      
-    } catch (error) {
-      console.error('[SignIn] Error:', error);
+      if (authError) {
+        setError(authError.message);
+        return;
+      }
+
+      if (!authData.user?.id) {
+        setError("Authentication failed — no user returned.");
+        return;
+      }
+
+      console.log("[SignIn] ✅ Browser sign-in succeeded, SIGNED_IN will fire via onAuthStateChange");
+
+      // ✅ Populate server-side profile cookies (userRole, userDisplayName, etc.)
+      // This runs in the background — it's not blocking the auth state update.
+      populateCookiesAction(authData.user.id, data.remember).catch((err) => {
+        console.warn("[SignIn] ⚠️ Cookie population failed (non-critical):", err);
+      });
+
+      // ✅ Redirect to lastPage or home — no ?refresh=true needed
+      const redirectTo = getLastPageForRedirect();
+      router.push(redirectTo);
+    } catch (err) {
+      console.error("[SignIn] ❌ Unexpected error:", err);
+      setError("An unexpected error occurred. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -107,6 +139,10 @@ export default function SigninWithPassword() {
         </Link>
       </div>
 
+      {error && (
+        <p className="text-sm text-red-500 font-[var(--font-sans)]">{error}</p>
+      )}
+
       <div>
         <button
           type="submit"
@@ -125,13 +161,6 @@ export default function SigninWithPassword() {
           )}
         </button>
       </div>
-      
-      {/* Debug info in development */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="text-xs text-[hsl(var(--muted-foreground))] mt-2">
-          Remember me: {data.remember ? 'Enabled' : 'Disabled'}
-        </div>
-      )}
     </form>
   );
 }

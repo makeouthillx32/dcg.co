@@ -107,6 +107,18 @@ export const signInAction = async (formData: FormData) => {
   return redirect(`${lastPage}${separator}refresh=true`);
 };
 
+/**
+ * Called by the client-side sign-in form AFTER signInWithPassword() succeeds
+ * in the browser. We can't do this from the client directly because it needs
+ * server-side cookie access to write userRole, userDisplayName, etc.
+ *
+ * Does NOT redirect — the caller handles navigation.
+ */
+export const populateCookiesAction = async (userId: string, remember: boolean) => {
+  authLogger.memberSignIn(userId, "", remember);
+  await populateUserCookies(userId, remember);
+};
+
 export const forgotPasswordAction = async (formData: FormData) => {
   const email = formData.get("email")?.toString()?.trim();
   const callbackUrl = formData.get("callbackUrl")?.toString();
