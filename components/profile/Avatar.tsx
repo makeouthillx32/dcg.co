@@ -15,7 +15,6 @@ export default function Avatar({
 }) {
   const [showPreview, setShowPreview] = useState(false);
 
-  // no fetch, no hardcoded fallbacks here — DB/API owns defaults
   const src = useMemo(() => {
     const v = typeof avatarUrl === "string" ? avatarUrl.trim() : "";
     return v.length > 0 ? v : null;
