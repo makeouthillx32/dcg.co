@@ -61,14 +61,14 @@ export default function Footer() {
         title: "About",
         links: [
           // ✅ CMS-driven pages (your real slug)
-          { name: "Our Story", href: "/pages/about-us" },
+          { name: "Our Story", href: "/pages/about" },
 
           // ✅ Landing section
           { name: "FAQs", href: "/#faq" },
 
           // ✅ Legal CMS pages (your real slugs)
-          { name: "Privacy Policy", href: "/legal/privacy-policy" },
-          { name: "Terms", href: "/legal/terms-and-conditions" },
+          { name: "Privacy Policy", href: "/pages/privacy-policy" },
+          { name: "Terms", href: "/pages/terms-and-conditions" },
         ],
       },
     ];
@@ -92,9 +92,9 @@ export default function Footer() {
       {
         title: "Your Account",
         links: [
-          { name: "Account", href: "/account" },
-          { name: "Orders", href: "/account/orders" },
-          { name: "Saved", href: "/account/saved" },
+          { name: "Account", href: "/profile/me" },
+          { name: "Orders", href: "/profile/me/orders" },
+          { name: "Saved", href: "/profile/me/saved" },
           { name: "Sign Out", href: "/auth/logout" },
         ],
       },
@@ -106,9 +106,9 @@ export default function Footer() {
       member.push({
         title: "Admin",
         links: [
-          { name: "Dashboard", href: "/admin" },
-          { name: "Products", href: "/admin/products" },
-          { name: "Orders", href: "/admin/orders" },
+          { name: "Dashboard", href: "/dashboard/me" },
+          { name: "Products", href: "/dashboard/me/settings/products" },
+          { name: "Orders", href: "/dashboard/me/orders" },
         ],
       });
     }
