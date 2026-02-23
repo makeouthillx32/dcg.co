@@ -74,7 +74,9 @@ export const signUpAction = async (formData: FormData) => {
     await populateUserCookies(userId, false);
     await new Promise((r) => setTimeout(r, 100));
     const lastPage = await getAndClearLastPage();
-    return redirect(lastPage);
+    // ✅ Append ?refresh=true so the client Provider immediately syncs the session
+    const separator = lastPage.includes("?") ? "&" : "?";
+    return redirect(`${lastPage}${separator}refresh=true`);
   }
 
   return encodedRedirect("success", "/sign-in", "Account created. Please check your email to verify, then sign in.");
@@ -100,7 +102,9 @@ export const signInAction = async (formData: FormData) => {
   await new Promise((r) => setTimeout(r, 100));
 
   const lastPage = await getAndClearLastPage();
-  return redirect(lastPage);
+  // ✅ Append ?refresh=true so the client Provider immediately syncs the session
+  const separator = lastPage.includes("?") ? "&" : "?";
+  return redirect(`${lastPage}${separator}refresh=true`);
 };
 
 export const forgotPasswordAction = async (formData: FormData) => {

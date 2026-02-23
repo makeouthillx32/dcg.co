@@ -304,6 +304,24 @@ export const Providers: React.FC<{ children: React.ReactNode; session?: Session 
       .catch((e) => console.error("[Provider] ❌ Forced session fetch failed:", e));
   };
 
+  // ✅ FIX: After email sign-in, signInAction redirects with ?refresh=true.
+  // This effect detects that flag on mount and immediately calls forceRefreshSession()
+  // so the session is populated in AuthContext before the user can open the mobile drawer.
+  // Without this, the drawer renders "Sign In" because the async onAuthStateChange
+  // fires after the component tree has already painted with session = null.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("refresh") === "true") {
+      console.log("[Provider] 🔑 ?refresh=true detected — forcing immediate session sync");
+      forceRefreshSession();
+      // Strip the param from the URL so it doesn't persist or show to the user
+      params.delete("refresh");
+      const newUrl = window.location.pathname + (params.toString() ? "?" + params.toString() : "");
+      window.history.replaceState({}, "", newUrl);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     if (!sessionFetched) {
       console.log("[Provider] 🔄 Fetching session client-side...");
