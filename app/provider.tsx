@@ -74,43 +74,51 @@ function InternalAuthProvider({
     forceRefreshSession();
   };
 
+  const lastUserIdRef = useRef<string | null>(null);
+
   useEffect(() => {
-    if (session?.user) setUser(session.user);
+    const nextUserId = session?.user?.id ?? null;
+
+    if (nextUserId) setUser(session!.user);
     else setUser(null);
 
-    // ✅ FIX: Force Next.js to re-render the full component tree whenever auth state
-    // changes. Without this, components like MobileDrawer that read `session` from
-    // AuthContext don't re-render after sign-in/sign-out because the custom window
-    // event fires before they've mounted their listener (post-navigation). router.refresh()
-    // re-syncs server components and flushes the updated session through the entire tree.
-    router.refresh();
+    // Only refresh the app tree when auth identity actually changes:
+    // - signed in (null -> uuid)
+    // - signed out (uuid -> null)
+    // Not on token refresh or repeated session checks.
+    if (lastUserIdRef.current !== nextUserId) {
+      lastUserIdRef.current = nextUserId;
+      router.refresh();
+    }
   }, [session, router]);
 
   useEffect(() => {
-    if (!isLoading && !session) {
-      const publicRoutes = [
-        "/",
-        "/sign-in",
-        "/sign-up",
-        "/forgot-password",
-        "/reset-password",
-        "/auth/callback",
-        "/auth/callback/oauth",
-      ];
-      const publicPrefixes = ["/products", "/collections", "/auth"];
+    if (isLoading) return;
 
-      const isPublicRoute =
-        publicRoutes.includes(pathname) || publicPrefixes.some((prefix) => pathname.startsWith(prefix));
+    // ## Guest Contract v1
+    // Guest CAN access: shop browsing, product pages, collections/categories, cart, checkout, static pages.
+    // Guest CANNOT access: /profile/*, /dashboard/*, /settings/*, /protected/*
+    const protectedPrefixes = ["/profile", "/dashboard", "/settings", "/protected"];
 
-      if (!isPublicRoute) {
-        console.log(`[Provider] Redirecting to sign-in from: ${pathname}`);
-        router.push("/sign-in");
-      } else {
-        console.log(`[Provider] Allowing public route: ${pathname}`);
-      }
+    const isProtectedRoute = protectedPrefixes.some(
+      (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+    );
+
+    // Only redirect guests when they attempt to enter protected areas.
+    if (!session && isProtectedRoute) {
+      const authPages = ["/sign-in", "/sign-up", "/forgot-password", "/reset-password"];
+
+      // Don't redirect if we're already on an auth page
+      if (authPages.includes(pathname)) return;
+
+      const target = pathname + (location.search || "");
+
+      console.log(`[Provider] Redirecting guest to sign-in from protected route: ${pathname}`);
+      router.replace(`/sign-in?next=${encodeURIComponent(target)}`);
+      return;
     }
+    
   }, [session, isLoading, pathname, router]);
-
   return (
     <AuthContext.Provider value={{ user, session, isLoading, refreshSession }}>
       <IOSSessionManager>{children}</IOSSessionManager>
