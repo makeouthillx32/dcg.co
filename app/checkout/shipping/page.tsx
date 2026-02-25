@@ -40,9 +40,6 @@ export default function CheckoutShippingPage() {
   const zipRef = useRef<HTMLInputElement>(null);
   const phoneRef = useRef<HTMLInputElement>(null);
 
-  // Member state — controls whether email is locked
-  const [isMember, setIsMember] = useState(false);
-
   // Form state
   const [email, setEmail] = useState("");
   const [shippingAddress, setShippingAddress] = useState({
@@ -67,9 +64,6 @@ export default function CheckoutShippingPage() {
     country: "US",
   });
   const [billingSameAsShipping, setBillingSameAsShipping] = useState(true);
-
-  // True once we confirm the user is a signed-in member — locks the email field
-  const [isMember, setIsMember] = useState(false);
 
   // Shipping rates
   const [shippingRates, setShippingRates] = useState<ShippingRate[]>([]);
@@ -100,8 +94,6 @@ export default function CheckoutShippingPage() {
 
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) return;
-
-      setIsMember(true);
 
       const { data: profile } = await supabase
         .from("profiles")
@@ -368,20 +360,13 @@ export default function CheckoutShippingPage() {
                   id="email"
                   name="email"
                   type="email"
-                  autoComplete={isMember ? "off" : "email"}
+                  autoComplete="email"
                   value={email}
-                  onBlur={isMember ? undefined : (e) => setEmail(e.target.value)}
-                  onChange={isMember ? undefined : (e) => setEmail(e.target.value)}
+                  onBlur={(e) => setEmail(e.target.value)}
+                  onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
-                  readOnly={isMember}
-                  className={isMember ? "bg-muted text-muted-foreground cursor-default select-none" : ""}
                   required
                 />
-                {isMember && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Order will be sent to your account email.
-                  </p>
-                )}
               </div>
             </div>
 
