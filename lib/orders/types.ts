@@ -1,5 +1,6 @@
 export type OrderStatus = 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
 export type PaymentStatus = 'unpaid' | 'paid' | 'refunded';
+export type FulfillmentStatus = 'unfulfilled' | 'fulfilled' | 'partial' | 'returned';
 
 export interface AdminOrder {
   id: string;
@@ -7,9 +8,12 @@ export interface AdminOrder {
   created_at: string;
   status: OrderStatus;
   payment_status: PaymentStatus;
+  fulfillment_status: FulfillmentStatus; // ← new: drives the tag in the grid
   total_cents: number;
   email: string;
-  shipping_address: any; 
+  customer_first_name?: string;
+  customer_last_name?: string;
+  shipping_address: any;
   items: AdminOrderItem[];
   tracking_number?: string;
   tracking_url?: string;
