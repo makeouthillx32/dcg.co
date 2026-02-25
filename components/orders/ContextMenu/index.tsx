@@ -4,7 +4,7 @@ import React, { useEffect, useCallback } from 'react';
 import { 
   OrderStatusIcon, 
   PaymentIcon 
-} from './OrderIcons';
+} from '../icons';
 import { 
   Printer, 
   Truck, 
