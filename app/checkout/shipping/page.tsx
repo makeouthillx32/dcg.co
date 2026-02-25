@@ -42,6 +42,7 @@ export default function CheckoutShippingPage() {
 
   // Form state
   const [email, setEmail] = useState("");
+  const [isMember, setIsMember] = useState(false);
   const [shippingAddress, setShippingAddress] = useState({
     firstName: "",
     lastName: "",
@@ -95,6 +96,8 @@ export default function CheckoutShippingPage() {
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) return;
 
+      setIsMember(true);
+
       const { data: profile } = await supabase
         .from("profiles")
         .select("first_name, last_name, email")
@@ -134,9 +137,10 @@ export default function CheckoutShippingPage() {
   }, [itemCount, router]);
 
   // Autofill detection using MutationObserver and polling
+  // Skip email checks when member (email is locked)
   useEffect(() => {
     const checkAutofill = () => {
-      if (emailRef.current && emailRef.current.value !== email) {
+      if (!isMember && emailRef.current && emailRef.current.value !== email) {
         setEmail(emailRef.current.value);
       }
       if (firstNameRef.current && firstNameRef.current.value !== shippingAddress.firstName) {
@@ -190,7 +194,7 @@ export default function CheckoutShippingPage() {
       clearInterval(timer);
       observer.disconnect();
     };
-  }, [email, shippingAddress]);
+  }, [email, isMember, shippingAddress]);
 
   // Load shipping rates when state is entered
   useEffect(() => {
@@ -261,8 +265,8 @@ export default function CheckoutShippingPage() {
 
   // Handle form submission
   const handleContinue = () => {
-    // Read current values from DOM (in case React state is stale)
-    const currentEmail = emailRef.current?.value || email;
+    // For members, use locked React state email. For guests, read from DOM.
+    const currentEmail = isMember ? email : (emailRef.current?.value || email);
     const currentShippingAddress = {
       firstName: firstNameRef.current?.value || shippingAddress.firstName,
       lastName: lastNameRef.current?.value || shippingAddress.lastName,
@@ -354,18 +358,30 @@ export default function CheckoutShippingPage() {
             <div className="space-y-4">
               <h2 className="text-xl font-semibold">Contact</h2>
               <div>
-                <Label htmlFor="email">Email Address *</Label>
+                <Label htmlFor="email">
+                  Email Address *
+                  {isMember && (
+                    <span className="ml-2 text-xs text-muted-foreground font-normal">
+                      (linked to your account)
+                    </span>
+                  )}
+                </Label>
                 <Input
                   ref={emailRef}
                   id="email"
                   name="email"
                   type="email"
-                  autoComplete="email"
-                  value={email}
-                  onBlur={(e) => setEmail(e.target.value)}
-                  onChange={(e) => setEmail(e.target.value)}
+                  autoComplete={isMember ? "off" : "email"}
+                  // Controlled when member (React owns value, blocks autofill override)
+                  // Uncontrolled when guest (browser autofill works normally)
+                  value={isMember ? email : undefined}
+                  defaultValue={isMember ? undefined : email}
+                  readOnly={isMember}
+                  onBlur={isMember ? undefined : (e) => setEmail(e.target.value)}
+                  onChange={isMember ? undefined : (e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
                   required
+                  className={isMember ? "bg-muted text-muted-foreground cursor-not-allowed" : ""}
                 />
               </div>
             </div>
