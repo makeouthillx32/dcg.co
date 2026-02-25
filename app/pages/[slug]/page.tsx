@@ -34,29 +34,36 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-// Dynamic route - no static generation needed
-// Pages will be generated on-demand and cached
-
 // Render content based on format
 function renderContent(page: { content: string; content_format: 'html' | 'markdown' }) {
   if (page.content_format === 'html') {
     return (
       <div
-        className="prose prose-slate max-w-none dark:prose-invert
+        className="
+          prose prose-slate max-w-none dark:prose-invert
+          overflow-x-hidden
           prose-headings:text-[hsl(var(--foreground))]
           prose-p:text-[hsl(var(--foreground))]
           prose-a:text-[hsl(var(--primary))]
           prose-strong:text-[hsl(var(--foreground))]
           prose-ul:text-[hsl(var(--foreground))]
-          prose-ol:text-[hsl(var(--foreground))]"
+          prose-ol:text-[hsl(var(--foreground))]
+          prose-li:text-[hsl(var(--foreground))]
+          [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-md
+          [&_table]:w-full [&_table]:overflow-x-auto [&_table]:block [&_table]:whitespace-nowrap sm:[&_table]:whitespace-normal
+          [&_pre]:overflow-x-auto [&_pre]:text-sm
+          [&_iframe]:max-w-full [&_iframe]:w-full
+          [&_video]:max-w-full [&_video]:w-full
+          [&_div]:max-w-full
+        "
         dangerouslySetInnerHTML={{ __html: page.content }}
       />
     );
   }
 
-  // Basic markdown rendering (you can add a proper markdown parser later)
+  // Basic markdown rendering
   return (
-    <div className="prose prose-slate max-w-none dark:prose-invert">
+    <div className="prose prose-slate max-w-none dark:prose-invert overflow-x-hidden">
       {page.content.split('\n').map((line, i) => {
         if (line.trim().startsWith('#')) {
           const level = line.match(/^#+/)?.[0].length || 1;
@@ -68,75 +75,49 @@ function renderContent(page: { content: string; content_format: 'html' | 'markdo
             </Tag>
           );
         }
-        
+
         return line.trim() ? (
-          <p key={i} className="mb-3 text-[hsl(var(--foreground))]">
+          <p key={i} className="text-[hsl(var(--foreground))]">
             {line}
           </p>
         ) : (
-          <div key={i} className="h-3" />
+          <br key={i} />
         );
       })}
     </div>
   );
 }
 
-export default async function Page({ params }: Props) {
+export default async function StaticPage({ params }: Props) {
   const { slug } = await params;
   const page = await getPublishedStaticPageBySlug(slug);
 
   if (!page) {
-    return notFound();
+    notFound();
   }
 
   return (
     <div className="min-h-screen bg-[hsl(var(--background))]">
-      {/* Container */}
-      <section className="mx-auto w-full max-w-4xl px-6 py-12 sm:px-8 lg:px-12">
-        {/* Header */}
-        <header className="mb-8 border-b border-[hsl(var(--border))] pb-6">
-          <h1 className="text-3xl font-bold tracking-tight text-[hsl(var(--foreground))] sm:text-4xl">
+      {/* Page header */}
+      <div className="border-b border-[hsl(var(--border))] bg-[hsl(var(--background))]">
+        <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
+          <h1 className="text-2xl font-bold tracking-tight text-[hsl(var(--foreground))] sm:text-3xl lg:text-4xl">
             {page.title}
           </h1>
           {page.meta_description && (
-            <p className="mt-3 text-base text-[hsl(var(--muted-foreground))]">
+            <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))] sm:text-base">
               {page.meta_description}
             </p>
           )}
-          
-          {/* Metadata */}
-          <div className="mt-4 flex items-center gap-4 text-sm text-[hsl(var(--muted-foreground))]">
-            <time dateTime={page.updated_at}>
-              Last updated: {new Date(page.updated_at).toLocaleDateString('en-US', { 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
-              })}
-            </time>
-            <span>•</span>
-            <span>Version {page.version}</span>
-          </div>
-        </header>
+        </div>
+      </div>
 
-        {/* Content */}
-        <article className="text-[hsl(var(--foreground))]">
+      {/* Page content */}
+      <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
+        <div className="overflow-x-hidden">
           {renderContent(page)}
-        </article>
-
-        {/* Footer */}
-        <footer className="mt-12 border-t border-[hsl(var(--border))] pt-6">
-          <p className="text-sm text-[hsl(var(--muted-foreground))]">
-            If you have questions about this page, please{' '}
-            <a
-              href="/contact"
-              className="text-[hsl(var(--primary))] hover:underline"
-            >
-              contact us
-            </a>
-            .
-          </p>
-        </footer>
-      </section>
+        </div>
+      </div>
     </div>
   );
 }

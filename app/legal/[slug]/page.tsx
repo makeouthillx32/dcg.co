@@ -11,9 +11,6 @@ type Props = {
   params: Promise<{ slug: string }>;
 };
 
-// Legal pages are typically: privacy-policy, terms-and-conditions
-const LEGAL_SLUGS = ['privacy-policy', 'terms-and-conditions'];
-
 // Generate metadata for SEO
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
@@ -36,15 +33,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-// Dynamic route - pages generated on-demand
-// Legal pages: privacy-policy, terms-and-conditions
-
 // Render content based on format
 function renderContent(page: { content: string; content_format: 'html' | 'markdown' }) {
   if (page.content_format === 'html') {
     return (
       <div
-        className="prose prose-slate max-w-none dark:prose-invert
+        className="
+          prose prose-slate max-w-none dark:prose-invert
+          overflow-x-hidden
           prose-headings:font-semibold prose-headings:text-[hsl(var(--foreground))]
           prose-p:text-[hsl(var(--foreground))]
           prose-a:text-[hsl(var(--primary))] prose-a:no-underline hover:prose-a:underline
@@ -53,7 +49,14 @@ function renderContent(page: { content: string; content_format: 'html' | 'markdo
           prose-ol:text-[hsl(var(--foreground))]
           prose-li:text-[hsl(var(--foreground))]
           prose-h2:mt-8 prose-h2:mb-4
-          prose-h3:mt-6 prose-h3:mb-3"
+          prose-h3:mt-6 prose-h3:mb-3
+          [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-md
+          [&_table]:w-full [&_table]:overflow-x-auto [&_table]:block [&_table]:whitespace-nowrap sm:[&_table]:whitespace-normal
+          [&_pre]:overflow-x-auto [&_pre]:text-sm
+          [&_iframe]:max-w-full [&_iframe]:w-full
+          [&_video]:max-w-full [&_video]:w-full
+          [&_div]:max-w-full
+        "
         dangerouslySetInnerHTML={{ __html: page.content }}
       />
     );
@@ -61,7 +64,7 @@ function renderContent(page: { content: string; content_format: 'html' | 'markdo
 
   // Basic markdown rendering
   return (
-    <div className="prose prose-slate max-w-none dark:prose-invert">
+    <div className="prose prose-slate max-w-none dark:prose-invert overflow-x-hidden">
       {page.content.split('\n').map((line, i) => {
         if (line.trim().startsWith('#')) {
           const level = line.match(/^#+/)?.[0].length || 1;
@@ -73,13 +76,13 @@ function renderContent(page: { content: string; content_format: 'html' | 'markdo
             </Tag>
           );
         }
-        
+
         return line.trim() ? (
-          <p key={i} className="mb-3 text-[hsl(var(--foreground))]">
+          <p key={i} className="text-[hsl(var(--foreground))]">
             {line}
           </p>
         ) : (
-          <div key={i} className="h-3" />
+          <br key={i} />
         );
       })}
     </div>
@@ -91,116 +94,41 @@ export default async function LegalPage({ params }: Props) {
   const page = await getPublishedStaticPageBySlug(slug);
 
   if (!page) {
-    return notFound();
+    notFound();
   }
 
   return (
     <div className="min-h-screen bg-[hsl(var(--background))]">
-      {/* Container */}
-      <section className="mx-auto w-full max-w-5xl px-6 py-12 sm:px-8 lg:px-16">
-        {/* Header */}
-        <header className="mb-10">
-          <div className="mb-4">
-            <a
-              href="/"
-              className="inline-flex items-center text-sm font-medium text-[hsl(var(--muted-foreground))] transition-colors hover:text-[hsl(var(--foreground))]"
-            >
-              <svg
-                className="mr-2 h-4 w-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 19l-7-7 7-7"
-                />
-              </svg>
-              Back to Home
-            </a>
-          </div>
-          
-          <h1 className="text-4xl font-bold tracking-tight text-[hsl(var(--foreground))] sm:text-5xl">
+      {/* Page header */}
+      <div className="border-b border-[hsl(var(--border))] bg-[hsl(var(--background))]">
+        <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
+          <h1 className="text-2xl font-bold tracking-tight text-[hsl(var(--foreground))] sm:text-3xl lg:text-4xl">
             {page.title}
           </h1>
-          
           {page.meta_description && (
-            <p className="mt-4 text-lg text-[hsl(var(--muted-foreground))]">
+            <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))] sm:text-base">
               {page.meta_description}
             </p>
           )}
-          
-          {/* Effective Date */}
-          <div className="mt-6 flex items-center gap-2 text-sm text-[hsl(var(--muted-foreground))]">
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-              />
-            </svg>
-            <span>
-              Effective Date: {new Date(page.updated_at).toLocaleDateString('en-US', { 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
+          {page.published_at && (
+            <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
+              Last updated:{' '}
+              {new Date(page.published_at).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
               })}
-            </span>
-          </div>
-        </header>
+            </p>
+          )}
+        </div>
+      </div>
 
-        {/* Content */}
-        <article className="border-t border-[hsl(var(--border))] pt-8">
+      {/* Page content */}
+      <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
+        <div className="overflow-x-hidden">
           {renderContent(page)}
-        </article>
-
-        {/* Footer */}
-        <footer className="mt-16 border-t border-[hsl(var(--border))] pt-8">
-          <div className="rounded-lg bg-[hsl(var(--muted))]/30 p-6">
-            <h3 className="font-semibold text-[hsl(var(--foreground))]">
-              Questions?
-            </h3>
-            <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">
-              If you have any questions about our {page.title.toLowerCase()}, please{' '}
-              <a
-                href="mailto:hello@desertcowgirl.com"
-                className="text-[hsl(var(--primary))] hover:underline"
-              >
-                contact us
-              </a>
-              .
-            </p>
-          </div>
-          
-          {/* Other Legal Pages */}
-          <div className="mt-6">
-            <p className="text-sm font-medium text-[hsl(var(--muted-foreground))]">
-              Other Legal Documents:
-            </p>
-            <div className="mt-2 flex flex-wrap gap-4">
-              {slug !== 'privacy-policy' && (
-                <a
-                  href="/legal/privacy-policy"
-                  className="text-sm text-[hsl(var(--primary))] hover:underline"
-                >
-                  Privacy Policy
-                </a>
-              )}
-              {slug !== 'terms-and-conditions' && (
-                <a
-                  href="/legal/terms-and-conditions"
-                  className="text-sm text-[hsl(var(--primary))] hover:underline"
-                >
-                  Terms & Conditions
-                </a>
-              )}
-            </div>
-          </div>
-        </footer>
-      </section>
+        </div>
+      </div>
     </div>
   );
 }
