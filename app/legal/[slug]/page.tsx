@@ -98,10 +98,10 @@ export default async function LegalPage({ params }: Props) {
   }
 
   return (
-    <div className="min-h-screen bg-[hsl(var(--background))]">
+    <div className="min-h-screen bg-[hsl(var(--background))] pt-20 md:pt-52">
       {/* Page header */}
-      <div className="border-b border-[hsl(var(--border))] bg-[hsl(var(--background))]">
-        <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
+      <div className="border-b border-[hsl(var(--border))]">
+        <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
           <h1 className="text-2xl font-bold tracking-tight text-[hsl(var(--foreground))] sm:text-3xl lg:text-4xl">
             {page.title}
           </h1>
@@ -124,7 +124,7 @@ export default async function LegalPage({ params }: Props) {
       </div>
 
       {/* Page content */}
-      <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
+      <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
         <div className="overflow-x-hidden">
           {renderContent(page)}
         </div>
