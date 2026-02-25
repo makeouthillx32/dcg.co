@@ -46,7 +46,7 @@ export function OrderGrid({ orders, selectedIds, onSelectChange, onRowClick }: O
             <th className="w-12 px-4 py-4">
               <input
                 type="checkbox"
-                className="h-4 w-4 rounded border-gray-300 text-black focus:ring-black"
+                className="h-4 w-4 rounded border-gray-300 text-black focus:ring-black cursor-pointer"
                 checked={orders.length > 0 && selectedIds.length === orders.length}
                 onChange={toggleAll}
               />
@@ -73,7 +73,7 @@ export function OrderGrid({ orders, selectedIds, onSelectChange, onRowClick }: O
               <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
                 <input
                   type="checkbox"
-                  className="h-4 w-4 rounded border-gray-300 text-black focus:ring-black"
+                  className="h-4 w-4 rounded border-gray-300 text-black focus:ring-black cursor-pointer"
                   checked={selectedIds.includes(order.id)}
                   onChange={(e: any) => toggleOne(e, order.id)}
                 />
@@ -132,7 +132,6 @@ export function OrderGrid({ orders, selectedIds, onSelectChange, onRowClick }: O
           onClose={() => setMenu(null)}
           onAction={(action, order) => {
             if (action === 'view') onRowClick(order);
-            // Parent handles print/ship/etc logic via state updates or server calls
             console.log(`Context Action: ${action} for ${order.order_number}`);
           }}
         />
