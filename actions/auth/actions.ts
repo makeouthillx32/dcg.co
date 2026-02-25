@@ -89,7 +89,7 @@ export const signUpAction = async (formData: FormData) => {
           guest_key: null, // members don't need a guest_key
           claimed_at: guestKey ? new Date().toISOString() : null,
         },
-        { onConflict: "email" } // if they ordered as guest before, upgrade that row
+        { onConflict: "auth_user_id" } // unique index exists on auth_user_id
       );
 
     if (customerError) {
