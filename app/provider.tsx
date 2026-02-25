@@ -11,6 +11,7 @@ import { defaultThemeId, getThemeById, getAvailableThemeIds } from "@/themes";
 import { dynamicFontManager } from "@/lib/dynamicFontManager";
 import { transitionTheme, smoothThemeToggle } from "@/utils/themeTransitions";
 import { authLogger } from "@/lib/authLogger";
+import { RoleProvider } from "@/lib/roleContext";
 
 interface EnhancedThemeContextType {
   themeType: "light" | "dark";
@@ -119,9 +120,12 @@ function InternalAuthProvider({
     }
     
   }, [session, isLoading, pathname, router]);
+
   return (
     <AuthContext.Provider value={{ user, session, isLoading, refreshSession }}>
-      <IOSSessionManager>{children}</IOSSessionManager>
+      <RoleProvider initialUserId={user?.id ?? null}>
+        <IOSSessionManager>{children}</IOSSessionManager>
+      </RoleProvider>
     </AuthContext.Provider>
   );
 }
