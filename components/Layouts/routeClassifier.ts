@@ -8,6 +8,8 @@ export interface RouteInfo {
   isDashboardPage: boolean;
   isProductsPage: boolean;
   isCollectionsPage: boolean;
+  /** CMS static pages under app/pages/[slug] */
+  isPagesRoute: boolean;
   isCheckoutRoute: boolean;
   isProfileMeRoute: boolean;
   /** Auth/off-pages render with NO header or footer — clean PWA shell */
@@ -52,10 +54,12 @@ export function classifyRoute(pathname: string): RouteInfo {
   const isDashboardPage = lower.startsWith("/dashboard");
   const isProductsPage = lower.startsWith("/products");
   const isCollectionsPage = lower.startsWith("/collections");
+  const isPagesRoute = lower.startsWith("/pages");   // app/pages/[slug] — static CMS pages
   const isCheckoutRoute = lower.startsWith("/checkout") || lower.startsWith("/cart");
   const isProfileMeRoute = lower.startsWith("/profile/me");
 
-  const isShopRoute = isHome || isProductsPage || isCollectionsPage || isCategoryPage;
+  const isShopRoute =
+    isHome || isProductsPage || isCollectionsPage || isCategoryPage || isPagesRoute;
   const useAppHeader = isCheckoutRoute || isProfileMeRoute;
 
   return {
@@ -64,6 +68,7 @@ export function classifyRoute(pathname: string): RouteInfo {
     isDashboardPage,
     isProductsPage,
     isCollectionsPage,
+    isPagesRoute,
     isCheckoutRoute,
     isProfileMeRoute,
     isAuthPage,
