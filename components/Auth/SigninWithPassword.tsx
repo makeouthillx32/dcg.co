@@ -131,8 +131,9 @@ export default function SigninWithPassword() {
           disabled={loading}
         />
 
+        {/* ✅ Fixed: was /auth/forgot-password (404), now points to /forgot-password */}
         <Link
-          href="/auth/forgot-password"
+          href="/forgot-password"
           className="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--sidebar-primary))] transition-colors duration-200"
         >
           Forgot Password?
