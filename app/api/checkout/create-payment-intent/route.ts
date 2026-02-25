@@ -31,8 +31,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // ── Detect authenticated member (server-side, trusted) ────────
+    // getUser() validates the JWT against Supabase Auth — cannot be
+    // spoofed by the client. If a session exists we use the account
+    // email as the canonical order email and link the order to the
+    // member's profile. Guests get null for both fields.
+    const {
+      data: { user: authUser },
+    } = await supabase.auth.getUser();
+
+    const authUserId = authUser?.id ?? null;
+    const authEmail = authUser?.email ?? null;
+
+    // Members: always use the account email. Guests: trust the form.
+    const resolvedEmail = authUserId ? (authEmail ?? email) : email;
+
+    console.log(
+      authUserId
+        ? `Member checkout — profile: ${authUserId}, email: ${resolvedEmail}`
+        : `Guest checkout — email: ${resolvedEmail}`
+    );
+
     // ── Guest key (set by middleware on first visit) ──────────────
-    // Used to link this order to a stable guest customer record.
+    // Members don't need it for order linkage, but we still read it
+    // so the cookie isn't left dangling on the order row.
     const guestKeyCookie = request.cookies.get("dcg_guest_key")?.value ?? null;
     const guestKey = guestKeyCookie ?? crypto.randomUUID(); // fallback if cookie somehow missing
     console.log("Guest key:", guestKey);
@@ -109,30 +131,33 @@ export async function POST(request: NextRequest) {
     const random = Math.random().toString(36).substring(2, 6).toUpperCase();
     const order_number = `DCG-${timestamp}-${random}`;
 
-    // ── Upsert guest customer ─────────────────────────────────────
-    // Find-or-create a customers row keyed to this guest_key + email.
-    // Non-fatal: order proceeds even if this fails.
+    // ── Upsert customer record ────────────────────────────────────
+    // For guests: find-or-create a customers row keyed to guest_key + email.
+    // For members: they already have a customers row from sign-up — skip this.
+    // Non-fatal either way: order proceeds even if this fails.
     let customerId: string | null = null;
-    try {
-      const { data: customerData, error: customerError } = await supabase.rpc(
-        "upsert_guest_customer",
-        {
-          p_guest_key: guestKey,
-          p_email: email.toLowerCase().trim(),
-          p_first_name: shipping_address.firstName ?? null,
-          p_last_name: shipping_address.lastName ?? null,
-          p_phone: phone ?? shipping_address.phone ?? null,
-          p_marketing: false,
+    if (!authUserId) {
+      try {
+        const { data: customerData, error: customerError } = await supabase.rpc(
+          "upsert_guest_customer",
+          {
+            p_guest_key: guestKey,
+            p_email: resolvedEmail.toLowerCase().trim(),
+            p_first_name: shipping_address.firstName ?? null,
+            p_last_name: shipping_address.lastName ?? null,
+            p_phone: phone ?? shipping_address.phone ?? null,
+            p_marketing: false,
+          }
+        );
+        if (customerError) {
+          console.error("upsert_guest_customer error:", customerError);
+        } else {
+          customerId = customerData as string;
+          console.log("Guest customer upserted:", customerId);
         }
-      );
-      if (customerError) {
-        console.error("upsert_guest_customer error:", customerError);
-      } else {
-        customerId = customerData as string;
-        console.log("Guest customer upserted:", customerId);
+      } catch (err) {
+        console.error("upsert_guest_customer threw:", err);
       }
-    } catch (err) {
-      console.error("upsert_guest_customer threw:", err);
     }
 
     // Create order
@@ -140,9 +165,10 @@ export async function POST(request: NextRequest) {
       .from("orders")
       .insert({
         order_number,
-        profile_id: null,        // Guest — no auth account
-        email,
-        customer_email: email,
+        profile_id: authUserId,          // member's profile id, null for guests
+        auth_user_id: authUserId,         // used by Orders Manager to classify as member
+        email: resolvedEmail,
+        customer_email: resolvedEmail,
         status: "pending",
         payment_status: "pending",
         subtotal_cents,
@@ -150,8 +176,8 @@ export async function POST(request: NextRequest) {
         tax_cents,
         total_cents,
         shipping_address,
-        customer_id: customerId, // ← links to customers table
-        guest_key: guestKey,     // ← mirrors the cookie for fast lookup
+        customer_id: customerId,          // populated for guests; null for members (they have profile_id)
+        guest_key: authUserId ? null : guestKey, // members don't need guest_key
       })
       .select()
       .single();
@@ -200,7 +226,8 @@ export async function POST(request: NextRequest) {
       metadata: {
         order_id: order.id,
         order_number: order.order_number,
-        guest_key: guestKey,
+        auth_user_id: authUserId ?? "",
+        guest_key: authUserId ? "" : guestKey,
         customer_id: customerId ?? "",
       },
       description: `Order ${order.order_number}`,
@@ -219,7 +246,7 @@ export async function POST(request: NextRequest) {
 
     console.log("Payment intent created:", paymentIntent.id);
 
-    // Link Stripe PI to order (customer_id + guest_key already set at insert)
+    // Link Stripe PI to order
     await supabase
       .from("orders")
       .update({ stripe_payment_intent_id: paymentIntent.id })

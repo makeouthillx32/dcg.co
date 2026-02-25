@@ -8,6 +8,7 @@ import { useCart } from "@/components/Layouts/overlays/cart/cart-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { createBrowserClient } from "@supabase/ssr";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator";
@@ -72,16 +73,57 @@ export default function CheckoutShippingPage() {
   // Tax calculation
   const [taxCents, setTaxCents] = useState(0);
   const [loadingTax, setLoadingTax] = useState(false);
-  
+
   // Promo discount (client-side only)
   const [promoDiscount, setPromoDiscount] = useState(0);
 
   // Load promo discount from sessionStorage (client-side only)
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const discount = parseInt(sessionStorage.getItem('discount_cents') || '0');
+    if (typeof window !== "undefined") {
+      const discount = parseInt(sessionStorage.getItem("discount_cents") || "0");
       setPromoDiscount(discount);
     }
+  }, []);
+
+  // ── Pre-fill contact info for authenticated members ────────────
+  useEffect(() => {
+    const supabase = createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) return;
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("first_name, last_name, email")
+        .eq("id", user.id)
+        .single();
+
+      const resolvedEmail = profile?.email ?? user.email ?? "";
+      const resolvedFirst = profile?.first_name ?? "";
+      const resolvedLast = profile?.last_name ?? "";
+
+      // Only set if fields are still empty (don't overwrite if user already typed)
+      setEmail((prev) => prev || resolvedEmail);
+      setShippingAddress((prev) => ({
+        ...prev,
+        firstName: prev.firstName || resolvedFirst,
+        lastName: prev.lastName || resolvedLast,
+      }));
+
+      // Sync to refs so handleContinue reads the right values
+      if (emailRef.current && !emailRef.current.value) {
+        emailRef.current.value = resolvedEmail;
+      }
+      if (firstNameRef.current && !firstNameRef.current.value) {
+        firstNameRef.current.value = resolvedFirst;
+      }
+      if (lastNameRef.current && !lastNameRef.current.value) {
+        lastNameRef.current.value = resolvedLast;
+      }
+    });
   }, []);
 
   // Redirect if cart is empty
@@ -98,34 +140,37 @@ export default function CheckoutShippingPage() {
         setEmail(emailRef.current.value);
       }
       if (firstNameRef.current && firstNameRef.current.value !== shippingAddress.firstName) {
-        setShippingAddress(prev => ({ ...prev, firstName: firstNameRef.current!.value }));
+        setShippingAddress((prev) => ({ ...prev, firstName: firstNameRef.current!.value }));
       }
       if (lastNameRef.current && lastNameRef.current.value !== shippingAddress.lastName) {
-        setShippingAddress(prev => ({ ...prev, lastName: lastNameRef.current!.value }));
+        setShippingAddress((prev) => ({ ...prev, lastName: lastNameRef.current!.value }));
       }
       if (address1Ref.current && address1Ref.current.value !== shippingAddress.address1) {
-        setShippingAddress(prev => ({ ...prev, address1: address1Ref.current!.value }));
+        setShippingAddress((prev) => ({ ...prev, address1: address1Ref.current!.value }));
       }
       if (address2Ref.current && address2Ref.current.value !== shippingAddress.address2) {
-        setShippingAddress(prev => ({ ...prev, address2: address2Ref.current!.value }));
+        setShippingAddress((prev) => ({ ...prev, address2: address2Ref.current!.value }));
       }
       if (cityRef.current && cityRef.current.value !== shippingAddress.city) {
-        setShippingAddress(prev => ({ ...prev, city: cityRef.current!.value }));
+        setShippingAddress((prev) => ({ ...prev, city: cityRef.current!.value }));
       }
       if (stateRef.current && stateRef.current.value !== shippingAddress.state) {
-        setShippingAddress(prev => ({ ...prev, state: stateRef.current!.value.toUpperCase() }));
+        setShippingAddress((prev) => ({
+          ...prev,
+          state: stateRef.current!.value.toUpperCase(),
+        }));
       }
       if (zipRef.current && zipRef.current.value !== shippingAddress.zip) {
-        setShippingAddress(prev => ({ ...prev, zip: zipRef.current!.value }));
+        setShippingAddress((prev) => ({ ...prev, zip: zipRef.current!.value }));
       }
       if (phoneRef.current && phoneRef.current.value !== shippingAddress.phone) {
-        setShippingAddress(prev => ({ ...prev, phone: phoneRef.current!.value }));
+        setShippingAddress((prev) => ({ ...prev, phone: phoneRef.current!.value }));
       }
     };
 
     // Check for autofill on mount and periodically
     const timer = setInterval(checkAutofill, 100);
-    
+
     // Also check after animations (browsers delay autofill)
     setTimeout(checkAutofill, 500);
     setTimeout(checkAutofill, 1000);
@@ -137,7 +182,7 @@ export default function CheckoutShippingPage() {
         attributes: true,
         childList: true,
         subtree: true,
-        attributeFilter: ['value']
+        attributeFilter: ["value"],
       });
     }
 
@@ -165,9 +210,9 @@ export default function CheckoutShippingPage() {
   const loadShippingRates = async () => {
     setLoadingRates(true);
     try {
-      const response = await fetch('/api/checkout/shipping-rates', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/checkout/shipping-rates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           subtotal_cents: subtotal,
           state: shippingAddress.state,
@@ -176,13 +221,13 @@ export default function CheckoutShippingPage() {
 
       const data = await response.json();
       setShippingRates(data.shipping_rates || []);
-      
+
       // Auto-select first rate
       if (data.shipping_rates && data.shipping_rates.length > 0) {
         setSelectedShippingRate(data.shipping_rates[0].id);
       }
     } catch (error) {
-      console.error('Failed to load shipping rates:', error);
+      console.error("Failed to load shipping rates:", error);
     } finally {
       setLoadingRates(false);
     }
@@ -190,14 +235,14 @@ export default function CheckoutShippingPage() {
 
   // Calculate tax
   const calculateTax = async () => {
-    const selectedRate = shippingRates.find(r => r.id === selectedShippingRate);
+    const selectedRate = shippingRates.find((r) => r.id === selectedShippingRate);
     if (!selectedRate) return;
 
     setLoadingTax(true);
     try {
-      const response = await fetch('/api/checkout/calculate-tax', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/checkout/calculate-tax", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           subtotal_cents: subtotal,
           shipping_cents: selectedRate.price_cents,
@@ -208,7 +253,7 @@ export default function CheckoutShippingPage() {
       const data = await response.json();
       setTaxCents(data.tax_cents || 0);
     } catch (error) {
-      console.error('Failed to calculate tax:', error);
+      console.error("Failed to calculate tax:", error);
     } finally {
       setLoadingTax(false);
     }
@@ -231,33 +276,43 @@ export default function CheckoutShippingPage() {
     };
 
     // Validation
-    if (!currentEmail || !currentShippingAddress.firstName || !currentShippingAddress.lastName ||
-        !currentShippingAddress.address1 || !currentShippingAddress.city ||
-        !currentShippingAddress.state || !currentShippingAddress.zip) {
-      alert('Please fill in all required fields');
+    if (
+      !currentEmail ||
+      !currentShippingAddress.firstName ||
+      !currentShippingAddress.lastName ||
+      !currentShippingAddress.address1 ||
+      !currentShippingAddress.city ||
+      !currentShippingAddress.state ||
+      !currentShippingAddress.zip
+    ) {
+      alert("Please fill in all required fields");
       return;
     }
 
     if (!selectedShippingRate) {
-      alert('Please select a shipping method');
+      alert("Please select a shipping method");
       return;
     }
 
     // Store in session storage (client-side only)
-    if (typeof window !== 'undefined') {
-      sessionStorage.setItem('checkout_email', currentEmail);
-      sessionStorage.setItem('checkout_shipping_address', JSON.stringify(currentShippingAddress));
-      sessionStorage.setItem('checkout_billing_address', JSON.stringify(
-        billingSameAsShipping ? currentShippingAddress : billingAddress
-      ));
-      sessionStorage.setItem('checkout_shipping_rate_id', selectedShippingRate);
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("checkout_email", currentEmail);
+      sessionStorage.setItem(
+        "checkout_shipping_address",
+        JSON.stringify(currentShippingAddress)
+      );
+      sessionStorage.setItem(
+        "checkout_billing_address",
+        JSON.stringify(billingSameAsShipping ? currentShippingAddress : billingAddress)
+      );
+      sessionStorage.setItem("checkout_shipping_rate_id", selectedShippingRate);
     }
 
     // Navigate to payment
-    router.push('/checkout/payment');
+    router.push("/checkout/payment");
   };
 
-  const selectedRate = shippingRates.find(r => r.id === selectedShippingRate);
+  const selectedRate = shippingRates.find((r) => r.id === selectedShippingRate);
   const shippingCents = selectedRate?.price_cents || 0;
   const totalCents = subtotal + shippingCents + taxCents - promoDiscount;
 
@@ -279,7 +334,7 @@ export default function CheckoutShippingPage() {
       {/* Main Content */}
       <div className="container mx-auto px-4 py-8 max-w-6xl">
         {/* Back Button */}
-        <Link 
+        <Link
           href="/checkout"
           className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-6"
         >
@@ -292,9 +347,7 @@ export default function CheckoutShippingPage() {
           <div className="lg:col-span-2 space-y-8">
             <div>
               <h1 className="text-3xl font-bold mb-2">Shipping Information</h1>
-              <p className="text-muted-foreground">
-                Where should we send your order?
-              </p>
+              <p className="text-muted-foreground">Where should we send your order?</p>
             </div>
 
             {/* Contact Information */}
@@ -308,7 +361,7 @@ export default function CheckoutShippingPage() {
                   name="email"
                   type="email"
                   autoComplete="email"
-                  defaultValue={email}
+                  value={email}
                   onBlur={(e) => setEmail(e.target.value)}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
@@ -320,7 +373,7 @@ export default function CheckoutShippingPage() {
             {/* Shipping Address */}
             <div className="space-y-4">
               <h2 className="text-xl font-semibold">Shipping Address</h2>
-              
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="firstName">First Name *</Label>
@@ -329,9 +382,13 @@ export default function CheckoutShippingPage() {
                     id="firstName"
                     name="given-name"
                     autoComplete="given-name"
-                    defaultValue={shippingAddress.firstName}
-                    onBlur={(e) => setShippingAddress(prev => ({ ...prev, firstName: e.target.value }))}
-                    onChange={(e) => setShippingAddress(prev => ({ ...prev, firstName: e.target.value }))}
+                    value={shippingAddress.firstName}
+                    onBlur={(e) =>
+                      setShippingAddress((prev) => ({ ...prev, firstName: e.target.value }))
+                    }
+                    onChange={(e) =>
+                      setShippingAddress((prev) => ({ ...prev, firstName: e.target.value }))
+                    }
                     required
                   />
                 </div>
@@ -342,9 +399,13 @@ export default function CheckoutShippingPage() {
                     id="lastName"
                     name="family-name"
                     autoComplete="family-name"
-                    defaultValue={shippingAddress.lastName}
-                    onBlur={(e) => setShippingAddress(prev => ({ ...prev, lastName: e.target.value }))}
-                    onChange={(e) => setShippingAddress(prev => ({ ...prev, lastName: e.target.value }))}
+                    value={shippingAddress.lastName}
+                    onBlur={(e) =>
+                      setShippingAddress((prev) => ({ ...prev, lastName: e.target.value }))
+                    }
+                    onChange={(e) =>
+                      setShippingAddress((prev) => ({ ...prev, lastName: e.target.value }))
+                    }
                     required
                   />
                 </div>
@@ -358,8 +419,12 @@ export default function CheckoutShippingPage() {
                   name="address-line1"
                   autoComplete="address-line1"
                   defaultValue={shippingAddress.address1}
-                  onBlur={(e) => setShippingAddress(prev => ({ ...prev, address1: e.target.value }))}
-                  onChange={(e) => setShippingAddress(prev => ({ ...prev, address1: e.target.value }))}
+                  onBlur={(e) =>
+                    setShippingAddress((prev) => ({ ...prev, address1: e.target.value }))
+                  }
+                  onChange={(e) =>
+                    setShippingAddress((prev) => ({ ...prev, address1: e.target.value }))
+                  }
                   placeholder="Street address"
                   required
                 />
@@ -373,8 +438,12 @@ export default function CheckoutShippingPage() {
                   name="address-line2"
                   autoComplete="address-line2"
                   defaultValue={shippingAddress.address2}
-                  onBlur={(e) => setShippingAddress(prev => ({ ...prev, address2: e.target.value }))}
-                  onChange={(e) => setShippingAddress(prev => ({ ...prev, address2: e.target.value }))}
+                  onBlur={(e) =>
+                    setShippingAddress((prev) => ({ ...prev, address2: e.target.value }))
+                  }
+                  onChange={(e) =>
+                    setShippingAddress((prev) => ({ ...prev, address2: e.target.value }))
+                  }
                 />
               </div>
 
@@ -387,8 +456,12 @@ export default function CheckoutShippingPage() {
                     name="address-level2"
                     autoComplete="address-level2"
                     defaultValue={shippingAddress.city}
-                    onBlur={(e) => setShippingAddress(prev => ({ ...prev, city: e.target.value }))}
-                    onChange={(e) => setShippingAddress(prev => ({ ...prev, city: e.target.value }))}
+                    onBlur={(e) =>
+                      setShippingAddress((prev) => ({ ...prev, city: e.target.value }))
+                    }
+                    onChange={(e) =>
+                      setShippingAddress((prev) => ({ ...prev, city: e.target.value }))
+                    }
                     required
                   />
                 </div>
@@ -400,8 +473,18 @@ export default function CheckoutShippingPage() {
                     name="address-level1"
                     autoComplete="address-level1"
                     defaultValue={shippingAddress.state}
-                    onBlur={(e) => setShippingAddress(prev => ({ ...prev, state: e.target.value.toUpperCase() }))}
-                    onChange={(e) => setShippingAddress(prev => ({ ...prev, state: e.target.value.toUpperCase() }))}
+                    onBlur={(e) =>
+                      setShippingAddress((prev) => ({
+                        ...prev,
+                        state: e.target.value.toUpperCase(),
+                      }))
+                    }
+                    onChange={(e) =>
+                      setShippingAddress((prev) => ({
+                        ...prev,
+                        state: e.target.value.toUpperCase(),
+                      }))
+                    }
                     placeholder="AZ"
                     maxLength={2}
                     required
@@ -418,8 +501,12 @@ export default function CheckoutShippingPage() {
                     name="postal-code"
                     autoComplete="postal-code"
                     defaultValue={shippingAddress.zip}
-                    onBlur={(e) => setShippingAddress(prev => ({ ...prev, zip: e.target.value }))}
-                    onChange={(e) => setShippingAddress(prev => ({ ...prev, zip: e.target.value }))}
+                    onBlur={(e) =>
+                      setShippingAddress((prev) => ({ ...prev, zip: e.target.value }))
+                    }
+                    onChange={(e) =>
+                      setShippingAddress((prev) => ({ ...prev, zip: e.target.value }))
+                    }
                     required
                   />
                 </div>
@@ -432,8 +519,12 @@ export default function CheckoutShippingPage() {
                     type="tel"
                     autoComplete="tel"
                     defaultValue={shippingAddress.phone}
-                    onBlur={(e) => setShippingAddress(prev => ({ ...prev, phone: e.target.value }))}
-                    onChange={(e) => setShippingAddress(prev => ({ ...prev, phone: e.target.value }))}
+                    onBlur={(e) =>
+                      setShippingAddress((prev) => ({ ...prev, phone: e.target.value }))
+                    }
+                    onChange={(e) =>
+                      setShippingAddress((prev) => ({ ...prev, phone: e.target.value }))
+                    }
                   />
                 </div>
               </div>
@@ -446,11 +537,14 @@ export default function CheckoutShippingPage() {
                   <Truck className="w-5 h-5" />
                   Shipping Method
                 </h2>
-                
+
                 <RadioGroup value={selectedShippingRate} onValueChange={setSelectedShippingRate}>
                   <div className="space-y-3">
                     {shippingRates.map((rate) => (
-                      <div key={rate.id} className="flex items-center space-x-3 p-4 border rounded-lg hover:bg-accent">
+                      <div
+                        key={rate.id}
+                        className="flex items-center space-x-3 p-4 border rounded-lg hover:bg-accent"
+                      >
                         <RadioGroupItem value={rate.id} id={rate.id} />
                         <Label htmlFor={rate.id} className="flex-1 cursor-pointer">
                           <div className="flex justify-between items-start">
@@ -462,7 +556,9 @@ export default function CheckoutShippingPage() {
                               </p>
                             </div>
                             <p className="font-semibold">
-                              {rate.price_cents === 0 ? 'FREE' : `$${(rate.price_cents / 100).toFixed(2)}`}
+                              {rate.price_cents === 0
+                                ? "FREE"
+                                : `$${(rate.price_cents / 100).toFixed(2)}`}
                             </p>
                           </div>
                         </Label>
@@ -476,8 +572,8 @@ export default function CheckoutShippingPage() {
             {/* Billing Address */}
             <div className="space-y-4">
               <div className="flex items-center space-x-2">
-                <Checkbox 
-                  id="billingSame" 
+                <Checkbox
+                  id="billingSame"
                   checked={billingSameAsShipping}
                   onCheckedChange={(checked) => setBillingSameAsShipping(checked as boolean)}
                 />
@@ -509,19 +605,18 @@ export default function CheckoutShippingPage() {
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Shipping</span>
                   <span>
-                    {selectedRate 
-                      ? selectedRate.price_cents === 0 
-                        ? 'FREE' 
+                    {selectedRate
+                      ? selectedRate.price_cents === 0
+                        ? "FREE"
                         : `$${(selectedRate.price_cents / 100).toFixed(2)}`
-                      : '--'
-                    }
+                      : "--"}
                   </span>
                 </div>
 
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Tax</span>
                   <span>
-                    {loadingTax ? 'Calculating...' : `$${(taxCents / 100).toFixed(2)}`}
+                    {loadingTax ? "Calculating..." : `$${(taxCents / 100).toFixed(2)}`}
                   </span>
                 </div>
               </div>
@@ -533,9 +628,9 @@ export default function CheckoutShippingPage() {
                 <span>${(totalCents / 100).toFixed(2)}</span>
               </div>
 
-              <Button 
+              <Button
                 type="button"
-                size="lg" 
+                size="lg"
                 className="w-full"
                 onClick={handleContinue}
                 disabled={!selectedShippingRate || loadingTax}
