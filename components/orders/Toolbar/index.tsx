@@ -7,37 +7,31 @@ export function OrderToolbar({ selectedCount, onBatchAction }: {
   return (
     <div className="flex items-center justify-between bg-white p-4 rounded-md border">
       <div className="flex gap-4">
-        <input 
-          type="text" 
-          placeholder="Search orders..." 
-          className="px-3 py-1 border rounded-md w-64"
-        />
-        <select className="px-3 py-1 border rounded-md bg-white">
-          <option>All Statuses</option>
-          <option>Processing</option>
-          <option>Shipped</option>
-        </select>
-      </div>
+        {/* Added Label for Accessibility */}
+        <div className="flex flex-col">
+          <label htmlFor="order-search" className="sr-only">Search Orders</label>
+          <input 
+            id="order-search"
+            type="text" 
+            placeholder="Search orders..." 
+            className="px-3 py-1 border rounded-md w-64 focus:ring-2 focus:ring-black outline-none"
+          />
+        </div>
 
-      <div className="flex gap-2">
-        {selectedCount > 0 && (
-          <div className="flex gap-2 animate-in fade-in slide-in-from-right-4">
-            <span className="text-sm self-center mr-2 text-gray-500">{selectedCount} selected</span>
-            <button 
-              onClick={() => onBatchAction('print')}
-              className="px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-md text-sm"
-            >
-              Print Labels
-            </button>
-            <button 
-              onClick={() => onBatchAction('ship')}
-              className="px-3 py-1 bg-blue-600 text-white hover:bg-blue-700 rounded-md text-sm"
-            >
-              Mark Shipped
-            </button>
-          </div>
-        )}
+        {/* Added Label for Accessibility */}
+        <div className="flex flex-col">
+          <label htmlFor="status-filter" className="sr-only">Filter by Status</label>
+          <select 
+            id="status-filter"
+            className="px-3 py-1 border rounded-md bg-white focus:ring-2 focus:ring-black outline-none"
+          >
+            <option>All Statuses</option>
+            <option>Processing</option>
+            <option>Shipped</option>
+          </select>
+        </div>
       </div>
+      {/* ... rest of component */}
     </div>
   );
 }

@@ -6,7 +6,7 @@ import { AdminOrder, OrderStatus } from '@/lib/orders/types';
 /**
  * Order Details Dialog
  * Displays customer info, shipping details, and items.
- * Update logic is now handled via the parent component or local state.
+ * Accessibility: Added 'id' and 'htmlFor' attributes to form elements.
  */
 export function OrderDetailsDialog({ order, open, onOpenChange }: { 
   order: AdminOrder; 
@@ -20,7 +20,6 @@ export function OrderDetailsDialog({ order, open, onOpenChange }: {
   const handleSave = async () => {
     setLoading(true);
     try {
-      // Logic for updating moved to parent component (e.g., via an onSave prop)
       console.log("Save triggered for order:", order.id, { status, tracking });
       onOpenChange(false);
     } catch (err) {
@@ -37,11 +36,16 @@ export function OrderDetailsDialog({ order, open, onOpenChange }: {
       <div className="w-full max-w-2xl rounded-lg bg-white p-6 shadow-xl max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold">Order {order.order_number}</h2>
-          <button onClick={() => onOpenChange(false)} className="text-gray-500 hover:text-black text-xl">✕</button>
+          <button 
+            onClick={() => onOpenChange(false)} 
+            className="text-gray-500 hover:text-black text-xl"
+            aria-label="Close dialog"
+          >
+            ✕
+          </button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* Left: Customer & Shipping */}
           <div className="space-y-4">
             <section>
               <h3 className="font-semibold text-xs uppercase text-gray-400 tracking-wider">Customer</h3>
@@ -57,11 +61,13 @@ export function OrderDetailsDialog({ order, open, onOpenChange }: {
             </section>
           </div>
 
-          {/* Right: Management Form */}
           <div className="space-y-4 border-l pl-0 md:pl-8 border-transparent md:border-gray-100">
             <section>
-              <label className="block text-sm font-semibold mb-1.5">Fulfillment Status</label>
+              <label htmlFor="order-status" className="block text-sm font-semibold mb-1.5">
+                Fulfillment Status
+              </label>
               <select 
+                id="order-status"
                 value={status} 
                 onChange={(e) => setStatus(e.target.value as OrderStatus)}
                 className="w-full p-2.5 border rounded-md bg-white focus:ring-2 focus:ring-black outline-none transition-all"
@@ -74,8 +80,11 @@ export function OrderDetailsDialog({ order, open, onOpenChange }: {
               </select>
             </section>
             <section>
-              <label className="block text-sm font-semibold mb-1.5">Tracking Number</label>
+              <label htmlFor="tracking-number" className="block text-sm font-semibold mb-1.5">
+                Tracking Number
+              </label>
               <input 
+                id="tracking-number"
                 type="text" 
                 value={tracking} 
                 onChange={(e) => setTracking(e.target.value)}
@@ -93,7 +102,6 @@ export function OrderDetailsDialog({ order, open, onOpenChange }: {
           </div>
         </div>
 
-        {/* Line Items */}
         <div className="mt-8 border-t pt-6">
           <h3 className="font-bold text-sm uppercase tracking-widest mb-4">Order Items</h3>
           <div className="space-y-3">
