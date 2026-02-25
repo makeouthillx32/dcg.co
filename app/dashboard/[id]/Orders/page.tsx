@@ -1,16 +1,24 @@
-import { getAdminOrders } from '@/lib/orders/admin';
+'use client';
+
+import React, { Suspense } from 'react';
+import Breadcrumb from "@/components/Breadcrumbs/dashboard";
 import { OrdersManager } from '@/components/orders';
+import { OrdersSkeleton } from '@/components/orders/skeleton';
 
-export default async function OrdersPage() {
-  // Server-side gate and initial fetch
-  const initialOrders = await getAdminOrders();
-
+/**
+ * Orders Management Page
+ * Following the Documents page pattern: Breadcrumbs + Suspense + Manager
+ */
+export default function OrdersPage() {
   return (
-    <div className="flex-1 space-y-4 p-8 pt-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-3xl font-bold tracking-tight">Orders</h2>
+    <>
+      <Breadcrumb pageName="Orders" />
+      
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <Suspense fallback={<OrdersSkeleton />}>
+          <OrdersManager initialOrders={[]} />
+        </Suspense>
       </div>
-      <OrdersManager initialOrders={initialOrders} />
-    </div>
+    </>
   );
 }
