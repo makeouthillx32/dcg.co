@@ -20,7 +20,7 @@ export default function CreateLandingSectionModal({
     position: 1,
     type: "static_html",
     is_active: true,
-    config: { slug: "landing-qr-download" },
+    config: { slug: "" },
   };
 
   return (

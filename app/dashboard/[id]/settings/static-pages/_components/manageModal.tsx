@@ -14,6 +14,16 @@ export function normalizeSlug(input: string) {
     .toLowerCase();
 }
 
+function slugFromTitle(title: string) {
+  return title
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
 export type CreateFormValue = {
   title: string;
   slug: string;
@@ -40,6 +50,15 @@ export function CreatePageModal({
 }) {
   const normalized = normalizeSlug(value.slug);
   const slugTaken = normalized ? existingSlugs.has(normalized) : false;
+
+  function handleTitleChange(title: string) {
+    const next: CreateFormValue = { ...value, title };
+    // Auto-derive slug from title only if user hasn't manually edited it
+    if (!value.slug || value.slug === slugFromTitle(value.title)) {
+      next.slug = slugFromTitle(title);
+    }
+    onChange(next);
+  }
 
   return (
     <div
@@ -76,7 +95,7 @@ export function CreatePageModal({
                 type="text"
                 className="w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm text-[hsl(var(--foreground))] focus:border-[hsl(var(--ring))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))]/20"
                 value={value.title}
-                onChange={(e) => onChange({ ...value, title: e.target.value })}
+                onChange={(e) => handleTitleChange(e.target.value)}
                 placeholder="Terms & Conditions"
               />
             </div>
@@ -104,7 +123,7 @@ export function CreatePageModal({
               <label className="block text-sm font-medium text-[hsl(var(--foreground))]">
                 Slug
                 <span className="ml-2 text-xs text-[hsl(var(--muted-foreground))]">
-                  Example: lookbook/summer-2026
+                  Auto-generated from title — edit to override
                 </span>
               </label>
               <input
@@ -112,7 +131,7 @@ export function CreatePageModal({
                 className="w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm text-[hsl(var(--foreground))] focus:border-[hsl(var(--ring))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))]/20"
                 value={value.slug}
                 onChange={(e) => onChange({ ...value, slug: e.target.value })}
-                placeholder="promo"
+                placeholder="auto-generated"
               />
               {slugTaken ? (
                 <p className="text-xs text-[hsl(var(--destructive))]">

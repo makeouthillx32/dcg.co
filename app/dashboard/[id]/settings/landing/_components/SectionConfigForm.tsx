@@ -24,19 +24,28 @@ interface CategoryOption {
   product_count?: number;
 }
 
+interface StaticPageOption {
+  id: string;
+  slug: string;
+  title: string;
+  is_published: boolean;
+}
+
 export function SectionConfigForm({ type, config, onChange }: SectionConfigFormProps) {
   const [collections, setCollections] = useState<CollectionOption[]>([]);
   const [categories, setCategories] = useState<CategoryOption[]>([]);
+  const [staticPages, setStaticPages] = useState<StaticPageOption[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Fetch collections and categories on mount
+  // Fetch collections, categories, and static pages on mount
   useEffect(() => {
     async function fetchData() {
       setLoading(true);
       try {
-        const [collectionsRes, categoriesRes] = await Promise.all([
+        const [collectionsRes, categoriesRes, staticPagesRes] = await Promise.all([
           fetch('/api/collections'),
-          fetch('/api/categories')
+          fetch('/api/categories'),
+          fetch('/api/static-pages/slugs'),
         ]);
         
         if (collectionsRes.ok) {
@@ -47,6 +56,11 @@ export function SectionConfigForm({ type, config, onChange }: SectionConfigFormP
         if (categoriesRes.ok) {
           const categoriesData = await categoriesRes.json();
           setCategories(categoriesData.data || categoriesData.categories || []);
+        }
+
+        if (staticPagesRes.ok) {
+          const staticPagesData = await staticPagesRes.json();
+          setStaticPages(staticPagesData.data || []);
         }
       } catch (error) {
         console.error('Failed to fetch options:', error);
@@ -277,14 +291,29 @@ export function SectionConfigForm({ type, config, onChange }: SectionConfigFormP
       <>
         <div className="form-field">
           <label className="form-label">Page Slug</label>
-          <input
-            type="text"
-            value={config.slug || ''}
-            onChange={(e) => updateField('slug', e.target.value)}
-            className="form-input"
-            placeholder="landing-qr-download"
-          />
-          <p className="form-hint">The slug of the static page to embed</p>
+          {staticPages.length > 0 ? (
+            <select
+              value={config.slug || ''}
+              onChange={(e) => updateField('slug', e.target.value)}
+              className="form-select"
+            >
+              <option value="">— Select a page —</option>
+              {staticPages.map((page) => (
+                <option key={page.id} value={page.slug}>
+                  {page.title} ({page.slug}){!page.is_published ? ' [unpublished]' : ''}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input
+              type="text"
+              value={config.slug || ''}
+              onChange={(e) => updateField('slug', e.target.value)}
+              className="form-input"
+              placeholder="landing-qr-download"
+            />
+          )}
+          <p className="form-hint">The static page to embed on the landing page</p>
         </div>
 
         <div className="form-field">
