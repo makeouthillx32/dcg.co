@@ -1,4 +1,4 @@
-// app/pages/[slug]/page.tsx
+// app/legal/[slug]/page.tsx
 import { notFound } from 'next/navigation';
 import { Metadata } from 'next';
 import { getPublishedStaticPageBySlug } from '@/lib/landing/static-pages.server';
@@ -18,19 +18,18 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   if (!page) {
     return {
-      title: 'Page Not Found',
+      title: 'Legal Document Not Found',
     };
   }
 
   return {
-    title: page.title,
-    description: page.meta_description || undefined,
+    title: `${page.title} | Desert Cowgirl`,
+    description: page.meta_description || `${page.title} for Desert Cowgirl boutique`,
     keywords: page.meta_keywords || undefined,
-    openGraph: page.og_image_url
-      ? {
-          images: [page.og_image_url],
-        }
-      : undefined,
+    robots: {
+      index: true,
+      follow: true,
+    },
   };
 }
 
@@ -42,13 +41,15 @@ function renderContent(page: { content: string; content_format: 'html' | 'markdo
         className="
           prose prose-slate max-w-none dark:prose-invert
           overflow-x-hidden
-          prose-headings:text-[hsl(var(--foreground))]
+          prose-headings:font-semibold prose-headings:text-[hsl(var(--foreground))]
           prose-p:text-[hsl(var(--foreground))]
-          prose-a:text-[hsl(var(--primary))]
-          prose-strong:text-[hsl(var(--foreground))]
+          prose-a:text-[hsl(var(--primary))] prose-a:no-underline hover:prose-a:underline
+          prose-strong:text-[hsl(var(--foreground))] prose-strong:font-semibold
           prose-ul:text-[hsl(var(--foreground))]
           prose-ol:text-[hsl(var(--foreground))]
           prose-li:text-[hsl(var(--foreground))]
+          prose-h2:mt-8 prose-h2:mb-4
+          prose-h3:mt-6 prose-h3:mb-3
           [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-md
           [&_table]:w-full [&_table]:overflow-x-auto [&_table]:block [&_table]:whitespace-nowrap sm:[&_table]:whitespace-normal
           [&_pre]:overflow-x-auto [&_pre]:text-sm
@@ -70,7 +71,7 @@ function renderContent(page: { content: string; content_format: 'html' | 'markdo
           const text = line.replace(/^#+\s*/, '');
           const Tag = `h${level}` as keyof JSX.IntrinsicElements;
           return (
-            <Tag key={i} className="text-[hsl(var(--foreground))]">
+            <Tag key={i} className="font-semibold text-[hsl(var(--foreground))]">
               {text}
             </Tag>
           );
@@ -88,7 +89,7 @@ function renderContent(page: { content: string; content_format: 'html' | 'markdo
   );
 }
 
-export default async function StaticPage({ params }: Props) {
+export default async function LegalPage({ params }: Props) {
   const { slug } = await params;
   const page = await getPublishedStaticPageBySlug(slug);
 
@@ -97,9 +98,6 @@ export default async function StaticPage({ params }: Props) {
   }
 
   return (
-    // pt accounts for the sticky shop header:
-    //   mobile  → single row ~5rem  → pt-20 (5rem)
-    //   desktop → logo + nav rows ~13rem → md:pt-52
     <div className="min-h-screen bg-[hsl(var(--background))] pt-20 md:pt-52">
       {/* Page header */}
       <div className="border-b border-[hsl(var(--border))]">
@@ -110,6 +108,16 @@ export default async function StaticPage({ params }: Props) {
           {page.meta_description && (
             <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))] sm:text-base">
               {page.meta_description}
+            </p>
+          )}
+          {page.published_at && (
+            <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
+              Last updated:{' '}
+              {new Date(page.published_at).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+              })}
             </p>
           )}
         </div>
