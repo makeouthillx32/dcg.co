@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
     const random = Math.random().toString(36).substring(2, 6).toUpperCase();
     const order_number = `DCG-${timestamp}-${random}`;
 
-    // Create order with ONLY fields that exist
+    // Create order
     const { data: order, error: orderError } = await supabase
       .from('orders')
       .insert({
@@ -134,14 +134,15 @@ export async function POST(request: NextRequest) {
     console.log('Order created:', order.id);
 
     // Create order items
+    // FIX: column is `product_title` (NOT NULL), not `title`
     const orderItems = cartItems.map(item => ({
       order_id: order.id,
       product_id: item.product_id,
       variant_id: item.variant_id,
       quantity: item.quantity,
       price_cents: item.price_cents,
-      title: item.products?.title || 'Product',
-      variant_title: item.product_variants?.title || null,
+      product_title: item.products?.title || 'Product',
+      variant_title: item.product_variants?.title || 'Default',
       sku: item.product_variants?.sku || null,
     }));
 
@@ -151,8 +152,13 @@ export async function POST(request: NextRequest) {
 
     if (itemsError) {
       console.error('Order items error:', itemsError);
-      // Don't fail - order is created, items can be fixed later
+      return NextResponse.json(
+        { error: 'Failed to create order items', details: itemsError.message },
+        { status: 500 }
+      );
     }
+
+    console.log('Order items created:', orderItems.length);
 
     // Create Stripe Payment Intent
     const paymentIntent = await stripe.paymentIntents.create({
@@ -181,7 +187,7 @@ export async function POST(request: NextRequest) {
 
     console.log('Payment intent created:', paymentIntent.id);
 
-    // Try to update order with payment intent (might fail if columns don't exist)
+    // Update order with Stripe payment intent ID
     await supabase
       .from('orders')
       .update({
@@ -215,3 +221,5 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+// Also added a console.log('Order items created:', orderItems.length) after the successful insert so you can confirm in Vercel logs that items are going through.
+// After deploying, do a fresh test checkout — you should see order_items populate and the Orders Manager will have real line item data to display.
