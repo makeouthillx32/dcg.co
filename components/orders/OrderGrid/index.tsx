@@ -1,13 +1,11 @@
 'use client';
 
 // components/orders/OrderGrid/index.tsx
-// Responsive: card list on mobile, table on md+
 
 import React, { useState } from 'react';
 import { AdminOrder, FulfillmentStatus } from '@/lib/orders/types';
-import { PaymentIcon } from '../icons';
 import { OrderContextMenu } from '../ContextMenu';
-import { MoreHorizontal, Printer, CheckCircle2 } from 'lucide-react';
+import { MoreHorizontal, Printer, CheckCircle2, User, Star } from 'lucide-react';
 
 interface OrderGridProps {
   orders: AdminOrder[];
@@ -43,6 +41,30 @@ function FulfillmentBadge({ status }: { status: FulfillmentStatus }) {
   );
 }
 
+// ── Customer type badge ────────────────────────────────────────────
+function CustomerTypeBadge({ order }: { order: AdminOrder }) {
+  if (order.is_member) {
+    return (
+      <span
+        title={`Member · ${order.points_earned} pts earned`}
+        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold border bg-yellow-50 text-yellow-700 border-yellow-200"
+      >
+        <Star className="w-2.5 h-2.5 fill-yellow-500 text-yellow-500" />
+        Member
+      </span>
+    );
+  }
+  return (
+    <span
+      title="Guest order"
+      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold border bg-gray-50 text-gray-500 border-gray-200"
+    >
+      <User className="w-2.5 h-2.5" />
+      Guest
+    </span>
+  );
+}
+
 // ── Mobile card ────────────────────────────────────────────────────
 function OrderCard({
   order, isSelected, onSelect, onRowClick, onFulfill, onPrint,
@@ -64,8 +86,8 @@ function OrderCard({
       }`}
       onClick={onRowClick}
     >
-      <div className="flex items-start justify-between gap-2">
-        {/* Left: checkbox + order # */}
+      {/* Top row: checkbox + order # + total */}
+      <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <input
             type="checkbox"
@@ -74,17 +96,16 @@ function OrderCard({
             onClick={(e) => e.stopPropagation()}
             className="h-4 w-4 rounded border-gray-300 shrink-0"
           />
-          <div className="font-mono font-bold text-gray-900 truncate">
-            #{order.order_number}
-          </div>
+          <span className="font-mono font-bold text-gray-900 truncate">#{order.order_number}</span>
+          <CustomerTypeBadge order={order} />
         </div>
-        {/* Right: total */}
-        <div className="font-mono font-bold text-gray-900 shrink-0">
+        <span className="font-mono font-bold text-gray-900 shrink-0">
           ${(order.total_cents / 100).toFixed(2)}
-        </div>
+        </span>
       </div>
 
-      <div className="mt-2 space-y-1">
+      {/* Customer info */}
+      <div className="mt-2 space-y-0.5">
         <div className="text-sm text-gray-700 truncate">{order.email}</div>
         {customerName && (
           <div className="text-xs text-gray-400 uppercase tracking-tight">{customerName}</div>
@@ -96,8 +117,9 @@ function OrderCard({
         </div>
       </div>
 
+      {/* Bottom row: badges + quick actions */}
       <div className="mt-3 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <FulfillmentBadge status={order.fulfillment_status ?? 'unfulfilled'} />
           <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${
             order.payment_status === 'paid'
@@ -106,23 +128,20 @@ function OrderCard({
           }`}>
             {order.payment_status?.toUpperCase()}
           </span>
+          {/* Points pill on mobile */}
+          {order.is_member && order.points_earned > 0 && (
+            <span className="text-[10px] text-yellow-600 font-semibold">+{order.points_earned} pts</span>
+          )}
         </div>
 
-        {/* Quick actions */}
         <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-          <button
-            title="Print shipping slip"
-            onClick={onPrint}
-            className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors"
-          >
+          <button title="Print slip" onClick={onPrint}
+            className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors">
             <Printer className="w-4 h-4" />
           </button>
           {order.fulfillment_status !== 'fulfilled' && (
-            <button
-              title="Mark fulfilled"
-              onClick={onFulfill}
-              className="p-1.5 rounded hover:bg-green-50 text-gray-400 hover:text-green-700 transition-colors"
-            >
+            <button title="Mark fulfilled" onClick={onFulfill}
+              className="p-1.5 rounded hover:bg-green-50 text-gray-400 hover:text-green-700 transition-colors">
               <CheckCircle2 className="w-4 h-4" />
             </button>
           )}
@@ -184,7 +203,7 @@ export function OrderGrid({ orders, selectedIds, onSelectChange, onRowClick, onF
 
   return (
     <div className="relative">
-      {/* ── MOBILE: Card list (hidden md+) ── */}
+      {/* ── MOBILE cards ── */}
       <div className="md:hidden space-y-3">
         {orders.map((order) => (
           <OrderCard
@@ -199,15 +218,13 @@ export function OrderGrid({ orders, selectedIds, onSelectChange, onRowClick, onF
         ))}
       </div>
 
-      {/* ── DESKTOP: Table (hidden below md) ── */}
+      {/* ── DESKTOP table ── */}
       <div className="hidden md:block overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
         <table className="w-full text-left text-sm text-gray-500">
           <thead className="bg-gray-50 text-xs uppercase text-gray-700">
             <tr>
               <th className="w-12 px-4 py-3">
-                <input
-                  type="checkbox"
-                  title="Select all"
+                <input type="checkbox" title="Select all"
                   className="h-4 w-4 rounded border-gray-300 cursor-pointer"
                   checked={orders.length > 0 && selectedIds.length === orders.length}
                   onChange={toggleAll}
@@ -219,7 +236,7 @@ export function OrderGrid({ orders, selectedIds, onSelectChange, onRowClick, onF
               <th className="px-4 py-3 font-semibold">Fulfillment</th>
               <th className="px-4 py-3 font-semibold">Payment</th>
               <th className="px-4 py-3 font-semibold text-right">Total</th>
-              <th className="px-4 py-3 text-center w-24">Actions</th>
+              <th className="px-4 py-3 text-center w-28">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -240,8 +257,7 @@ export function OrderGrid({ orders, selectedIds, onSelectChange, onRowClick, onF
                 >
                   {/* Checkbox */}
                   <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                    <input
-                      type="checkbox"
+                    <input type="checkbox"
                       className="h-4 w-4 rounded border-gray-300 cursor-pointer"
                       checked={isSelected}
                       onChange={() => toggleOne(order.id)}
@@ -260,12 +276,22 @@ export function OrderGrid({ orders, selectedIds, onSelectChange, onRowClick, onF
                     })}
                   </td>
 
-                  {/* Customer */}
+                  {/* Customer — with type badge */}
                   <td className="px-4 py-3">
-                    <div className="font-medium text-gray-900 truncate max-w-[160px]">{order.email}</div>
-                    {customerName && (
-                      <div className="text-[10px] text-gray-400 uppercase tracking-tight">{customerName}</div>
-                    )}
+                    <div className="flex flex-col gap-0.5">
+                      <div className="flex items-center gap-1.5">
+                        <CustomerTypeBadge order={order} />
+                        {order.is_member && order.points_earned > 0 && (
+                          <span className="text-[10px] text-yellow-600 font-semibold">
+                            +{order.points_earned} pts
+                          </span>
+                        )}
+                      </div>
+                      <span className="font-medium text-gray-900 truncate max-w-[160px]">{order.email}</span>
+                      {customerName && (
+                        <span className="text-[10px] text-gray-400 uppercase tracking-tight">{customerName}</span>
+                      )}
+                    </div>
                   </td>
 
                   {/* Fulfillment */}
@@ -292,11 +318,8 @@ export function OrderGrid({ orders, selectedIds, onSelectChange, onRowClick, onF
                   {/* Actions */}
                   <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center justify-center gap-1">
-                      <button
-                        title="Print shipping slip"
-                        onClick={() => onPrint(order)}
-                        className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors"
-                      >
+                      <button title="Print slip" onClick={() => onPrint(order)}
+                        className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors">
                         <Printer className="w-4 h-4" />
                       </button>
                       {order.fulfillment_status !== 'fulfilled' && (
@@ -325,7 +348,6 @@ export function OrderGrid({ orders, selectedIds, onSelectChange, onRowClick, onF
         </table>
       </div>
 
-      {/* Context menu */}
       {menu && (
         <OrderContextMenu
           {...menu}

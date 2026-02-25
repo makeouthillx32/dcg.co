@@ -22,9 +22,9 @@ export function OrdersManager({ initialOrders }: OrdersManagerProps) {
   // Filters
   const [fulfillmentFilter, setFulfillmentFilter] = useState<FulfillmentStatus | 'all'>('all');
   const [paymentFilter, setPaymentFilter] = useState<PaymentStatus | 'all'>('all');
+  const [customerTypeFilter, setCustomerTypeFilter] = useState<'all' | 'member' | 'guest'>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Optimistic fulfill — updates local state immediately
   const handleFulfill = useCallback(async (order: AdminOrder, trackingNumber?: string) => {
     const res = await fetch(`/api/orders/${order.id}/fulfill`, {
       method: 'PATCH',
@@ -35,7 +35,6 @@ export function OrdersManager({ initialOrders }: OrdersManagerProps) {
       const json = await res.json().catch(() => ({}));
       throw new Error(json.error ?? 'Failed to mark fulfilled');
     }
-    // Optimistic update
     setOrders((prev) =>
       prev.map((o) =>
         o.id === order.id
@@ -43,7 +42,6 @@ export function OrdersManager({ initialOrders }: OrdersManagerProps) {
           : o
       )
     );
-    // Sync editing dialog if open
     setEditingOrder((prev) =>
       prev?.id === order.id
         ? { ...prev, fulfillment_status: 'fulfilled', tracking_number: trackingNumber ?? prev.tracking_number }
@@ -60,8 +58,6 @@ export function OrdersManager({ initialOrders }: OrdersManagerProps) {
   }, []);
 
   const handleBatchPrint = useCallback(() => {
-    if (selectedIds.length === 0) return;
-    // For batch: open print with first selected, chain is handled in the browser
     const first = orders.find((o) => selectedIds.includes(o.id));
     if (first) handlePrint(first);
   }, [selectedIds, orders, handlePrint]);
@@ -74,11 +70,12 @@ export function OrdersManager({ initialOrders }: OrdersManagerProps) {
     setSelectedIds([]);
   }, [selectedIds, orders, handleFulfill]);
 
-  // Filtered + searched orders
   const filteredOrders = useMemo(() => {
     return orders.filter((o) => {
       if (fulfillmentFilter !== 'all' && o.fulfillment_status !== fulfillmentFilter) return false;
       if (paymentFilter !== 'all' && o.payment_status !== paymentFilter) return false;
+      if (customerTypeFilter === 'member' && !o.is_member) return false;
+      if (customerTypeFilter === 'guest' && !o.is_guest) return false;
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const name = [o.customer_first_name, o.customer_last_name].join(' ').toLowerCase();
@@ -90,11 +87,10 @@ export function OrdersManager({ initialOrders }: OrdersManagerProps) {
       }
       return true;
     });
-  }, [orders, fulfillmentFilter, paymentFilter, searchQuery]);
+  }, [orders, fulfillmentFilter, paymentFilter, customerTypeFilter, searchQuery]);
 
   return (
     <>
-      {/* Print overlay — hidden on screen, visible only when printing */}
       {printOrder && (
         <div className="hidden print:block">
           <ShippingSlip order={printOrder} />
@@ -106,9 +102,11 @@ export function OrdersManager({ initialOrders }: OrdersManagerProps) {
           selectedCount={selectedIds.length}
           fulfillmentFilter={fulfillmentFilter}
           paymentFilter={paymentFilter}
+          customerTypeFilter={customerTypeFilter}
           searchQuery={searchQuery}
           onFulfillmentFilter={setFulfillmentFilter}
           onPaymentFilter={setPaymentFilter}
+          onCustomerTypeFilter={setCustomerTypeFilter}
           onSearch={setSearchQuery}
           onBatchAction={(action) => {
             if (action === 'print') handleBatchPrint();

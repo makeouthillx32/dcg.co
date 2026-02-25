@@ -4,13 +4,13 @@
 
 import { useState } from 'react';
 import { AdminOrder, FulfillmentStatus } from '@/lib/orders/types';
-import { X, Printer, CheckCircle2, Package, Truck, MapPin, User, StickyNote } from 'lucide-react';
+import { X, Printer, CheckCircle2, Package, Truck, MapPin, Star, User } from 'lucide-react';
 
 function gramsToOz(g: number) {
   return Math.round((g / 28.3495) * 100) / 100;
 }
 
-interface OrderDetailsDialogProps {
+interface Props {
   order: AdminOrder;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -18,15 +18,7 @@ interface OrderDetailsDialogProps {
   onPrint: (order: AdminOrder) => void;
 }
 
-const FULFILLMENT_LABEL: Record<FulfillmentStatus, string> = {
-  unfulfilled: 'Unfulfilled',
-  partial:     'Partial',
-  fulfilled:   'Fulfilled',
-  returned:    'Returned',
-  cancelled:   'Cancelled',
-};
-
-export function OrderDetailsDialog({ order, open, onOpenChange, onFulfill, onPrint }: OrderDetailsDialogProps) {
+export function OrderDetailsDialog({ order, open, onOpenChange, onFulfill, onPrint }: Props) {
   const [trackingNumber, setTrackingNumber] = useState(order.tracking_number ?? '');
   const [extraWeightOz, setExtraWeightOz] = useState('');
   const [fulfilling, setFulfilling] = useState(false);
@@ -39,7 +31,7 @@ export function OrderDetailsDialog({ order, open, onOpenChange, onFulfill, onPri
     ? [addr.firstName, addr.lastName].filter(Boolean).join(' ')
     : [order.customer_first_name, order.customer_last_name].filter(Boolean).join(' ') || order.email;
 
-  // Weight calculation
+  // Weight
   const totalWeightGrams = order.items.reduce(
     (sum, item) => sum + (item.weight_grams ?? 0) * item.quantity, 0
   );
@@ -62,15 +54,29 @@ export function OrderDetailsDialog({ order, open, onOpenChange, onFulfill, onPri
     }
   };
 
+  const isFulfilled = fulfilled || order.fulfillment_status === 'fulfilled';
+
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4">
       <div className="w-full sm:max-w-2xl bg-white rounded-t-2xl sm:rounded-xl shadow-2xl max-h-[92vh] overflow-y-auto">
 
-        {/* Header */}
+        {/* ── Header ── */}
         <div className="flex items-center justify-between px-5 py-4 border-b sticky top-0 bg-white z-10">
           <div>
-            <div className="font-black text-lg">#{order.order_number}</div>
-            <div className="text-xs text-gray-400">
+            <div className="flex items-center gap-2">
+              <span className="font-black text-lg">#{order.order_number}</span>
+              {/* Identity badge */}
+              {order.is_member ? (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold border bg-yellow-50 text-yellow-700 border-yellow-200">
+                  <Star className="w-3 h-3 fill-yellow-500 text-yellow-500" /> Member
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold border bg-gray-50 text-gray-500 border-gray-200">
+                  <User className="w-3 h-3" /> Guest
+                </span>
+              )}
+            </div>
+            <div className="text-xs text-gray-400 mt-0.5">
               {new Date(order.created_at).toLocaleDateString('en-US', {
                 weekday: 'short', year: 'numeric', month: 'short', day: 'numeric',
               })}
@@ -84,11 +90,8 @@ export function OrderDetailsDialog({ order, open, onOpenChange, onFulfill, onPri
               <Printer className="w-4 h-4" />
               <span className="hidden sm:inline">Print Slip</span>
             </button>
-            <button
-              onClick={() => onOpenChange(false)}
-              className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-              aria-label="Close"
-            >
+            <button onClick={() => onOpenChange(false)}
+              className="p-2 rounded-lg hover:bg-gray-100 transition-colors" aria-label="Close">
               <X className="w-5 h-5" />
             </button>
           </div>
@@ -96,14 +99,14 @@ export function OrderDetailsDialog({ order, open, onOpenChange, onFulfill, onPri
 
         <div className="p-5 space-y-5">
 
-          {/* Status badges */}
+          {/* ── Status row ── */}
           <div className="flex flex-wrap gap-2">
             <span className={`text-xs font-bold px-3 py-1 rounded-full border ${
-              fulfilled || order.fulfillment_status === 'fulfilled'
+              isFulfilled
                 ? 'bg-green-50 text-green-700 border-green-200'
                 : 'bg-amber-50 text-amber-700 border-amber-200'
             }`}>
-              {fulfilled || order.fulfillment_status === 'fulfilled' ? 'Fulfilled' : 'Unfulfilled'}
+              {isFulfilled ? 'Fulfilled' : 'Unfulfilled'}
             </span>
             <span className={`text-xs font-bold px-3 py-1 rounded-full border ${
               order.payment_status === 'paid'
@@ -119,7 +122,37 @@ export function OrderDetailsDialog({ order, open, onOpenChange, onFulfill, onPri
             )}
           </div>
 
-          {/* Ship To */}
+          {/* ── Member points callout ── */}
+          {order.is_member && (
+            <div className="flex items-center gap-3 bg-yellow-50 border border-yellow-100 rounded-lg px-4 py-3">
+              <Star className="w-5 h-5 fill-yellow-400 text-yellow-400 shrink-0" />
+              <div>
+                <div className="text-sm font-semibold text-yellow-800">
+                  {order.points_earned > 0
+                    ? `+${order.points_earned} points earned on this order`
+                    : 'Member order — points will be credited'}
+                </div>
+                <div className="text-xs text-yellow-600 mt-0.5">
+                  1 point per $1 spent on subtotal · Points system coming soon
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── Guest note ── */}
+          {order.is_guest && (
+            <div className="flex items-center gap-3 bg-gray-50 border border-gray-100 rounded-lg px-4 py-3">
+              <User className="w-4 h-4 text-gray-400 shrink-0" />
+              <div className="text-sm text-gray-500">
+                Guest order — no account attached.{' '}
+                <span className="text-gray-400 text-xs">
+                  Customer can claim this order by signing up with the same email.
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* ── Ship To ── */}
           <section>
             <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">
               <MapPin className="w-3 h-3" /> Ship To
@@ -133,11 +166,11 @@ export function OrderDetailsDialog({ order, open, onOpenChange, onFulfill, onPri
               )}
               <div className="text-gray-500">{addr?.country ?? 'United States'}</div>
               {addr?.phone && <div className="text-gray-500">{addr.phone}</div>}
-              <div className="text-gray-500">{order.email}</div>
+              <div className="text-gray-500 pt-0.5">{order.email}</div>
             </div>
           </section>
 
-          {/* Items */}
+          {/* ── Items ── */}
           <section>
             <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">
               <Package className="w-3 h-3" /> Items
@@ -170,7 +203,7 @@ export function OrderDetailsDialog({ order, open, onOpenChange, onFulfill, onPri
             </div>
           </section>
 
-          {/* Totals */}
+          {/* ── Totals ── */}
           <section className="bg-gray-50 rounded-lg p-3 text-sm space-y-1">
             {order.subtotal_cents != null && (
               <div className="flex justify-between text-gray-600">
@@ -178,17 +211,13 @@ export function OrderDetailsDialog({ order, open, onOpenChange, onFulfill, onPri
                 <span>${(order.subtotal_cents / 100).toFixed(2)}</span>
               </div>
             )}
-            {(order.shipping_cents ?? 0) > 0 ? (
-              <div className="flex justify-between text-gray-600">
-                <span>Shipping</span>
-                <span>${(order.shipping_cents! / 100).toFixed(2)}</span>
-              </div>
-            ) : (
-              <div className="flex justify-between text-gray-600">
-                <span>Shipping</span>
-                <span className="text-green-600 font-medium">FREE</span>
-              </div>
-            )}
+            <div className="flex justify-between text-gray-600">
+              <span>Shipping</span>
+              {(order.shipping_cents ?? 0) > 0
+                ? <span>${(order.shipping_cents! / 100).toFixed(2)}</span>
+                : <span className="text-green-600 font-medium">FREE</span>
+              }
+            </div>
             {(order.tax_cents ?? 0) > 0 && (
               <div className="flex justify-between text-gray-600">
                 <span>Tax</span>
@@ -207,7 +236,7 @@ export function OrderDetailsDialog({ order, open, onOpenChange, onFulfill, onPri
             </div>
           </section>
 
-          {/* Package weight */}
+          {/* ── Package weight ── */}
           <section>
             <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">
               <Truck className="w-3 h-3" /> Package Weight
@@ -222,55 +251,41 @@ export function OrderDetailsDialog({ order, open, onOpenChange, onFulfill, onPri
                   <span className="font-mono shrink-0">
                     {item.weight_grams
                       ? `${gramsToOz(item.weight_grams * item.quantity)} oz`
-                      : <span className="text-amber-500">—</span>
-                    }
+                      : <span className="text-amber-500">—</span>}
                   </span>
                 </div>
               ))}
-
-              {/* Extra packaging weight input */}
               <div className="flex items-center justify-between pt-2 border-t border-gray-200">
-                <label htmlFor="extra-weight" className="text-gray-600">
-                  + Packaging / box weight (oz)
-                </label>
+                <label htmlFor="extra-weight" className="text-gray-600">+ Packaging / box (oz)</label>
                 <input
                   id="extra-weight"
-                  type="number"
-                  min="0"
-                  step="0.1"
-                  placeholder="0"
+                  type="number" min="0" step="0.1" placeholder="0"
                   value={extraWeightOz}
                   onChange={(e) => setExtraWeightOz(e.target.value)}
                   className="w-20 text-right border border-gray-200 rounded px-2 py-1 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-black/10"
                 />
               </div>
-
-              {/* Total */}
               <div className="flex justify-between font-bold text-gray-900 pt-1 border-t border-gray-200">
                 <span>Total package weight</span>
                 <span className="font-mono">
                   {packageWeightOz > 0
-                    ? packageLb > 0
-                      ? `${packageLb} lb ${packageRemOz} oz`
-                      : `${packageWeightOz} oz`
-                    : <span className="text-amber-500 font-normal">Weigh manually</span>
-                  }
+                    ? packageLb > 0 ? `${packageLb} lb ${packageRemOz} oz` : `${packageWeightOz} oz`
+                    : <span className="text-amber-500 font-normal">Weigh manually</span>}
                 </span>
               </div>
-
               {!hasAllWeights && (
                 <div className="text-xs text-amber-600">
-                  ⚠ Some items are missing weight data. Add weights in Products → Variants for accurate calculations.
+                  ⚠ Some items are missing weight data — add them in Products → Variants.
                 </div>
               )}
             </div>
           </section>
 
-          {/* Tracking + fulfill */}
-          {!fulfilled && order.fulfillment_status !== 'fulfilled' && (
+          {/* ── Fulfill ── */}
+          {!isFulfilled && (
             <section>
               <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">
-                <Truck className="w-3 h-3" /> Mark Fulfilled
+                <CheckCircle2 className="w-3 h-3" /> Mark Fulfilled
               </div>
               <div className="space-y-3">
                 <div>
@@ -298,12 +313,12 @@ export function OrderDetailsDialog({ order, open, onOpenChange, onFulfill, onPri
             </section>
           )}
 
-          {(fulfilled || order.fulfillment_status === 'fulfilled') && (
+          {isFulfilled && (
             <div className="flex items-center gap-2 bg-green-50 border border-green-100 rounded-lg px-4 py-3 text-sm text-green-700 font-medium">
               <CheckCircle2 className="w-4 h-4" />
               This order has been fulfilled.
               {(order.tracking_number || trackingNumber) && (
-                <span className="font-mono text-green-600 ml-1">
+                <span className="font-mono text-green-600 ml-1 text-xs">
                   {order.tracking_number ?? trackingNumber}
                 </span>
               )}
