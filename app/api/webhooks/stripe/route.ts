@@ -2,6 +2,7 @@
 import { createServerClient } from "@/utils/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
+import { sendNotification } from "@/lib/notifications";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2024-11-20.acacia",
@@ -117,7 +118,7 @@ async function handlePaymentSucceeded(
   }
 
   // Update order
-  const { error } = await supabase
+  const { data: order, error } = await supabase
     .from('orders')
     .update({
       payment_status: 'paid',
@@ -127,14 +128,35 @@ async function handlePaymentSucceeded(
       ...paymentMethodDetails,
       updated_at: new Date().toISOString(),
     })
-    .eq('id', orderId);
+    .eq('id', orderId)
+    .select('order_number, total_cents, email, customer_first_name, customer_last_name')
+    .single();
 
   if (error) {
     console.error('Failed to update order on payment success:', error);
-  } else {
-    console.log(`Order ${orderId} marked as paid`);
-    // TODO: Send confirmation email here
-    // TODO: Trigger inventory reduction
+    return;
+  }
+
+  console.log(`Order ${orderId} marked as paid`);
+
+  // ── New order notification → visible to all admins ────────────
+  try {
+    const total = order ? `$${(order.total_cents / 100).toFixed(2)}` : '';
+    const orderNum = order?.order_number ?? orderId;
+    const customerName = [order?.customer_first_name, order?.customer_last_name]
+      .filter(Boolean).join(' ') || order?.email || 'Guest';
+
+    await sendNotification({
+      title: `New order ${orderNum}`,
+      subtitle: `${customerName} — ${total}`,
+      actionUrl: `/dashboard/orders`,
+      role_admin: true,
+    });
+
+    console.log(`[Notifications] ✅ New order notification sent for ${orderNum}`);
+  } catch (notifErr) {
+    // Non-fatal — order is already marked paid, don't throw
+    console.error('[Notifications] ⚠️ Failed to send new order notification:', notifErr);
   }
 }
 
@@ -152,7 +174,7 @@ async function handlePaymentFailed(
 
   const lastError = paymentIntent.last_payment_error;
 
-  const { error } = await supabase
+  const { data: order, error } = await supabase
     .from('orders')
     .update({
       payment_status: 'failed',
@@ -161,13 +183,32 @@ async function handlePaymentFailed(
       payment_error_message: lastError?.message || null,
       updated_at: new Date().toISOString(),
     })
-    .eq('id', orderId);
+    .eq('id', orderId)
+    .select('order_number, email')
+    .single();
 
   if (error) {
     console.error('Failed to update order on payment failure:', error);
-  } else {
-    console.log(`Order ${orderId} payment failed: ${lastError?.message}`);
-    // TODO: Send payment failure email
+    return;
+  }
+
+  console.log(`Order ${orderId} payment failed: ${lastError?.message}`);
+
+  // ── Failed payment notification → admins only ─────────────────
+  try {
+    const orderNum = order?.order_number ?? orderId;
+    const reason = lastError?.message ?? 'Unknown reason';
+
+    await sendNotification({
+      title: `Payment failed — ${orderNum}`,
+      subtitle: `${order?.email ?? 'Guest'} · ${reason}`,
+      actionUrl: `/dashboard/orders`,
+      role_admin: true,
+    });
+
+    console.log(`[Notifications] ✅ Failed payment notification sent for ${orderNum}`);
+  } catch (notifErr) {
+    console.error('[Notifications] ⚠️ Failed to send payment failure notification:', notifErr);
   }
 }
 
@@ -243,7 +284,7 @@ async function handleChargeRefunded(
   // Get order by payment intent
   const { data: order } = await supabase
     .from('orders')
-    .select('id')
+    .select('id, order_number, total_cents, email')
     .eq('stripe_payment_intent_id', paymentIntentId)
     .single();
 
@@ -261,9 +302,21 @@ async function handleChargeRefunded(
 
   if (error) {
     console.error('Failed to update order on refund:', error);
-  } else {
-    console.log(`Order ${order.id} refunded`);
-    // TODO: Send refund confirmation email
-    // TODO: Restore inventory
+    return;
+  }
+
+  console.log(`Order ${order.id} refunded`);
+
+  // ── Refund notification → admins only ─────────────────────────
+  try {
+    const total = `$${(order.total_cents / 100).toFixed(2)}`;
+    await sendNotification({
+      title: `Order refunded — ${order.order_number}`,
+      subtitle: `${order.email ?? 'Guest'} · ${total}`,
+      actionUrl: `/dashboard/orders`,
+      role_admin: true,
+    });
+  } catch (notifErr) {
+    console.error('[Notifications] ⚠️ Failed to send refund notification:', notifErr);
   }
 }
