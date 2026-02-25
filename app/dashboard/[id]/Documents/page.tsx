@@ -1,24 +1,24 @@
-// app/dashboard/[id]/Documents/page.tsx
 'use client';
 
 import React, { Suspense } from 'react';
 import Breadcrumb from "@/components/Breadcrumbs/dashboard";
-import Documents from '@/components/documents';
-import { DocumentsSkeleton } from '@/components/documents/skeleton'; // Fixed: Added 's' to DocumentsSkeleton
-import DocumentsErrorBoundary from '@/components/documents/DocumentsErrorBoundary';
+import { OrdersManager } from '@/components/orders';
+import { OrdersSkeleton } from '@/components/orders/skeleton';
 
-export default function DocumentsPage() {
+/**
+ * Orders Management Page
+ * Following the Documents page pattern: Breadcrumbs + Suspense + Manager
+ */
+export default function OrdersPage() {
   return (
     <>
-      <Breadcrumb pageName="Documents" />
+      <Breadcrumb pageName="Orders" />
       
-      <Suspense 
-        fallback={<DocumentsSkeleton viewMode="grid" count={12} />}
-      >
-        <DocumentsErrorBoundary>
-          <Documents />
-        </DocumentsErrorBoundary>
-      </Suspense>
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <Suspense fallback={<OrdersSkeleton />}>
+          <OrdersManager initialOrders={[]} />
+        </Suspense>
+      </div>
     </>
   );
 }

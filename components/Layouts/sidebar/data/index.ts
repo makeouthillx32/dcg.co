@@ -19,8 +19,8 @@ export const NAV_DATA = [
         items: [],
       },
       {
-        title: "Profile",
-        url: "/profile",
+        title: "Orders",
+        url: "/Orders",
         icon: Icons.User,
         items: [],
       },
