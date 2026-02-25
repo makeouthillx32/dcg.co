@@ -64,7 +64,7 @@ export default function Footer() {
           { name: "Our Story", href: "/pages/about" },
 
           // ✅ Landing section
-          { name: "FAQs", href: "/#faq" },
+          { name: "FAQs", href: "/pages/faq" },
 
           // ✅ Legal CMS pages (your real slugs)
           { name: "Privacy Policy", href: "/pages/privacy-policy" },
