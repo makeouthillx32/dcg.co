@@ -365,8 +365,12 @@ export const getLastPageForRedirect = (): string => {
   const lastPage = getCookie("lastPage");
   if (!lastPage) return "/";
 
-  const excludedPages = ["/sign-in", "/sign-up", "/forgot-password"];
+  const excludedPages = ["/sign-in", "/sign-up", "/forgot-password", "/protected/reset-password"];
   if (excludedPages.includes(lastPage)) return "/";
+
+    // ✅ Also exclude any /protected/* path
+  if (lastPage.startsWith("/protected/")) return "/";
+
 
   if (lastPage.startsWith("/#")) return "/";
 
