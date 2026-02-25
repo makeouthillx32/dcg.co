@@ -36,7 +36,7 @@ async function fetchOrders(): Promise<AdminOrder[]> {
         price_cents
       )
     `)
-    .order('created_at', { ascending: false }); // newest first
+    .order('created_at', { ascending: false });
 
   if (error) {
     console.error('[Orders] Supabase fetch error:', error.message);
@@ -49,7 +49,6 @@ async function fetchOrders(): Promise<AdminOrder[]> {
     created_at: o.created_at,
     status: o.status,
     payment_status: o.payment_status,
-    // Pull fulfillment status from first fulfillment row, default to unfulfilled
     fulfillment_status: o.fulfillments?.[0]?.status ?? 'unfulfilled',
     total_cents: o.total_cents,
     email: o.email,

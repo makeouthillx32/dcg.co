@@ -1,124 +1,315 @@
 'use client';
 
+// components/orders/OrderDetailsDialog/index.tsx
+
 import { useState } from 'react';
-import { AdminOrder, OrderStatus } from '@/lib/orders/types';
+import { AdminOrder, FulfillmentStatus } from '@/lib/orders/types';
+import { X, Printer, CheckCircle2, Package, Truck, MapPin, User, StickyNote } from 'lucide-react';
 
-/**
- * Order Details Dialog
- * Displays customer info, shipping details, and items.
- * Accessibility: Added 'id' and 'htmlFor' attributes to form elements.
- */
-export function OrderDetailsDialog({ order, open, onOpenChange }: { 
-  order: AdminOrder; 
-  open: boolean; 
-  onOpenChange: (open: boolean) => void 
-}) {
-  const [loading, setLoading] = useState(false);
-  const [status, setStatus] = useState<OrderStatus>(order.status);
-  const [tracking, setTracking] = useState(order.tracking_number || '');
+function gramsToOz(g: number) {
+  return Math.round((g / 28.3495) * 100) / 100;
+}
 
-  const handleSave = async () => {
-    setLoading(true);
-    try {
-      console.log("Save triggered for order:", order.id, { status, tracking });
-      onOpenChange(false);
-    } catch (err) {
-      alert("Failed to update order");
-    } finally {
-      setLoading(false);
-    }
-  };
+interface OrderDetailsDialogProps {
+  order: AdminOrder;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onFulfill: (order: AdminOrder, trackingNumber?: string) => Promise<void>;
+  onPrint: (order: AdminOrder) => void;
+}
+
+const FULFILLMENT_LABEL: Record<FulfillmentStatus, string> = {
+  unfulfilled: 'Unfulfilled',
+  partial:     'Partial',
+  fulfilled:   'Fulfilled',
+  returned:    'Returned',
+  cancelled:   'Cancelled',
+};
+
+export function OrderDetailsDialog({ order, open, onOpenChange, onFulfill, onPrint }: OrderDetailsDialogProps) {
+  const [trackingNumber, setTrackingNumber] = useState(order.tracking_number ?? '');
+  const [extraWeightOz, setExtraWeightOz] = useState('');
+  const [fulfilling, setFulfilling] = useState(false);
+  const [fulfilled, setFulfilled] = useState(order.fulfillment_status === 'fulfilled');
 
   if (!open) return null;
 
+  const addr = order.shipping_address;
+  const customerName = addr
+    ? [addr.firstName, addr.lastName].filter(Boolean).join(' ')
+    : [order.customer_first_name, order.customer_last_name].filter(Boolean).join(' ') || order.email;
+
+  // Weight calculation
+  const totalWeightGrams = order.items.reduce(
+    (sum, item) => sum + (item.weight_grams ?? 0) * item.quantity, 0
+  );
+  const totalWeightOz = Math.round((totalWeightGrams / 28.3495) * 100) / 100;
+  const extraOz = parseFloat(extraWeightOz) || 0;
+  const packageWeightOz = Math.round((totalWeightOz + extraOz) * 100) / 100;
+  const packageLb = Math.floor(packageWeightOz / 16);
+  const packageRemOz = Math.round((packageWeightOz % 16) * 100) / 100;
+  const hasAllWeights = order.items.every((i) => i.weight_grams != null);
+
+  const handleFulfill = async () => {
+    setFulfilling(true);
+    try {
+      await onFulfill(order, trackingNumber.trim() || undefined);
+      setFulfilled(true);
+    } catch (err: any) {
+      alert(err.message ?? 'Failed to mark fulfilled');
+    } finally {
+      setFulfilling(false);
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-2xl rounded-lg bg-white p-6 shadow-xl max-h-[90vh] overflow-y-auto">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold">Order {order.order_number}</h2>
-          <button 
-            onClick={() => onOpenChange(false)} 
-            className="text-gray-500 hover:text-black text-xl"
-            aria-label="Close dialog"
-          >
-            ✕
-          </button>
-        </div>
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4">
+      <div className="w-full sm:max-w-2xl bg-white rounded-t-2xl sm:rounded-xl shadow-2xl max-h-[92vh] overflow-y-auto">
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <div className="space-y-4">
-            <section>
-              <h3 className="font-semibold text-xs uppercase text-gray-400 tracking-wider">Customer</h3>
-              <p className="font-medium">{order.email}</p>
-            </section>
-            <section>
-              <h3 className="font-semibold text-xs uppercase text-gray-400 tracking-wider">Shipping Address</h3>
-              <div className="text-sm bg-gray-50 p-3 rounded-md border border-gray-100 mt-2">
-                <pre className="font-sans whitespace-pre-wrap leading-relaxed">
-                  {JSON.stringify(order.shipping_address, null, 2)}
-                </pre>
-              </div>
-            </section>
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b sticky top-0 bg-white z-10">
+          <div>
+            <div className="font-black text-lg">#{order.order_number}</div>
+            <div className="text-xs text-gray-400">
+              {new Date(order.created_at).toLocaleDateString('en-US', {
+                weekday: 'short', year: 'numeric', month: 'short', day: 'numeric',
+              })}
+            </div>
           </div>
-
-          <div className="space-y-4 border-l pl-0 md:pl-8 border-transparent md:border-gray-100">
-            <section>
-              <label htmlFor="order-status" className="block text-sm font-semibold mb-1.5">
-                Fulfillment Status
-              </label>
-              <select 
-                id="order-status"
-                value={status} 
-                onChange={(e) => setStatus(e.target.value as OrderStatus)}
-                className="w-full p-2.5 border rounded-md bg-white focus:ring-2 focus:ring-black outline-none transition-all"
-              >
-                <option value="pending">Pending</option>
-                <option value="processing">Processing</option>
-                <option value="shipped">Shipped</option>
-                <option value="delivered">Delivered</option>
-                <option value="cancelled">Cancelled</option>
-              </select>
-            </section>
-            <section>
-              <label htmlFor="tracking-number" className="block text-sm font-semibold mb-1.5">
-                Tracking Number
-              </label>
-              <input 
-                id="tracking-number"
-                type="text" 
-                value={tracking} 
-                onChange={(e) => setTracking(e.target.value)}
-                placeholder="UPS / FedEx / USPS"
-                className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-black outline-none transition-all"
-              />
-            </section>
-            <button 
-              onClick={handleSave}
-              disabled={loading}
-              className="w-full bg-black text-white py-3 rounded-md font-bold hover:bg-zinc-800 disabled:bg-zinc-400 transition-colors mt-4"
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => onPrint(order)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
             >
-              {loading ? "Updating..." : "Update Order"}
+              <Printer className="w-4 h-4" />
+              <span className="hidden sm:inline">Print Slip</span>
+            </button>
+            <button
+              onClick={() => onOpenChange(false)}
+              className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              aria-label="Close"
+            >
+              <X className="w-5 h-5" />
             </button>
           </div>
         </div>
 
-        <div className="mt-8 border-t pt-6">
-          <h3 className="font-bold text-sm uppercase tracking-widest mb-4">Order Items</h3>
-          <div className="space-y-3">
-            {order.items?.map((item) => (
-              <div key={item.id} className="flex justify-between items-center py-2 border-b border-gray-50 last:border-0">
-                <div className="flex flex-col">
-                  <span className="font-medium">{item.title}</span>
-                  <span className="text-xs text-gray-400">SKU: {item.sku} × {item.quantity}</span>
+        <div className="p-5 space-y-5">
+
+          {/* Status badges */}
+          <div className="flex flex-wrap gap-2">
+            <span className={`text-xs font-bold px-3 py-1 rounded-full border ${
+              fulfilled || order.fulfillment_status === 'fulfilled'
+                ? 'bg-green-50 text-green-700 border-green-200'
+                : 'bg-amber-50 text-amber-700 border-amber-200'
+            }`}>
+              {fulfilled || order.fulfillment_status === 'fulfilled' ? 'Fulfilled' : 'Unfulfilled'}
+            </span>
+            <span className={`text-xs font-bold px-3 py-1 rounded-full border ${
+              order.payment_status === 'paid'
+                ? 'bg-green-50 text-green-700 border-green-100'
+                : 'bg-amber-50 text-amber-700 border-amber-100'
+            }`}>
+              {order.payment_status?.toUpperCase()}
+            </span>
+            {order.shipping_method_name && (
+              <span className="text-xs px-3 py-1 rounded-full border border-gray-200 bg-gray-50 text-gray-600">
+                {order.shipping_method_name}
+              </span>
+            )}
+          </div>
+
+          {/* Ship To */}
+          <section>
+            <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">
+              <MapPin className="w-3 h-3" /> Ship To
+            </div>
+            <div className="bg-gray-50 rounded-lg p-3 text-sm space-y-0.5">
+              <div className="font-semibold">{customerName}</div>
+              {addr?.address1 && <div>{addr.address1}</div>}
+              {addr?.address2 && <div>{addr.address2}</div>}
+              {(addr?.city || addr?.state || addr?.zip) && (
+                <div>{[addr?.city, addr?.state].filter(Boolean).join(', ')} {addr?.zip}</div>
+              )}
+              <div className="text-gray-500">{addr?.country ?? 'United States'}</div>
+              {addr?.phone && <div className="text-gray-500">{addr.phone}</div>}
+              <div className="text-gray-500">{order.email}</div>
+            </div>
+          </section>
+
+          {/* Items */}
+          <section>
+            <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">
+              <Package className="w-3 h-3" /> Items
+            </div>
+            <div className="border border-gray-100 rounded-lg divide-y divide-gray-100 overflow-hidden">
+              {order.items.map((item) => (
+                <div key={item.id} className="flex items-center justify-between px-3 py-2.5 text-sm">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className="bg-gray-100 text-gray-700 font-bold text-xs w-6 h-6 rounded-full flex items-center justify-center shrink-0">
+                      {item.quantity}
+                    </span>
+                    <div className="min-w-0">
+                      <div className="font-medium text-gray-900 truncate">{item.title}</div>
+                      {item.variant_title && item.variant_title !== 'Default' && (
+                        <div className="text-xs text-gray-500">{item.variant_title}</div>
+                      )}
+                      <div className="text-xs text-gray-400 font-mono">{item.sku}</div>
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0 ml-4">
+                    <div className="font-mono font-medium">${(item.price_cents / 100).toFixed(2)}</div>
+                    {item.weight_grams ? (
+                      <div className="text-xs text-gray-400">{gramsToOz(item.weight_grams)} oz</div>
+                    ) : (
+                      <div className="text-xs text-amber-500">no weight</div>
+                    )}
+                  </div>
                 </div>
-                <span className="font-mono">${(item.price_cents / 100).toFixed(2)}</span>
+              ))}
+            </div>
+          </section>
+
+          {/* Totals */}
+          <section className="bg-gray-50 rounded-lg p-3 text-sm space-y-1">
+            {order.subtotal_cents != null && (
+              <div className="flex justify-between text-gray-600">
+                <span>Subtotal</span>
+                <span>${(order.subtotal_cents / 100).toFixed(2)}</span>
               </div>
-            ))}
-          </div>
-          <div className="mt-4 flex justify-between items-center bg-gray-50 p-3 rounded-md">
-            <span className="font-bold">Total Amount</span>
-            <span className="font-bold text-lg">${(order.total_cents / 100).toFixed(2)}</span>
-          </div>
+            )}
+            {(order.shipping_cents ?? 0) > 0 ? (
+              <div className="flex justify-between text-gray-600">
+                <span>Shipping</span>
+                <span>${(order.shipping_cents! / 100).toFixed(2)}</span>
+              </div>
+            ) : (
+              <div className="flex justify-between text-gray-600">
+                <span>Shipping</span>
+                <span className="text-green-600 font-medium">FREE</span>
+              </div>
+            )}
+            {(order.tax_cents ?? 0) > 0 && (
+              <div className="flex justify-between text-gray-600">
+                <span>Tax</span>
+                <span>${(order.tax_cents! / 100).toFixed(2)}</span>
+              </div>
+            )}
+            {(order.discount_cents ?? 0) > 0 && (
+              <div className="flex justify-between text-green-600">
+                <span>Discount</span>
+                <span>–${(order.discount_cents! / 100).toFixed(2)}</span>
+              </div>
+            )}
+            <div className="flex justify-between font-black text-base pt-1 border-t border-gray-200">
+              <span>Total</span>
+              <span>${(order.total_cents / 100).toFixed(2)}</span>
+            </div>
+          </section>
+
+          {/* Package weight */}
+          <section>
+            <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">
+              <Truck className="w-3 h-3" /> Package Weight
+            </div>
+            <div className="bg-gray-50 rounded-lg p-3 text-sm space-y-2">
+              {order.items.map((item) => (
+                <div key={item.id} className="flex justify-between text-gray-600">
+                  <span className="truncate mr-2">
+                    {item.quantity}× {item.title}
+                    {item.variant_title && item.variant_title !== 'Default' ? ` (${item.variant_title})` : ''}
+                  </span>
+                  <span className="font-mono shrink-0">
+                    {item.weight_grams
+                      ? `${gramsToOz(item.weight_grams * item.quantity)} oz`
+                      : <span className="text-amber-500">—</span>
+                    }
+                  </span>
+                </div>
+              ))}
+
+              {/* Extra packaging weight input */}
+              <div className="flex items-center justify-between pt-2 border-t border-gray-200">
+                <label htmlFor="extra-weight" className="text-gray-600">
+                  + Packaging / box weight (oz)
+                </label>
+                <input
+                  id="extra-weight"
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  placeholder="0"
+                  value={extraWeightOz}
+                  onChange={(e) => setExtraWeightOz(e.target.value)}
+                  className="w-20 text-right border border-gray-200 rounded px-2 py-1 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-black/10"
+                />
+              </div>
+
+              {/* Total */}
+              <div className="flex justify-between font-bold text-gray-900 pt-1 border-t border-gray-200">
+                <span>Total package weight</span>
+                <span className="font-mono">
+                  {packageWeightOz > 0
+                    ? packageLb > 0
+                      ? `${packageLb} lb ${packageRemOz} oz`
+                      : `${packageWeightOz} oz`
+                    : <span className="text-amber-500 font-normal">Weigh manually</span>
+                  }
+                </span>
+              </div>
+
+              {!hasAllWeights && (
+                <div className="text-xs text-amber-600">
+                  ⚠ Some items are missing weight data. Add weights in Products → Variants for accurate calculations.
+                </div>
+              )}
+            </div>
+          </section>
+
+          {/* Tracking + fulfill */}
+          {!fulfilled && order.fulfillment_status !== 'fulfilled' && (
+            <section>
+              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">
+                <Truck className="w-3 h-3" /> Mark Fulfilled
+              </div>
+              <div className="space-y-3">
+                <div>
+                  <label htmlFor="tracking" className="block text-xs text-gray-500 mb-1">
+                    Tracking number (optional)
+                  </label>
+                  <input
+                    id="tracking"
+                    type="text"
+                    placeholder="e.g. 9400111899223397658538"
+                    value={trackingNumber}
+                    onChange={(e) => setTrackingNumber(e.target.value)}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-black/10"
+                  />
+                </div>
+                <button
+                  onClick={handleFulfill}
+                  disabled={fulfilling}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-black text-white rounded-lg font-semibold text-sm hover:bg-gray-800 disabled:opacity-50 transition-colors"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  {fulfilling ? 'Marking fulfilled…' : 'Mark as Fulfilled'}
+                </button>
+              </div>
+            </section>
+          )}
+
+          {(fulfilled || order.fulfillment_status === 'fulfilled') && (
+            <div className="flex items-center gap-2 bg-green-50 border border-green-100 rounded-lg px-4 py-3 text-sm text-green-700 font-medium">
+              <CheckCircle2 className="w-4 h-4" />
+              This order has been fulfilled.
+              {(order.tracking_number || trackingNumber) && (
+                <span className="font-mono text-green-600 ml-1">
+                  {order.tracking_number ?? trackingNumber}
+                </span>
+              )}
+            </div>
+          )}
+
         </div>
       </div>
     </div>

@@ -358,3 +358,18 @@ select:focus {
   /* Inherit font family to all nested elements */
   font-family: inherit;
 }
+/* ── Add to your globals.css ─────────────────────────────── */
+@media print {
+  /* Hide everything */
+  body > * {
+    display: none !important;
+  }
+  /* Show only the slip */
+  #dcg-print-slip {
+    display: block !important;
+  }
+  /* Clean print margins */
+  @page {
+    margin: 0.5in;
+  }
+}

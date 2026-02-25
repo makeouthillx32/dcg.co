@@ -5,6 +5,7 @@ import { createClient } from '@/utils/supabase/server';
 export async function GET() {
   const supabase = await createClient();
 
+  // Verify caller is authenticated
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   if (authError || !user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -18,33 +19,23 @@ export async function GET() {
       created_at,
       status,
       payment_status,
-      subtotal_cents,
-      shipping_cents,
-      tax_cents,
-      discount_cents,
       total_cents,
       email,
       customer_first_name,
       customer_last_name,
       shipping_address,
-      shipping_method_name,
       tracking_number,
       tracking_url,
       internal_notes,
       fulfillments (
-        id,
         status
       ),
       order_items (
         id,
         sku,
-        product_title,
-        variant_title,
+        title,
         quantity,
-        price_cents,
-        product_variants (
-          weight_grams
-        )
+        price_cents
       )
     `)
     .order('created_at', { ascending: false });
@@ -61,28 +52,20 @@ export async function GET() {
     status: o.status,
     payment_status: o.payment_status,
     fulfillment_status: o.fulfillments?.[0]?.status ?? 'unfulfilled',
-    fulfillment_id: o.fulfillments?.[0]?.id ?? null,
-    subtotal_cents: o.subtotal_cents ?? 0,
-    shipping_cents: o.shipping_cents ?? 0,
-    tax_cents: o.tax_cents ?? 0,
-    discount_cents: o.discount_cents ?? 0,
     total_cents: o.total_cents,
     email: o.email,
     customer_first_name: o.customer_first_name,
     customer_last_name: o.customer_last_name,
     shipping_address: o.shipping_address,
-    shipping_method_name: o.shipping_method_name,
     tracking_number: o.tracking_number,
     tracking_url: o.tracking_url,
     internal_notes: o.internal_notes,
     items: (o.order_items ?? []).map((item: any) => ({
       id: item.id,
       sku: item.sku ?? '',
-      title: item.product_title ?? '',
-      variant_title: item.variant_title ?? '',
+      title: item.title ?? '',
       quantity: item.quantity,
       price_cents: item.price_cents,
-      weight_grams: item.product_variants?.weight_grams ?? null,
     })),
   }));
 
