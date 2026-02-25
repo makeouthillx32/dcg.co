@@ -15,6 +15,8 @@ export type ProfileCookieRow = {
 
 export type ProfileUpsertRow = {
   id: string;
+  auth_user_id: string; // ← required: links profile to auth.users
+  email: string;        // ← required: snapshot for orders, admin UI, support
   role: ValidRole;
   display_name: string;
   first_name: string;

@@ -12,6 +12,7 @@ import { dynamicFontManager } from "@/lib/dynamicFontManager";
 import { transitionTheme, smoothThemeToggle } from "@/utils/themeTransitions";
 import { authLogger } from "@/lib/authLogger";
 import { RoleProvider } from "@/lib/roleContext";
+import { isAuthRoute, isProtectedRoute } from "@/lib/protectedRoutes";
 
 interface EnhancedThemeContextType {
   themeType: "light" | "dark";
@@ -97,28 +98,14 @@ function InternalAuthProvider({
     if (isLoading) return;
 
     // ## Guest Contract v1
+    // Source of truth: lib/protectedRoutes.ts (also consumed by middleware.ts).
     // Guest CAN access: shop browsing, product pages, collections/categories, cart, checkout, static pages.
     // Guest CANNOT access: /profile/*, /dashboard/*, /settings/*, /protected/*
-    const protectedPrefixes = ["/profile", "/dashboard", "/settings", "/protected"];
-
-    const isProtectedRoute = protectedPrefixes.some(
-      (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
-    );
-
-    // Only redirect guests when they attempt to enter protected areas.
-    if (!session && isProtectedRoute) {
-      const authPages = ["/sign-in", "/sign-up", "/forgot-password", "/reset-password"];
-
-      // Don't redirect if we're already on an auth page
-      if (authPages.includes(pathname)) return;
-
+    if (!session && isProtectedRoute(pathname) && !isAuthRoute(pathname)) {
       const target = pathname + (location.search || "");
-
       console.log(`[Provider] Redirecting guest to sign-in from protected route: ${pathname}`);
       router.replace(`/sign-in?next=${encodeURIComponent(target)}`);
-      return;
     }
-    
   }, [session, isLoading, pathname, router]);
 
   return (

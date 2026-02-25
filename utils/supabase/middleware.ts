@@ -1,7 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
-
-const AUTH_ROUTES = ["/sign-in", "/sign-up", "/forgot-password", "/reset-password"];
+import { isAuthRoute, isProtectedRoute } from "@/lib/protectedRoutes";
 
 export async function middleware(req: NextRequest) {
   let res = NextResponse.next({ request: req });
@@ -13,13 +12,10 @@ export async function middleware(req: NextRequest) {
   }
 
   // ── Guest key ───────────────────────────────────────────────
-  // Stable anonymous identity for guest checkout + order history.
-  // Set once, lives for 1 year, never changes unless cleared.
-  // Passed to upsert_guest_customer() at checkout time.
   if (!req.cookies.get("dcg_guest_key")) {
     res.cookies.set("dcg_guest_key", crypto.randomUUID(), {
       path: "/",
-      maxAge: 60 * 60 * 24 * 365, // 1 year
+      maxAge: 60 * 60 * 24 * 365,
       httpOnly: true,
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
@@ -29,9 +25,7 @@ export async function middleware(req: NextRequest) {
   const pathname = req.nextUrl.pathname;
 
   // ── Skip auth logic on auth pages ───────────────────────────
-  if (AUTH_ROUTES.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
-    return res;
-  }
+  if (isAuthRoute(pathname)) return res;
 
   // ── Supabase session ─────────────────────────────────────────
   const supabase = createServerClient(
@@ -55,13 +49,7 @@ export async function middleware(req: NextRequest) {
   } = await supabase.auth.getSession();
 
   // ── Protect pages (not API routes) ──────────────────────────
-  const protectedPrefixes = ["/protected", "/settings", "/dashboard", "/profile"];
-
-  const isProtectedPage = protectedPrefixes.some(
-    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
-  );
-
-  if (isProtectedPage && !session) {
+  if (isProtectedRoute(pathname) && !session) {
     const target = pathname + (req.nextUrl.search || "");
     const url = new URL(`/sign-in?next=${encodeURIComponent(target)}`, req.url);
     return NextResponse.redirect(url);

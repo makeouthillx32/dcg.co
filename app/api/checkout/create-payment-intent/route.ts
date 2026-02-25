@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = await createServerClient();
     const body = await request.json();
-    
+
     const {
       cart_id,
       email,
@@ -21,19 +21,25 @@ export async function POST(request: NextRequest) {
       shipping_rate_id,
     } = body;
 
-    console.log('Creating payment intent for:', { cart_id, email });
+    console.log("Creating payment intent for:", { cart_id, email });
 
     // Validation
     if (!cart_id || !email || !shipping_address || !shipping_rate_id) {
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        { error: "Missing required fields" },
         { status: 400 }
       );
     }
 
+    // ── Guest key (set by middleware on first visit) ──────────────
+    // Used to link this order to a stable guest customer record.
+    const guestKeyCookie = request.cookies.get("dcg_guest_key")?.value ?? null;
+    const guestKey = guestKeyCookie ?? crypto.randomUUID(); // fallback if cookie somehow missing
+    console.log("Guest key:", guestKey);
+
     // Get cart items
     const { data: cartItems, error: cartError } = await supabase
-      .from('cart_items')
+      .from("cart_items")
       .select(`
         id,
         quantity,
@@ -50,35 +56,35 @@ export async function POST(request: NextRequest) {
           sku
         )
       `)
-      .eq('cart_id', cart_id);
+      .eq("cart_id", cart_id);
 
     if (cartError || !cartItems || cartItems.length === 0) {
-      console.error('Cart error:', cartError);
+      console.error("Cart error:", cartError);
       return NextResponse.json(
-        { error: 'Cart not found or empty' },
+        { error: "Cart not found or empty" },
         { status: 400 }
       );
     }
 
-    console.log('Cart items:', cartItems);
+    console.log("Cart items:", cartItems);
 
     // Calculate subtotal
     const subtotal_cents = cartItems.reduce(
-      (sum, item) => sum + (item.price_cents * item.quantity),
+      (sum, item) => sum + item.price_cents * item.quantity,
       0
     );
 
     // Get shipping rate
     const { data: shippingRate, error: shippingError } = await supabase
-      .from('shipping_rates')
-      .select('*')
-      .eq('id', shipping_rate_id)
+      .from("shipping_rates")
+      .select("*")
+      .eq("id", shipping_rate_id)
       .single();
 
     if (shippingError || !shippingRate) {
-      console.error('Shipping rate error:', shippingError);
+      console.error("Shipping rate error:", shippingError);
       return NextResponse.json(
-        { error: 'Invalid shipping rate' },
+        { error: "Invalid shipping rate" },
         { status: 400 }
       );
     }
@@ -87,89 +93,115 @@ export async function POST(request: NextRequest) {
 
     // Calculate tax
     const { data: taxData } = await supabase
-      .from('tax_rates')
-      .select('rate')
-      .eq('state', shipping_address.state)
-      .eq('is_active', true);
+      .from("tax_rates")
+      .select("rate")
+      .eq("state", shipping_address.state)
+      .eq("is_active", true);
 
     const taxRate = taxData?.reduce((sum, t) => sum + Number(t.rate), 0) || 0;
     const tax_cents = Math.round((subtotal_cents + shipping_cents) * taxRate);
-
-    // Calculate total
     const total_cents = subtotal_cents + shipping_cents + tax_cents;
 
-    console.log('Order totals:', { subtotal_cents, shipping_cents, tax_cents, total_cents });
+    console.log("Order totals:", { subtotal_cents, shipping_cents, tax_cents, total_cents });
 
     // Generate order number
-    const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
     const random = Math.random().toString(36).substring(2, 6).toUpperCase();
     const order_number = `DCG-${timestamp}-${random}`;
 
+    // ── Upsert guest customer ─────────────────────────────────────
+    // Find-or-create a customers row keyed to this guest_key + email.
+    // Non-fatal: order proceeds even if this fails.
+    let customerId: string | null = null;
+    try {
+      const { data: customerData, error: customerError } = await supabase.rpc(
+        "upsert_guest_customer",
+        {
+          p_guest_key: guestKey,
+          p_email: email.toLowerCase().trim(),
+          p_first_name: shipping_address.firstName ?? null,
+          p_last_name: shipping_address.lastName ?? null,
+          p_phone: phone ?? shipping_address.phone ?? null,
+          p_marketing: false,
+        }
+      );
+      if (customerError) {
+        console.error("upsert_guest_customer error:", customerError);
+      } else {
+        customerId = customerData as string;
+        console.log("Guest customer upserted:", customerId);
+      }
+    } catch (err) {
+      console.error("upsert_guest_customer threw:", err);
+    }
+
     // Create order
     const { data: order, error: orderError } = await supabase
-      .from('orders')
+      .from("orders")
       .insert({
         order_number,
-        profile_id: null, // Guest checkout
+        profile_id: null,        // Guest — no auth account
         email,
-        status: 'pending',
-        payment_status: 'pending',
+        customer_email: email,
+        status: "pending",
+        payment_status: "pending",
         subtotal_cents,
         shipping_cents,
         tax_cents,
         total_cents,
         shipping_address,
+        customer_id: customerId, // ← links to customers table
+        guest_key: guestKey,     // ← mirrors the cookie for fast lookup
       })
       .select()
       .single();
 
     if (orderError || !order) {
-      console.error('Order creation error:', orderError);
+      console.error("Order creation error:", orderError);
       return NextResponse.json(
-        { error: 'Failed to create order', details: orderError?.message },
+        { error: "Failed to create order", details: orderError?.message },
         { status: 500 }
       );
     }
 
-    console.log('Order created:', order.id);
+    console.log("Order created:", order.id);
 
     // Create order items
-    // FIX: column is `product_title` (NOT NULL), not `title`
-    const orderItems = cartItems.map(item => ({
+    const orderItems = cartItems.map((item) => ({
       order_id: order.id,
       product_id: item.product_id,
       variant_id: item.variant_id,
       quantity: item.quantity,
       price_cents: item.price_cents,
-      product_title: item.products?.title || 'Product',
-      variant_title: item.product_variants?.title || 'Default',
-      sku: item.product_variants?.sku || null,
+      product_title: (item.products as any)?.title || "Product",
+      variant_title: (item.product_variants as any)?.title || "Default",
+      sku: (item.product_variants as any)?.sku || null,
     }));
 
     const { error: itemsError } = await supabase
-      .from('order_items')
+      .from("order_items")
       .insert(orderItems);
 
     if (itemsError) {
-      console.error('Order items error:', itemsError);
+      console.error("Order items error:", itemsError);
       return NextResponse.json(
-        { error: 'Failed to create order items', details: itemsError.message },
+        { error: "Failed to create order items", details: itemsError.message },
         { status: 500 }
       );
     }
 
-    console.log('Order items created:', orderItems.length);
+    console.log("Order items created:", orderItems.length);
 
     // Create Stripe Payment Intent
     const paymentIntent = await stripe.paymentIntents.create({
       amount: total_cents,
-      currency: 'usd',
-      automatic_payment_methods: {
-        enabled: true,
-      },
+      currency: "usd",
+      automatic_payment_methods: { enabled: true },
       metadata: {
         order_id: order.id,
         order_number: order.order_number,
+        guest_key: guestKey,
+        customer_id: customerId ?? "",
       },
       description: `Order ${order.order_number}`,
       shipping: {
@@ -180,20 +212,18 @@ export async function POST(request: NextRequest) {
           city: shipping_address.city,
           state: shipping_address.state,
           postal_code: shipping_address.zip,
-          country: 'US',
+          country: "US",
         },
       },
     });
 
-    console.log('Payment intent created:', paymentIntent.id);
+    console.log("Payment intent created:", paymentIntent.id);
 
-    // Update order with Stripe payment intent ID
+    // Link Stripe PI to order (customer_id + guest_key already set at insert)
     await supabase
-      .from('orders')
-      .update({
-        stripe_payment_intent_id: paymentIntent.id,
-      })
-      .eq('id', order.id);
+      .from("orders")
+      .update({ stripe_payment_intent_id: paymentIntent.id })
+      .eq("id", order.id);
 
     return NextResponse.json({
       success: true,
@@ -210,16 +240,14 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error: any) {
-    console.error('Create payment intent error:', error);
+    console.error("Create payment intent error:", error);
     return NextResponse.json(
-      { 
-        error: 'Failed to create payment intent',
+      {
+        error: "Failed to create payment intent",
         details: error.message,
-        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
       },
       { status: 500 }
     );
   }
 }
-// Also added a console.log('Order items created:', orderItems.length) after the successful insert so you can confirm in Vercel logs that items are going through.
-// After deploying, do a fresh test checkout — you should see order_items populate and the Orders Manager will have real line item data to display.

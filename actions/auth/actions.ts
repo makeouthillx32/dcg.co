@@ -46,8 +46,13 @@ export const signUpAction = async (formData: FormData) => {
   const userId = data.user.id;
   const displayName = `${firstName} ${lastName}`.trim();
 
+  // ── Profile upsert ────────────────────────────────────────────
+  // auth_user_id and email are required for role checks, order linkage,
+  // admin UI, and the customers identity system.
   const payload: ProfileUpsertRow = {
     id: userId,
+    auth_user_id: userId, // ← same as id for email/password signups
+    email: email.toLowerCase().trim(),
     role: "member",
     display_name: displayName,
     first_name: firstName,
@@ -61,6 +66,57 @@ export const signUpAction = async (formData: FormData) => {
   if (profileUpsertError) {
     console.error("[Auth] ❌ Profile upsert failed:", profileUpsertError.message);
     return encodedRedirect("error", "/sign-up", profileUpsertError.message);
+  }
+
+  // ── Customers upsert ──────────────────────────────────────────
+  // Creates a customers row (type: member) so order history and
+  // guest-order claiming work from day one.
+  // Also handles the case where they previously ordered as a guest
+  // with the same email — upgrades that row to member.
+  try {
+    const cookieStore = await cookies();
+    const guestKey = cookieStore.get("dcg_guest_key")?.value ?? null;
+
+    const { error: customerError } = await supabase
+      .from("customers")
+      .upsert(
+        {
+          auth_user_id: userId,
+          email: email.toLowerCase().trim(),
+          first_name: firstName,
+          last_name: lastName,
+          type: "member",
+          guest_key: null, // members don't need a guest_key
+          claimed_at: guestKey ? new Date().toISOString() : null,
+        },
+        { onConflict: "email" } // if they ordered as guest before, upgrade that row
+      );
+
+    if (customerError) {
+      // Non-fatal — profile is already created, don't block sign-up
+      console.error("[Auth] ⚠️ Customers upsert failed:", customerError.message);
+    } else {
+      console.log("[Auth] ✅ Customers row upserted for new member:", userId);
+
+      // If they had a guest_key cookie, backfill their past guest orders
+      if (guestKey) {
+        const { data: claimedCount, error: claimError } = await supabase.rpc(
+          "claim_guest_orders",
+          {
+            p_auth_user_id: userId,
+            p_email: email.toLowerCase().trim(),
+            p_guest_key: guestKey,
+          }
+        );
+        if (claimError) {
+          console.error("[Auth] ⚠️ claim_guest_orders failed:", claimError.message);
+        } else if (claimedCount > 0) {
+          console.log(`[Auth] ✅ Claimed ${claimedCount} past guest order(s) for ${email}`);
+        }
+      }
+    }
+  } catch (err) {
+    console.error("[Auth] ⚠️ Customers upsert threw:", err);
   }
 
   try {
@@ -136,47 +192,4 @@ export const forgotPasswordAction = async (formData: FormData) => {
 
   if (callbackUrl) return redirect(callbackUrl);
   return encodedRedirect("success", "/forgot-password", "Check your email for a link to reset your password.");
-};
-
-export const resetPasswordAction = async (formData: FormData) => {
-  const supabase = await createClient();
-  const password = (formData.get("password") as string) || "";
-  const confirmPassword = (formData.get("confirmPassword") as string) || "";
-
-  if (!password || !confirmPassword) {
-    return encodedRedirect("error", "/protected/reset-password", "Password and confirm password are required");
-  }
-  if (password !== confirmPassword) {
-    return encodedRedirect("error", "/protected/reset-password", "Passwords do not match");
-  }
-
-  const { error } = await supabase.auth.updateUser({ password });
-  if (error) return encodedRedirect("error", "/protected/reset-password", "Password update failed");
-
-  return encodedRedirect("success", "/protected/reset-password", "Password updated");
-};
-
-export const signOutAction = async () => {
-  const supabase = await createClient();
-  const store = await cookies();
-
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-
-  if (session?.user) authLogger.memberSignOut(session.user.id, session.user.email || "");
-
-  await clearAuthCookies();
-
-  // (extra safety) if Next cookies store behaves oddly in some env, keep a fallback
-  store.delete("userRole");
-  store.delete("userRoleUserId");
-  store.delete("userDisplayName");
-  store.delete("userPermissions");
-  store.delete("rememberMe");
-  store.delete("lastPage");
-
-  await supabase.auth.signOut();
-  await new Promise((r) => setTimeout(r, 100));
-  return redirect("/");
 };
