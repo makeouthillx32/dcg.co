@@ -34,9 +34,75 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
+/**
+ * Detects if the stored HTML is a full document (has <html> or <body> tags).
+ * If so, extracts the <style> blocks and <body> inner content separately
+ * so the page's own CSS doesn't leak out and break the shop layout.
+ */
+function extractHtmlParts(html: string): { styles: string; body: string } | null {
+  const isFullDoc = /<html[\s>]|<!DOCTYPE/i.test(html);
+  if (!isFullDoc) return null;
+
+  // Extract all <style>...</style> blocks
+  const styleMatches = [...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)];
+  const styles = styleMatches.map((m) => m[1]).join('\n');
+
+  // Extract inner content of <body>
+  const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+  const body = bodyMatch ? bodyMatch[1] : html;
+
+  return { styles, body };
+}
+
 // Render content based on format
 function renderContent(page: { content: string; content_format: 'html' | 'markdown' }) {
   if (page.content_format === 'html') {
+    const extracted = extractHtmlParts(page.content);
+
+    if (extracted) {
+      // Full HTML document — render styles scoped + body content isolated
+      return (
+        <div className="static-page-content w-full overflow-x-hidden">
+          {/* Scoped styles: injected inside a <style> tag within the content div */}
+          <style
+            dangerouslySetInnerHTML={{
+              __html: `
+                /* Scope all rules from the page's own stylesheet to .static-page-content */
+                .static-page-content {
+                  /* Reset body-level styles the HTML doc may have set */
+                  display: block !important;
+                  align-items: unset !important;
+                  flex-direction: unset !important;
+                }
+                .static-page-content body,
+                .static-page-content html {
+                  display: block;
+                }
+                /* Inject the page's own styles, lightly scoped */
+                ${extracted.styles
+                  .replace(/\bbody\b/g, '.static-page-content')
+                  .replace(/\bhtml\b/g, '.static-page-content')}
+                /* Mobile safety overrides */
+                .static-page-content main,
+                .static-page-content article,
+                .static-page-content section {
+                  max-width: 100% !important;
+                  width: 100% !important;
+                  box-sizing: border-box !important;
+                }
+                .static-page-content img {
+                  max-width: 100% !important;
+                  height: auto !important;
+                }
+              `,
+            }}
+          />
+          <div dangerouslySetInnerHTML={{ __html: extracted.body }} />
+        </div>
+      );
+    }
+
+    // Partial HTML (no full doc wrapper) — render as-is with prose
     return (
       <div
         className="
