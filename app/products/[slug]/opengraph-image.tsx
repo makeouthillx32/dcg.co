@@ -1,4 +1,10 @@
 // app/products/[slug]/opengraph-image.tsx
+//
+// ✅ VERIFIED against descowgrl Supabase (efglhzzageijqhfwvsub)
+//    - product_images.bucket_name = "product-images"
+//    - product_images.object_path = "products/{id}/{n}.webp"
+//    - is_primary, sort_order, position, is_public confirmed in live schema
+
 import { ImageResponse } from "next/og";
 import { createServerClient } from "@/utils/supabase/server";
 
@@ -11,34 +17,36 @@ export const size = {
 
 export const contentType = "image/png";
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function buildImageUrl(bucket_name: string | null, object_path: string | null): string | null {
-  if (!bucket_name || !object_path || !SUPABASE_URL) return null;
-  const encodedPath = object_path
+const SUPABASE_URL =
+  process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://efglhzzageijqhfwvsub.supabase.co";
+
+type RawImage = {
+  bucket_name: string | null;
+  object_path: string | null;
+  is_primary: boolean | null;
+  is_public: boolean | null;
+  sort_order: number | null;
+  position: number | null;
+};
+
+function buildStorageUrl(img: RawImage | null): string | null {
+  if (!img?.bucket_name || !img?.object_path) return null;
+  const encodedPath = img.object_path
     .split("/")
     .filter(Boolean)
     .map((seg) => encodeURIComponent(seg))
     .join("/");
-  return `${SUPABASE_URL}/storage/v1/object/public/${bucket_name}/${encodedPath}`;
+  return `${SUPABASE_URL}/storage/v1/object/public/${img.bucket_name}/${encodedPath}`;
 }
 
-function pickPrimaryImage(images: Array<{
-  bucket_name: string | null;
-  object_path: string | null;
-  is_primary: boolean | null;
-  sort_order: number | null;
-  position: number | null;
-  is_public: boolean | null;
-}>): { bucket_name: string | null; object_path: string | null } | null {
+function pickPrimaryImage(images: RawImage[]): RawImage | null {
   if (!images?.length) return null;
-
-  const publicOnly = images.filter((i) => i.is_public ?? true);
-  const arr = publicOnly.length ? publicOnly : images;
-
+  const pub = images.filter((i) => i.is_public ?? true);
+  const arr = pub.length ? pub : images;
   const primary = arr.find((i) => i.is_primary);
   if (primary) return primary;
-
   return [...arr].sort((a, b) => {
     const as = a.sort_order ?? a.position ?? 999999;
     const bs = b.sort_order ?? b.position ?? 999999;
@@ -46,9 +54,14 @@ function pickPrimaryImage(images: Array<{
   })[0] ?? null;
 }
 
-export default async function Image({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = await params;
+// ─── OG Image ─────────────────────────────────────────────────────────────────
 
+export default async function Image({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  const { slug } = await params;
   const supabase = await createServerClient();
 
   const { data: product } = await supabase
@@ -57,7 +70,6 @@ export default async function Image({ params }: { params: Promise<{ slug: string
       title,
       slug,
       price_cents,
-      currency,
       badge,
       product_images (
         bucket_name,
@@ -79,11 +91,9 @@ export default async function Image({ params }: { params: Promise<{ slug: string
   const badge = product?.badge ?? null;
 
   const primaryImg = pickPrimaryImage(product?.product_images ?? []);
-  const imageUrl = primaryImg
-    ? buildImageUrl(primaryImg.bucket_name, primaryImg.object_path)
-    : null;
+  const imageUrl = buildStorageUrl(primaryImg);
 
-  // Brand colors
+  // Brand palette
   const sand = "#F5E6C8";
   const rust = "#C0522A";
   const darkBrown = "#2C1810";
@@ -102,50 +112,40 @@ export default async function Image({ params }: { params: Promise<{ slug: string
           fontFamily: "Georgia, serif",
         }}
       >
-        {/* Decorative background texture stripes */}
+        {/* Subtle diagonal stripe texture */}
         <div
           style={{
             position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
+            inset: 0,
             background: `repeating-linear-gradient(
               -45deg,
               transparent,
               transparent 40px,
-              rgba(192, 82, 42, 0.04) 40px,
-              rgba(192, 82, 42, 0.04) 41px
+              rgba(192, 82, 42, 0.035) 40px,
+              rgba(192, 82, 42, 0.035) 41px
             )`,
             display: "flex",
           }}
         />
 
-        {/* Left: Brand info */}
+        {/* Left panel: brand + product info */}
         <div
           style={{
             display: "flex",
             flexDirection: "column",
             justifyContent: "space-between",
-            padding: "60px 56px",
-            flex: imageUrl ? "0 0 560px" : "1",
+            padding: "56px 52px",
+            flex: imageUrl ? "0 0 548px" : "1",
             zIndex: 1,
           }}
         >
-          {/* Top: Logo / Brand */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-              }}
-            >
-              {/* Brand mark — simple star/badge icon substitute */}
+          {/* Brand header */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <div
                 style={{
-                  width: 36,
-                  height: 36,
+                  width: 32,
+                  height: 32,
                   background: rust,
                   borderRadius: "50%",
                   display: "flex",
@@ -155,8 +155,8 @@ export default async function Image({ params }: { params: Promise<{ slug: string
               >
                 <div
                   style={{
-                    width: 16,
-                    height: 16,
+                    width: 12,
+                    height: 12,
                     background: warmWhite,
                     borderRadius: "50%",
                     display: "flex",
@@ -165,47 +165,40 @@ export default async function Image({ params }: { params: Promise<{ slug: string
               </div>
               <span
                 style={{
-                  fontSize: 20,
+                  fontSize: 18,
                   fontWeight: 700,
                   color: rust,
-                  letterSpacing: "0.12em",
+                  letterSpacing: "0.14em",
                   textTransform: "uppercase",
                 }}
               >
                 Desert Cowgirl
               </span>
             </div>
-
-            {/* Divider */}
             <div
               style={{
-                width: 60,
+                width: 48,
                 height: 2,
                 background: rust,
-                marginTop: 16,
+                marginTop: 14,
                 display: "flex",
               }}
             />
           </div>
 
-          {/* Middle: Product title + badge + price */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          {/* Product info */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
             {badge && (
-              <div
-                style={{
-                  display: "flex",
-                  alignSelf: "flex-start",
-                }}
-              >
+              <div style={{ display: "flex" }}>
                 <span
                   style={{
                     background: rust,
                     color: warmWhite,
-                    fontSize: 14,
+                    fontSize: 13,
                     fontWeight: 700,
                     letterSpacing: "0.1em",
                     textTransform: "uppercase",
-                    padding: "6px 18px",
+                    padding: "5px 16px",
                     borderRadius: 4,
                   }}
                 >
@@ -213,23 +206,21 @@ export default async function Image({ params }: { params: Promise<{ slug: string
                 </span>
               </div>
             )}
-
             <div
               style={{
-                fontSize: imageUrl ? 42 : 52,
+                fontSize: imageUrl ? 40 : 50,
                 fontWeight: 800,
                 color: darkBrown,
                 lineHeight: 1.15,
-                maxWidth: 440,
+                maxWidth: 430,
               }}
             >
               {title}
             </div>
-
             {price && (
               <div
                 style={{
-                  fontSize: 32,
+                  fontSize: 30,
                   fontWeight: 700,
                   color: rust,
                 }}
@@ -239,20 +230,19 @@ export default async function Image({ params }: { params: Promise<{ slug: string
             )}
           </div>
 
-          {/* Bottom: CTA */}
+          {/* CTA */}
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             <div
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 10,
                 background: darkBrown,
                 color: warmWhite,
-                fontSize: 16,
+                fontSize: 15,
                 fontWeight: 600,
                 letterSpacing: "0.08em",
                 textTransform: "uppercase",
-                padding: "14px 28px",
+                padding: "13px 26px",
                 borderRadius: 8,
                 alignSelf: "flex-start",
               }}
@@ -261,8 +251,8 @@ export default async function Image({ params }: { params: Promise<{ slug: string
             </div>
             <span
               style={{
-                fontSize: 13,
-                color: "rgba(44, 24, 16, 0.5)",
+                fontSize: 12,
+                color: "rgba(44, 24, 16, 0.45)",
                 marginTop: 4,
               }}
             >
@@ -271,17 +261,17 @@ export default async function Image({ params }: { params: Promise<{ slug: string
           </div>
         </div>
 
-        {/* Right: Product image */}
+        {/* Right panel: product image */}
         {imageUrl && (
           <div
             style={{
               flex: 1,
-              position: "relative",
               display: "flex",
+              position: "relative",
               overflow: "hidden",
             }}
           >
-            {/* Gradient overlay on left edge for smooth blending */}
+            {/* Left-edge fade so the image blends into the panel */}
             <div
               style={{
                 position: "absolute",
@@ -306,7 +296,7 @@ export default async function Image({ params }: { params: Promise<{ slug: string
           </div>
         )}
 
-        {/* Bottom brand bar */}
+        {/* Brand accent bar at bottom */}
         <div
           style={{
             position: "absolute",
