@@ -111,19 +111,19 @@ export default async function StaticPage({ params }: Props) {
               {page.meta_description}
             </p>
           )}
-          {(page.published_at || page.version) && (
+          {(page.published_at || page.updated_at || page.version) && (
             <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
-              {page.published_at && (
+              {(page.published_at || page.updated_at) && (
                 <>
                   Last updated:{' '}
-                  {new Date(page.published_at).toLocaleDateString('en-US', {
+                  {new Date(page.published_at ?? page.updated_at).toLocaleDateString('en-US', {
                     year: 'numeric',
                     month: 'long',
                     day: 'numeric',
                   })}
                 </>
               )}
-              {page.published_at && page.version && ' · '}
+              {(page.published_at || page.updated_at) && page.version && ' · '}
               {page.version && `v${page.version}`}
             </p>
           )}
