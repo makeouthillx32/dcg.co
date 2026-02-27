@@ -1,170 +1,121 @@
-// components/cart/CartItem.tsx
+// components/Layouts/overlays/cart/CartItem.tsx
 "use client";
 
-import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useCart, CartItem as CartItemType } from "@/components/Layouts/overlays/cart/cart-context";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { X, Minus, Plus } from "lucide-react";
+import { Minus, Plus, Trash2 } from "lucide-react";
+import { useCart } from "@/components/Layouts/overlays/cart/cart-context";
 
 interface CartItemProps {
-  item: CartItemType;
-}
-
-function isNonEmptyString(v: unknown): v is string {
-  return typeof v === "string" && v.trim().length > 0;
-}
-
-function isLocalImageUrl(url: string) {
-  // Next/Image is safest for local public assets or same-origin paths
-  return url.startsWith("/");
+  item: {
+    id: string;
+    variant_id: string;
+    product_id: string;
+    quantity: number;
+    price_cents: number;
+    product_title: string;
+    product_slug: string;
+    variant_title: string | null;
+    image_url: string | null;
+    image_alt?: string;
+  };
 }
 
 export default function CartItem({ item }: CartItemProps) {
   const { updateQuantity, removeItem } = useCart();
-  const [isUpdating, setIsUpdating] = useState(false);
 
-  const handleQuantityChange = async (newQuantity: number) => {
-    if (newQuantity < 1) return;
-
-    setIsUpdating(true);
-    try {
-      await updateQuantity(item.id, newQuantity);
-    } finally {
-      setIsUpdating(false);
-    }
-  };
-
-  const handleRemove = async () => {
-    setIsUpdating(true);
-    try {
-      await removeItem(item.id);
-    } finally {
-      setIsUpdating(false);
-    }
-  };
-
-  const itemTotal = (item.price_cents * item.quantity) / 100;
-
-  const imageUrl = isNonEmptyString(item.image_url) ? item.image_url.trim() : null;
+  const lineTotal = (item.price_cents * item.quantity) / 100;
+  const unitPrice = item.price_cents / 100;
 
   return (
-    <div className="flex gap-4 py-4 border-b last:border-0">
-      {/* Product Image */}
+    <div className="flex gap-4 px-5 py-4 bg-[hsl(var(--card))] hover:bg-[hsl(var(--muted)/0.3)] transition-colors">
+
+      {/* ── Product image ── */}
       <Link
         href={`/products/${item.product_slug}`}
-        className="relative h-24 w-24 flex-shrink-0 overflow-hidden rounded-md border bg-muted"
+        className="relative flex-shrink-0 h-[88px] w-[88px] overflow-hidden rounded-xl bg-[hsl(var(--muted))] shadow-sm"
+        tabIndex={-1}
       >
-        {imageUrl ? (
-          isLocalImageUrl(imageUrl) ? (
-            <Image
-              src={imageUrl}
-              alt={item.product_title}
-              fill
-              sizes="96px"
-              className="object-cover"
-              priority={false}
-            />
-          ) : (
-            // External URLs (Supabase public URL, CDN, etc.)
-            // Using <img> avoids Next/Image remotePatterns/domain blocking.
-            <img
-              src={imageUrl}
-              alt={item.product_title}
-              className="h-full w-full object-cover"
-              loading="lazy"
-              referrerPolicy="no-referrer"
-            />
-          )
+        {item.image_url ? (
+          <Image
+            src={item.image_url}
+            alt={item.image_alt ?? item.product_title}
+            fill
+            sizes="88px"
+            className="object-cover"
+          />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">
-            No image
+          <div className="flex h-full w-full items-center justify-center text-[hsl(var(--muted-foreground))] opacity-30 text-2xl">
+            🤠
           </div>
         )}
       </Link>
 
-      {/* Product Details */}
-      <div className="flex-1 flex flex-col justify-between">
-        {/* Title & Remove */}
+      {/* ── Details ── */}
+      <div className="flex flex-1 flex-col justify-between min-w-0 py-0.5">
+
+        {/* Top row: title + remove */}
         <div className="flex items-start justify-between gap-2">
-          <div className="flex-1">
+          <div className="min-w-0">
             <Link
               href={`/products/${item.product_slug}`}
-              className="font-medium hover:underline line-clamp-2"
+              className="block text-sm font-semibold text-[hsl(var(--foreground))] leading-snug line-clamp-2 hover:underline underline-offset-2"
             >
               {item.product_title}
             </Link>
-
-            {/* Variant Info */}
             {item.variant_title && (
-              <p className="text-sm text-muted-foreground mt-1">{item.variant_title}</p>
-            )}
-
-            {/* SKU */}
-            {item.variant_sku && (
-              <p className="text-xs text-muted-foreground mt-1">SKU: {item.variant_sku}</p>
+              <p className="mt-0.5 text-xs text-[hsl(var(--muted-foreground))] truncate">
+                {item.variant_title}
+              </p>
             )}
           </div>
 
-          {/* Remove Button */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 -mt-1 -mr-2"
-            onClick={handleRemove}
-            disabled={isUpdating}
+          {/* Remove button */}
+          <button
+            onClick={() => removeItem(item.id)}
+            className="flex-shrink-0 flex h-7 w-7 items-center justify-center rounded-full text-[hsl(var(--muted-foreground))] hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-950/40 transition-colors"
             aria-label="Remove item"
           >
-            <X className="h-4 w-4" />
-          </Button>
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
         </div>
 
-        {/* Price & Quantity Controls */}
-        <div className="flex items-center justify-between mt-2">
-          {/* Quantity Controls */}
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => handleQuantityChange(item.quantity - 1)}
-              disabled={isUpdating || item.quantity <= 1}
+        {/* Bottom row: qty controls + price */}
+        <div className="flex items-center justify-between gap-2 mt-2">
+
+          {/* Quantity stepper */}
+          <div className="flex items-center rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--background))] overflow-hidden">
+            <button
+              onClick={() => updateQuantity(item.id, item.quantity - 1)}
+              disabled={item.quantity <= 1}
+              className="flex h-8 w-8 items-center justify-center text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))] disabled:opacity-30 transition-colors active:scale-90"
+              aria-label="Decrease quantity"
             >
               <Minus className="h-3 w-3" />
-            </Button>
+            </button>
 
-            <Input
-              type="number"
-              min="1"
-              max="99"
-              value={item.quantity}
-              onChange={(e) => {
-                const value = parseInt(e.target.value);
-                if (!isNaN(value)) handleQuantityChange(value);
-              }}
-              className="h-8 w-14 text-center"
-              disabled={isUpdating}
-            />
+            <span className="w-8 text-center text-sm font-semibold text-[hsl(var(--foreground))] tabular-nums select-none">
+              {item.quantity}
+            </span>
 
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => handleQuantityChange(item.quantity + 1)}
-              disabled={isUpdating || item.quantity >= 99}
+            <button
+              onClick={() => updateQuantity(item.id, item.quantity + 1)}
+              disabled={item.quantity >= 99}
+              className="flex h-8 w-8 items-center justify-center text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))] disabled:opacity-30 transition-colors active:scale-90"
+              aria-label="Increase quantity"
             >
               <Plus className="h-3 w-3" />
-            </Button>
+            </button>
           </div>
 
-          {/* Item Total */}
+          {/* Price */}
           <div className="text-right">
-            <p className="font-semibold">${itemTotal.toFixed(2)}</p>
+            <p className="text-sm font-bold text-[hsl(var(--foreground))] tabular-nums">
+              ${lineTotal.toFixed(2)}
+            </p>
             {item.quantity > 1 && (
-              <p className="text-xs text-muted-foreground">
-                ${(item.price_cents / 100).toFixed(2)} each
+              <p className="text-xs text-[hsl(var(--muted-foreground))] tabular-nums">
+                ${unitPrice.toFixed(2)} ea
               </p>
             )}
           </div>
