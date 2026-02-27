@@ -1,4 +1,4 @@
-// components/cart/CartDrawer.tsx
+// components/Layouts/overlays/cart/CartDrawer.tsx
 "use client";
 
 import { useCart } from "@/components/Layouts/overlays/cart/cart-context";
@@ -10,35 +10,38 @@ import { Separator } from "@/components/ui/separator";
 import CartItem from "./CartItem";
 import EmptyCart from "./EmptyCart";
 import CartShareButton from "./CartShareButton";
+import { SavedCartsHistory } from "./SavedCartsBanner";
 import { ArrowRight } from "lucide-react";
 
 export default function CartDrawer() {
   const router = useRouter();
   const { isOpen, closeCart, items, itemCount, subtotal } = useCart();
 
-  // Handle checkout navigation
   const handleCheckout = () => {
-    closeCart(); // Close the drawer
-    router.push('/checkout'); // Navigate to checkout
+    closeCart();
+    router.push("/checkout");
   };
 
   return (
-    <SheetHeader className="px-6 py-4 border-b">
-      <div className="flex items-center justify-between gap-3">
-        <SheetTitle className="text-2xl font-bold">
-          Your Cart
-          {itemCount > 0 && (
-            <span className="text-muted-foreground text-base ml-2">
-              ({itemCount} {itemCount === 1 ? 'item' : 'items'})
-            </span>
-          )}
-        </SheetTitle>
+    <Sheet open={isOpen} onOpenChange={(open) => !open && closeCart()}>
+      <SheetContent side="right" className="flex flex-col w-full sm:max-w-md p-0">
 
-        {/* Share icon — only visible when cart sharing is enabled */}
-        <CartShareButton />
-      </div>
-    </SheetHeader>
+        {/* Header */}
+        <SheetHeader className="px-6 py-4 border-b">
+          <div className="flex items-center justify-between gap-3">
+            <SheetTitle className="text-2xl font-bold">
+              Your Cart
+              {itemCount > 0 && (
+                <span className="text-muted-foreground text-base ml-2">
+                  ({itemCount} {itemCount === 1 ? "item" : "items"})
+                </span>
+              )}
+            </SheetTitle>
 
+            {/* Share icon — only visible when cart sharing is enabled */}
+            <CartShareButton />
+          </div>
+        </SheetHeader>
 
         {/* Cart Items - Scrollable */}
         <ScrollArea className="flex-1 px-6">
@@ -59,9 +62,7 @@ export default function CartDrawer() {
             {/* Subtotal */}
             <div className="flex items-center justify-between text-lg">
               <span className="font-medium">Subtotal</span>
-              <span className="font-bold">
-                ${(subtotal / 100).toFixed(2)}
-              </span>
+              <span className="font-bold">${(subtotal / 100).toFixed(2)}</span>
             </div>
 
             <Separator />
@@ -72,11 +73,7 @@ export default function CartDrawer() {
             </p>
 
             {/* Checkout Button */}
-            <Button 
-              size="lg" 
-              className="w-full"
-              onClick={handleCheckout}
-            >
+            <Button size="lg" className="w-full" onClick={handleCheckout}>
               <span className="flex items-center justify-center gap-2">
                 Proceed to Checkout
                 <ArrowRight className="w-4 h-4" />
@@ -84,15 +81,15 @@ export default function CartDrawer() {
             </Button>
 
             {/* Continue Shopping */}
-            <Button 
-              variant="ghost" 
-              className="w-full"
-              onClick={closeCart}
-            >
+            <Button variant="ghost" className="w-full" onClick={closeCart}>
               Continue Shopping
             </Button>
           </div>
         )}
+
+        {/* Recently Saved Carts - expandable history */}
+        <SavedCartsHistory onRestore={closeCart} />
+
       </SheetContent>
     </Sheet>
   );
