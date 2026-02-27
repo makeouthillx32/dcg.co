@@ -9,6 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import CartItem from "./CartItem";
 import EmptyCart from "./EmptyCart";
+import CartShareButton from "./CartShareButton";
 import { ArrowRight } from "lucide-react";
 
 export default function CartDrawer() {
@@ -22,19 +23,22 @@ export default function CartDrawer() {
   };
 
   return (
-    <Sheet open={isOpen} onOpenChange={closeCart}>
-      <SheetContent className="w-full sm:max-w-lg flex flex-col p-0">
-        {/* Header */}
-        <SheetHeader className="px-6 py-4 border-b">
-          <SheetTitle className="text-2xl font-bold">
-            Your Cart
-            {itemCount > 0 && (
-              <span className="text-muted-foreground text-base ml-2">
-                ({itemCount} {itemCount === 1 ? 'item' : 'items'})
-              </span>
-            )}
-          </SheetTitle>
-        </SheetHeader>
+    <SheetHeader className="px-6 py-4 border-b">
+      <div className="flex items-center justify-between gap-3">
+        <SheetTitle className="text-2xl font-bold">
+          Your Cart
+          {itemCount > 0 && (
+            <span className="text-muted-foreground text-base ml-2">
+              ({itemCount} {itemCount === 1 ? 'item' : 'items'})
+            </span>
+          )}
+        </SheetTitle>
+
+        {/* Share icon — only visible when cart sharing is enabled */}
+        <CartShareButton />
+      </div>
+    </SheetHeader>
+
 
         {/* Cart Items - Scrollable */}
         <ScrollArea className="flex-1 px-6">
