@@ -1,3 +1,9 @@
+// ═══════════════════════════════════════════════════════════════════
+// FILE 1: lib/orders/types.ts
+// Changes: add 'source' field and 'is_pos' to AdminOrder
+// ═══════════════════════════════════════════════════════════════════
+
+export type OrderSource = 'web' | 'pos';
 export type OrderStatus = 'pending' | 'processing' | 'paid' | 'fulfilled' | 'cancelled' | 'refunded';
 export type PaymentStatus = 'unpaid' | 'pending' | 'paid' | 'refunded';
 export type FulfillmentStatus = 'unfulfilled' | 'partial' | 'fulfilled' | 'returned' | 'cancelled';
@@ -44,9 +50,14 @@ export interface AdminOrder {
   items: AdminOrderItem[];
   tracking_number?: string;
   tracking_url?: string;
+  label_pdf_path?: string;
+  label_postage_cents?: number;
   internal_notes?: string;
-  // Identity
-  is_guest: boolean;
-  is_member: boolean;
-  points_earned: number; // frontend display only — not persisted yet
+  // Identity — mutually exclusive
+  source: OrderSource;    // 'web' | 'pos'
+  is_pos: boolean;        // source === 'pos' — in-person admin sale, no shipping needed
+  is_member: boolean;     // auth_user_id is set — logged-in web purchase
+  is_guest: boolean;      // guest_key set, no auth — anonymous web purchase
+  is_legacy: boolean;     // pre-identity system, both null
+  points_earned: number;
 }

@@ -4,7 +4,7 @@
 
 import { useState, useMemo, useCallback } from 'react';
 import { OrderGrid } from './OrderGrid';
-import { OrderToolbar } from './Toolbar';
+import { OrderToolbar, CustomerTypeFilter } from './Toolbar';
 import { OrderDetailsDialog } from './OrderDetailsDialog';
 import { ShippingSlip } from './Print';
 import { PackagePicker } from './PackagePicker';
@@ -15,21 +15,20 @@ interface OrdersManagerProps {
 }
 
 export function OrdersManager({ initialOrders }: OrdersManagerProps) {
-  const [orders, setOrders]           = useState<AdminOrder[]>(initialOrders);
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [orders, setOrders]             = useState<AdminOrder[]>(initialOrders);
+  const [selectedIds, setSelectedIds]   = useState<string[]>([]);
   const [editingOrder, setEditingOrder] = useState<AdminOrder | null>(null);
 
-  // Packing slip (HTML) — still available from context menu / grid printer icon
-  const [slipOrder, setSlipOrder]     = useState<AdminOrder | null>(null);
-
-  // Label generation — opened from grid printer icon (bypasses detail dialog)
-  const [labelOrder, setLabelOrder]   = useState<AdminOrder | null>(null);
+  // HTML packing slip — still available from context menu
+  const [slipOrder, setSlipOrder]   = useState<AdminOrder | null>(null);
+  // Label picker — opened from grid printer icon when no stored label exists
+  const [labelOrder, setLabelOrder] = useState<AdminOrder | null>(null);
 
   // Filters
-  const [fulfillmentFilter, setFulfillmentFilter] = useState<FulfillmentStatus | 'all'>('all');
-  const [paymentFilter, setPaymentFilter]         = useState<PaymentStatus | 'all'>('all');
-  const [customerTypeFilter, setCustomerTypeFilter] = useState<'all' | 'member' | 'guest'>('all');
-  const [searchQuery, setSearchQuery]             = useState('');
+  const [fulfillmentFilter, setFulfillmentFilter]     = useState<FulfillmentStatus | 'all'>('all');
+  const [paymentFilter, setPaymentFilter]             = useState<PaymentStatus | 'all'>('all');
+  const [customerTypeFilter, setCustomerTypeFilter]   = useState<CustomerTypeFilter>('all');
+  const [searchQuery, setSearchQuery]                 = useState('');
 
   // ── Fulfill ───────────────────────────────────────────────────
   const handleFulfill = useCallback(async (order: AdminOrder, trackingNumber?: string) => {
@@ -42,34 +41,31 @@ export function OrdersManager({ initialOrders }: OrdersManagerProps) {
       const json = await res.json().catch(() => ({}));
       throw new Error(json.error ?? 'Failed to mark fulfilled');
     }
-    setOrders((prev) =>
-      prev.map((o) =>
-        o.id === order.id
-          ? { ...o, fulfillment_status: 'fulfilled', tracking_number: trackingNumber ?? o.tracking_number }
-          : o
-      )
-    );
-    setEditingOrder((prev) =>
-      prev?.id === order.id
-        ? { ...prev, fulfillment_status: 'fulfilled', tracking_number: trackingNumber ?? prev.tracking_number }
-        : prev
-    );
+    const update = (o: AdminOrder) =>
+      o.id === order.id
+        ? { ...o, fulfillment_status: 'fulfilled' as FulfillmentStatus, tracking_number: trackingNumber ?? o.tracking_number }
+        : o;
+    setOrders((prev) => prev.map(update));
+    setEditingOrder((prev) => prev && update(prev));
   }, []);
 
-  // ── Grid "print" icon → open PackagePicker directly ──────────
-  // If order already has a stored label, opens detail dialog instead
-  // (where they can hit Reprint)
+  // ── Print / Label ─────────────────────────────────────────────
+  // Grid printer icon: POS orders skip label (open detail dialog);
+  // web orders with stored label → detail dialog for reprint;
+  // web orders without label → PackagePicker
   const handlePrint = useCallback((order: AdminOrder) => {
-    if ((order as any).label_pdf_path) {
-      // Already has a label — open the detail dialog so they can reprint
+    if (order.is_pos) {
+      // POS order — no label, just open details
+      setEditingOrder(order);
+    } else if (order.label_pdf_path) {
+      // Label already paid for — open detail dialog to reprint
       setEditingOrder(order);
     } else {
-      // No label yet — open picker to generate one
+      // No label yet — open PackagePicker to generate
       setLabelOrder(order);
     }
   }, []);
 
-  // Called by PackagePicker (grid-level, not inside detail dialog)
   const handleLabelSuccess = useCallback((trackingNumber: string, trackingUrl: string) => {
     if (!labelOrder) return;
     setOrders((prev) =>
@@ -82,13 +78,10 @@ export function OrdersManager({ initialOrders }: OrdersManagerProps) {
     setLabelOrder(null);
   }, [labelOrder]);
 
-  // ── Packing slip (HTML browser print) ────────────────────────
+  // HTML packing slip (paper insert)
   const handlePackingSlip = useCallback((order: AdminOrder) => {
     setSlipOrder(order);
-    setTimeout(() => {
-      window.print();
-      setSlipOrder(null);
-    }, 300);
+    setTimeout(() => { window.print(); setSlipOrder(null); }, 300);
   }, []);
 
   // ── Batch ─────────────────────────────────────────────────────
@@ -110,13 +103,15 @@ export function OrdersManager({ initialOrders }: OrdersManagerProps) {
     return orders.filter((o) => {
       if (fulfillmentFilter !== 'all' && o.fulfillment_status !== fulfillmentFilter) return false;
       if (paymentFilter !== 'all' && o.payment_status !== paymentFilter) return false;
-      if (customerTypeFilter === 'member' && !o.is_member) return false;
-      if (customerTypeFilter === 'guest' && !o.is_guest) return false;
+      // Customer type filter — now three buckets
+      if (customerTypeFilter === 'pos'    && !o.is_pos)    return false;
+      if (customerTypeFilter === 'member' && (!o.is_member || o.is_pos)) return false;
+      if (customerTypeFilter === 'guest'  && (!o.is_guest  || o.is_pos)) return false;
       if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
+        const q    = searchQuery.toLowerCase();
         const name = [o.customer_first_name, o.customer_last_name].join(' ').toLowerCase();
         if (
-          !o.order_number.toLowerCase().includes(q) &&
+          !String(o.order_number).toLowerCase().includes(q) &&
           !o.email.toLowerCase().includes(q) &&
           !name.includes(q)
         ) return false;
@@ -127,14 +122,14 @@ export function OrdersManager({ initialOrders }: OrdersManagerProps) {
 
   return (
     <>
-      {/* HTML packing slip — hidden from screen, shown only to printer */}
+      {/* HTML packing slip — hidden on screen, shown by @media print */}
       {slipOrder && (
         <div className="hidden print:block">
           <ShippingSlip order={slipOrder} />
         </div>
       )}
 
-      {/* PackagePicker — opened from grid printer icon when no label exists */}
+      {/* PackagePicker — label generation for web orders */}
       {labelOrder && (
         <PackagePicker
           order={labelOrder}

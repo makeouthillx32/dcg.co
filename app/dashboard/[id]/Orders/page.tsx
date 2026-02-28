@@ -17,6 +17,7 @@ async function fetchOrders(): Promise<AdminOrder[]> {
       created_at,
       status,
       payment_status,
+      source,
       subtotal_cents,
       shipping_cents,
       tax_cents,
@@ -29,6 +30,8 @@ async function fetchOrders(): Promise<AdminOrder[]> {
       shipping_method_name,
       tracking_number,
       tracking_url,
+      label_pdf_path,
+      label_postage_cents,
       internal_notes,
       guest_key,
       auth_user_id,
@@ -57,12 +60,12 @@ async function fetchOrders(): Promise<AdminOrder[]> {
   }
 
   return (data ?? []).map((o: any): AdminOrder => {
-    // auth_user_id set → member (logged-in purchase)
-    // guest_key set, no auth_user_id → guest
-    // both null → legacy order (pre-identity system)
-    const isMember = !!o.auth_user_id;
-    const isGuest  = !isMember && !!o.guest_key;
-    const isLegacy = !isMember && !isGuest;
+    const source = (o.source ?? 'web') as 'web' | 'pos';
+    const isPOS   = source === 'pos';
+    // For web orders: classify by identity columns
+    const isMember = !isPOS && !!o.auth_user_id;
+    const isGuest  = !isPOS && !isMember && !!o.guest_key;
+    const isLegacy = !isPOS && !isMember && !isGuest;
 
     return {
       id: o.id,
@@ -71,6 +74,8 @@ async function fetchOrders(): Promise<AdminOrder[]> {
       status: o.status,
       payment_status: o.payment_status,
       fulfillment_status: o.fulfillments?.[0]?.status ?? 'unfulfilled',
+      source,
+      is_pos: isPOS,
       subtotal_cents: o.subtotal_cents ?? 0,
       shipping_cents: o.shipping_cents ?? 0,
       tax_cents: o.tax_cents ?? 0,
@@ -83,6 +88,8 @@ async function fetchOrders(): Promise<AdminOrder[]> {
       shipping_method_name: o.shipping_method_name,
       tracking_number: o.tracking_number,
       tracking_url: o.tracking_url,
+      label_pdf_path: o.label_pdf_path,
+      label_postage_cents: o.label_postage_cents,
       internal_notes: o.internal_notes,
       is_member: isMember,
       is_guest: isGuest,
@@ -103,19 +110,18 @@ async function fetchOrders(): Promise<AdminOrder[]> {
   });
 }
 
-// Server component — no 'use client'
-export default async function OrdersPage() {
-  const orders = await fetchOrders();
-
+export default async function OrdersPage({ params }: { params: { id: string } }) {
   return (
-    <>
-      <Breadcrumb pageName="Orders" />
-
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <Suspense fallback={<OrdersSkeleton />}>
-          <OrdersManager initialOrders={orders} />
-        </Suspense>
-      </div>
-    </>
+    <div className="space-y-6">
+      <Breadcrumb items={[{ label: 'Orders' }]} />
+      <Suspense fallback={<OrdersSkeleton />}>
+        <OrdersData />
+      </Suspense>
+    </div>
   );
+}
+
+async function OrdersData() {
+  const orders = await fetchOrders();
+  return <OrdersManager initialOrders={orders} />;
 }

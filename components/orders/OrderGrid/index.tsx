@@ -1,11 +1,14 @@
 'use client';
 
 // components/orders/OrderGrid/index.tsx
+// CustomerTypeBadge now handles three states: Member | Guest | POS (In-Person)
+// The mobile card and desktop row both show the badge.
+// Filter is expanded to include 'pos' via the customerTypeFilter prop.
 
 import React, { useState } from 'react';
 import { AdminOrder, FulfillmentStatus } from '@/lib/orders/types';
 import { OrderContextMenu } from '../ContextMenu';
-import { MoreHorizontal, Printer, CheckCircle2, User, Star } from 'lucide-react';
+import { MoreHorizontal, Printer, CheckCircle2, User, Star, ShoppingBag } from 'lucide-react';
 
 interface OrderGridProps {
   orders: AdminOrder[];
@@ -42,7 +45,22 @@ function FulfillmentBadge({ status }: { status: FulfillmentStatus }) {
 }
 
 // ── Customer type badge ────────────────────────────────────────────
+// Three mutually exclusive states:
+//   POS    → in-person admin sale  (purple, ShoppingBag icon)
+//   Member → logged-in web order   (yellow, Star icon)
+//   Guest  → anonymous web order   (gray, User icon)
 function CustomerTypeBadge({ order }: { order: AdminOrder }) {
+  if (order.is_pos) {
+    return (
+      <span
+        title="In-person sale via POS"
+        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold border bg-purple-50 text-purple-700 border-purple-200"
+      >
+        <ShoppingBag className="w-2.5 h-2.5" />
+        POS
+      </span>
+    );
+  }
   if (order.is_member) {
     return (
       <span
@@ -82,45 +100,38 @@ function OrderCard({
   return (
     <div
       className={`rounded-lg border p-4 cursor-pointer transition-colors ${
-        isSelected ? 'border-black bg-gray-50' : 'border-gray-200 bg-white hover:bg-gray-50'
+        isSelected ? 'border-black bg-gray-50' : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50/50'
       }`}
       onClick={onRowClick}
     >
-      {/* Top row: checkbox + order # + total */}
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 min-w-0">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start gap-3 min-w-0">
           <input
             type="checkbox"
             checked={isSelected}
-            onChange={(e) => { e.stopPropagation(); onSelect(); }}
+            onChange={onSelect}
             onClick={(e) => e.stopPropagation()}
-            className="h-4 w-4 rounded border-gray-300 shrink-0"
+            className="mt-1 shrink-0"
           />
-          <span className="font-mono font-bold text-gray-900 truncate">#{order.order_number}</span>
-          <CustomerTypeBadge order={order} />
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-bold font-mono text-sm">#{order.order_number}</span>
+              <CustomerTypeBadge order={order} />
+            </div>
+            <div className="text-xs text-gray-500 mt-0.5 truncate">
+              {customerName ?? order.email}
+            </div>
+            <div className="text-xs text-gray-400 mt-0.5">
+              {new Date(order.created_at).toLocaleDateString('en-US', {
+                month: 'short', day: 'numeric',
+              })}
+            </div>
+          </div>
         </div>
-        <span className="font-mono font-bold text-gray-900 shrink-0">
-          ${(order.total_cents / 100).toFixed(2)}
-        </span>
-      </div>
 
-      {/* Customer info */}
-      <div className="mt-2 space-y-0.5">
-        <div className="text-sm text-gray-700 truncate">{order.email}</div>
-        {customerName && (
-          <div className="text-xs text-gray-400 uppercase tracking-tight">{customerName}</div>
-        )}
-        <div className="text-xs text-gray-400">
-          {new Date(order.created_at).toLocaleDateString('en-US', {
-            month: 'short', day: 'numeric', year: 'numeric',
-          })}
-        </div>
-      </div>
-
-      {/* Bottom row: badges + quick actions */}
-      <div className="mt-3 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 flex-wrap">
-          <FulfillmentBadge status={order.fulfillment_status ?? 'unfulfilled'} />
+        <div className="flex flex-col items-end gap-1 shrink-0">
+          <span className="font-mono font-bold text-sm">${(order.total_cents / 100).toFixed(2)}</span>
+          <FulfillmentBadge status={order.fulfillment_status} />
           <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${
             order.payment_status === 'paid'
               ? 'bg-green-50 text-green-700 border-green-100'
@@ -135,10 +146,13 @@ function OrderCard({
         </div>
 
         <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-          <button title="Print slip" onClick={onPrint}
-            className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors">
-            <Printer className="w-4 h-4" />
-          </button>
+          {/* POS orders don't need a shipping label */}
+          {!order.is_pos && (
+            <button title="Print label" onClick={onPrint}
+              className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors">
+              <Printer className="w-4 h-4" />
+            </button>
+          )}
           {order.fulfillment_status !== 'fulfilled' && (
             <button title="Mark fulfilled" onClick={onFulfill}
               className="p-1.5 rounded hover:bg-green-50 text-gray-400 hover:text-green-700 transition-colors">
@@ -177,34 +191,26 @@ export function OrderGrid({ orders, selectedIds, onSelectChange, onRowClick, onF
     try {
       await onFulfill(order);
     } catch (err: any) {
-      alert(err.message ?? 'Failed to fulfill order');
+      alert(err.message ?? 'Failed to mark fulfilled');
     } finally {
       setFulfilling(null);
     }
   };
 
-  const handleContextAction = async (action: string, order: AdminOrder) => {
+  const handleContextAction = (action: string, order: AdminOrder) => {
     if (action === 'view') onRowClick(order);
-    if (action === 'print_receipt') onPrint(order);
-    if (action === 'mark_shipped') {
-      setFulfilling(order.id);
-      try { await onFulfill(order); } catch (err: any) { alert(err.message); } finally { setFulfilling(null); }
-    }
+    if (action === 'print_receipt' || action === 'print') onPrint(order);
+    if (action === 'mark_shipped') onFulfill(order);
     if (action === 'copy_id') navigator.clipboard.writeText(order.id).catch(() => {});
   };
 
-  if (orders.length === 0) {
-    return (
-      <div className="text-center py-16 text-gray-400 italic text-sm bg-white border border-gray-200 rounded-lg">
-        No orders match the current filters.
-      </div>
-    );
-  }
+  const isBusy = (id: string) => fulfilling === id;
 
+  // ── Mobile ────────────────────────────────────────────────────
   return (
-    <div className="relative">
-      {/* ── MOBILE cards ── */}
-      <div className="md:hidden space-y-3">
+    <div>
+      {/* Mobile cards */}
+      <div className="sm:hidden space-y-2">
         {orders.map((order) => (
           <OrderCard
             key={order.id}
@@ -216,82 +222,80 @@ export function OrderGrid({ orders, selectedIds, onSelectChange, onRowClick, onF
             onPrint={() => onPrint(order)}
           />
         ))}
+        {orders.length === 0 && (
+          <div className="py-12 text-center text-sm text-gray-400">No orders match your filters</div>
+        )}
       </div>
 
-      {/* ── DESKTOP table ── */}
-      <div className="hidden md:block overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
-        <table className="w-full text-left text-sm text-gray-500">
-          <thead className="bg-gray-50 text-xs uppercase text-gray-700">
+      {/* Desktop table */}
+      <div className="hidden sm:block overflow-x-auto rounded-lg border border-gray-200">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
-              <th className="w-12 px-4 py-3">
-                <input type="checkbox" title="Select all"
-                  className="h-4 w-4 rounded border-gray-300 cursor-pointer"
-                  checked={orders.length > 0 && selectedIds.length === orders.length}
+              <th className="w-10 px-4 py-3">
+                <input
+                  type="checkbox"
+                  checked={selectedIds.length > 0 && selectedIds.length === orders.length}
+                  ref={(el) => {
+                    if (el) el.indeterminate = selectedIds.length > 0 && selectedIds.length < orders.length;
+                  }}
                   onChange={toggleAll}
                 />
               </th>
-              <th className="px-4 py-3 font-semibold">Order</th>
-              <th className="px-4 py-3 font-semibold">Date</th>
-              <th className="px-4 py-3 font-semibold">Customer</th>
-              <th className="px-4 py-3 font-semibold">Fulfillment</th>
-              <th className="px-4 py-3 font-semibold">Payment</th>
-              <th className="px-4 py-3 font-semibold text-right">Total</th>
-              <th className="px-4 py-3 text-center w-28">Actions</th>
+              <th className="px-4 py-3 text-left font-semibold text-gray-600">Order</th>
+              <th className="px-4 py-3 text-left font-semibold text-gray-600">Customer</th>
+              <th className="px-4 py-3 text-left font-semibold text-gray-600">Date</th>
+              <th className="px-4 py-3 text-left font-semibold text-gray-600">Status</th>
+              <th className="px-4 py-3 text-left font-semibold text-gray-600">Payment</th>
+              <th className="px-4 py-3 text-right font-semibold text-gray-600">Total</th>
+              <th className="px-4 py-3 text-center font-semibold text-gray-600">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
+            {orders.length === 0 && (
+              <tr>
+                <td colSpan={8} className="py-12 text-center text-sm text-gray-400">
+                  No orders match your filters
+                </td>
+              </tr>
+            )}
             {orders.map((order) => {
-              const isSelected = selectedIds.includes(order.id);
               const customerName = [order.customer_first_name, order.customer_last_name]
-                .filter(Boolean).join(' ') || null;
-              const isBusy = fulfilling === order.id;
+                .filter(Boolean).join(' ') || order.email;
 
               return (
                 <tr
                   key={order.id}
-                  onContextMenu={(e) => handleContextMenu(e, order)}
                   onClick={() => onRowClick(order)}
-                  className={`group cursor-pointer transition-colors hover:bg-gray-50 ${
-                    isSelected ? 'bg-blue-50/30 hover:bg-blue-50/50' : ''
-                  }`}
+                  onContextMenu={(e) => handleContextMenu(e, order)}
+                  className="hover:bg-gray-50 cursor-pointer transition-colors"
                 >
-                  {/* Checkbox */}
                   <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                    <input type="checkbox"
-                      className="h-4 w-4 rounded border-gray-300 cursor-pointer"
-                      checked={isSelected}
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(order.id)}
                       onChange={() => toggleOne(order.id)}
                     />
                   </td>
 
-                  {/* Order # */}
-                  <td className="px-4 py-3 font-mono font-bold text-gray-900">
-                    #{order.order_number}
+                  {/* Order number + type badge */}
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-bold">#{order.order_number}</span>
+                      <CustomerTypeBadge order={order} />
+                    </div>
+                  </td>
+
+                  {/* Customer */}
+                  <td className="px-4 py-3 text-gray-700 max-w-[180px] truncate">
+                    {customerName}
                   </td>
 
                   {/* Date */}
-                  <td className="px-4 py-3 whitespace-nowrap text-gray-600 text-xs">
+                  <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
                     {new Date(order.created_at).toLocaleDateString('en-US', {
                       month: 'short', day: 'numeric', year: 'numeric',
                     })}
-                  </td>
-
-                  {/* Customer — with type badge */}
-                  <td className="px-4 py-3">
-                    <div className="flex flex-col gap-0.5">
-                      <div className="flex items-center gap-1.5">
-                        <CustomerTypeBadge order={order} />
-                        {order.is_member && order.points_earned > 0 && (
-                          <span className="text-[10px] text-yellow-600 font-semibold">
-                            +{order.points_earned} pts
-                          </span>
-                        )}
-                      </div>
-                      <span className="font-medium text-gray-900 truncate max-w-[160px]">{order.email}</span>
-                      {customerName && (
-                        <span className="text-[10px] text-gray-400 uppercase tracking-tight">{customerName}</span>
-                      )}
-                    </div>
                   </td>
 
                   {/* Fulfillment */}
@@ -318,18 +322,21 @@ export function OrderGrid({ orders, selectedIds, onSelectChange, onRowClick, onF
                   {/* Actions */}
                   <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center justify-center gap-1">
-                      <button title="Print slip" onClick={() => onPrint(order)}
-                        className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors">
-                        <Printer className="w-4 h-4" />
-                      </button>
+                      {/* Hide print for POS orders — no label needed */}
+                      {!order.is_pos && (
+                        <button title="Print label" onClick={() => onPrint(order)}
+                          className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors">
+                          <Printer className="w-4 h-4" />
+                        </button>
+                      )}
                       {order.fulfillment_status !== 'fulfilled' && (
                         <button
                           title="Mark fulfilled"
-                          disabled={isBusy}
+                          disabled={isBusy(order.id)}
                           onClick={(e) => handleFulfillClick(e, order)}
                           className="p-1.5 rounded hover:bg-green-50 text-gray-400 hover:text-green-700 disabled:opacity-40 transition-colors"
                         >
-                          <CheckCircle2 className={`w-4 h-4 ${isBusy ? 'animate-spin' : ''}`} />
+                          <CheckCircle2 className={`w-4 h-4 ${isBusy(order.id) ? 'animate-spin' : ''}`} />
                         </button>
                       )}
                       <button

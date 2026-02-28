@@ -1,28 +1,47 @@
 // app/api/orders/[id]/label/route.ts
 // Generates a USPS shipping label for an order.
-// 1. Fetches order from Supabase
-// 2. Gets USPS OAuth + Payment tokens
-// 3. Calls USPS Domestic Labels API
-// 4. Parses multipart response → extracts PDF + tracking number
-// 5. Saves tracking number + label URL to the order
-// 6. Returns PDF blob to the browser
+//
+// MOCK MODE (USPS_ENV=mock or missing credentials):
+//   - Skips USPS API entirely
+//   - Generates a realistic 4×6 PDF locally using pdf-lib
+//   - Uses real order data (to/from addresses, mail class, weight)
+//   - Stamps "SAMPLE — NOT FOR MAILING" on it
+//   - Returns a fake tracking number so the UI flow works end-to-end
+//   - Does NOT save to Supabase storage (no side effects)
+//
+// LIVE MODE (USPS_ENV=production or sandbox, credentials present):
+//   - Calls USPS Labels API (real or test environment)
+//   - Charges postage in production via EPS payment token
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/utils/supabase/server';
 import { getOAuthToken, getPaymentToken } from '@/lib/usps/tokens';
 import { resolveMailClass, resolveRateIndicator } from '@/lib/usps/mailClass';
+import { generateMockLabel, generateFakeTrackingNumber } from '@/lib/usps/mockLabel';
 
-const USPS_BASE = process.env.USPS_ENV === 'production'
+const USPS_ENV = process.env.USPS_ENV ?? 'mock';
+const USPS_BASE = USPS_ENV === 'production'
   ? 'https://apis.usps.com'
   : 'https://apis-tem.usps.com';
 
-// ── Package dimensions payload from the request body ────────────
+function isMockMode(): boolean {
+  if (USPS_ENV === 'mock') return true;
+  const hasCreds =
+    process.env.USPS_CONSUMER_KEY &&
+    process.env.USPS_CONSUMER_SECRET &&
+    process.env.USPS_FROM_STREET &&
+    process.env.USPS_FROM_CITY &&
+    process.env.USPS_FROM_STATE &&
+    process.env.USPS_FROM_ZIP;
+  return !hasCreds;
+}
+
 interface PackageDimensions {
-  weightLb: number;      // e.g. 0.5
-  lengthIn: number;      // e.g. 12
-  widthIn: number;       // e.g. 9
-  heightIn: number;      // e.g. 2
-  presetName?: string;   // e.g. "Poly Mailer"
+  weightLb: number;
+  lengthIn: number;
+  widthIn: number;
+  heightIn: number;
+  presetName?: string;
 }
 
 export async function POST(
@@ -32,7 +51,6 @@ export async function POST(
   try {
     const supabase = await createServerClient();
 
-    // ── Auth check: admin only ───────────────────────────────────
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -46,7 +64,6 @@ export async function POST(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    // ── Parse package dimensions from request body ───────────────
     const body = await request.json() as PackageDimensions;
     const { weightLb, lengthIn, widthIn, heightIn, presetName } = body;
 
@@ -57,7 +74,6 @@ export async function POST(
       );
     }
 
-    // ── Fetch order ──────────────────────────────────────────────
     const { data: order, error: orderError } = await supabase
       .from('orders')
       .select(`
@@ -90,16 +106,61 @@ export async function POST(
       );
     }
 
-    // ── Resolve mail class from order's shipping method ──────────
     const mailClass = resolveMailClass(order.shipping_method_name);
+    const mailingDate = new Date().toISOString().split('T')[0];
+
+    // ── MOCK MODE ──────────────────────────────────────────────────
+    if (isMockMode()) {
+      console.log('[USPS Label] Mock mode — generating local PDF, no API call');
+
+      const toName = [
+        addr.firstName ?? order.customer_first_name ?? '',
+        addr.lastName  ?? order.customer_last_name  ?? '',
+      ].filter(Boolean).join(' ') || order.email;
+
+      const pdfBytes = await generateMockLabel({
+        orderNumber:  order.order_number,
+        toName,
+        toAddress1:   addr.address1,
+        toAddress2:   addr.address2 ?? undefined,
+        toCity:       addr.city,
+        toState:      addr.state,
+        toZip:        addr.zip.replace(/\D/g, '').slice(0, 5),
+        fromName:     process.env.USPS_FROM_FIRST_NAME ?? 'Desert',
+        fromCompany:  process.env.USPS_FROM_COMPANY ?? 'Desert Cowgirl Co.',
+        fromAddress1: process.env.USPS_FROM_STREET ?? '123 Main St',
+        fromCity:     process.env.USPS_FROM_CITY   ?? 'Your City',
+        fromState:    process.env.USPS_FROM_STATE  ?? 'TX',
+        fromZip:      process.env.USPS_FROM_ZIP    ?? '00000',
+        mailClass,
+        weightLb,
+        lengthIn,
+        widthIn,
+        heightIn,
+        mailingDate,
+      });
+
+      const fakeTracking = generateFakeTrackingNumber();
+      const fakeTrackingUrl = `https://tools.usps.com/go/TrackConfirmAction_input?origTrackNum=${fakeTracking}`;
+
+      return new NextResponse(pdfBytes, {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': `inline; filename="label-${order.order_number}-SAMPLE.pdf"`,
+          'X-Tracking-Number': fakeTracking,
+          'X-Tracking-URL':    fakeTrackingUrl,
+          'X-Postage':         '0',
+          'X-Label-Cached':    'false',
+          'X-Mock-Mode':       'true',
+        },
+      });
+    }
+
+    // ── LIVE MODE ──────────────────────────────────────────────────
     const rateIndicator = resolveRateIndicator(mailClass);
-
-    // ── Get USPS tokens ──────────────────────────────────────────
-    const oauthToken = await getOAuthToken();
+    const oauthToken   = await getOAuthToken();
     const paymentToken = await getPaymentToken(oauthToken);
-
-    // ── Build label request ──────────────────────────────────────
-    const mailingDate = new Date().toISOString().split('T')[0]; // today YYYY-MM-DD
 
     const labelPayload = {
       imageInfo: {
@@ -111,22 +172,22 @@ export async function POST(
         returnLabel: false,
       },
       toAddress: {
-        firstName: addr.firstName ?? order.customer_first_name ?? '',
-        lastName: addr.lastName ?? order.customer_last_name ?? '',
-        streetAddress: addr.address1,
+        firstName:        addr.firstName ?? order.customer_first_name ?? '',
+        lastName:         addr.lastName  ?? order.customer_last_name  ?? '',
+        streetAddress:    addr.address1,
         secondaryAddress: addr.address2 ?? undefined,
-        city: addr.city,
-        state: addr.state,
+        city:    addr.city,
+        state:   addr.state,
         ZIPCode: addr.zip.replace(/\D/g, '').slice(0, 5),
       },
       fromAddress: {
-        firstName: process.env.USPS_FROM_FIRST_NAME ?? '',
-        lastName: process.env.USPS_FROM_LAST_NAME ?? '',
-        firm: process.env.USPS_FROM_COMPANY ?? 'Desert Cowgirl Co.',
+        firstName:     process.env.USPS_FROM_FIRST_NAME ?? '',
+        lastName:      process.env.USPS_FROM_LAST_NAME  ?? '',
+        firm:          process.env.USPS_FROM_COMPANY ?? 'Desert Cowgirl Co.',
         streetAddress: process.env.USPS_FROM_STREET ?? '',
-        city: process.env.USPS_FROM_CITY ?? '',
-        state: process.env.USPS_FROM_STATE ?? '',
-        ZIPCode: process.env.USPS_FROM_ZIP ?? '',
+        city:          process.env.USPS_FROM_CITY   ?? '',
+        state:         process.env.USPS_FROM_STATE  ?? '',
+        ZIPCode:       process.env.USPS_FROM_ZIP    ?? '',
       },
       packageDescription: {
         mailClass,
@@ -135,7 +196,7 @@ export async function POST(
         weight: weightLb,
         dimensionsUOM: 'in',
         length: lengthIn,
-        width: widthIn,
+        width:  widthIn,
         height: heightIn,
         processingCategory: 'MACHINABLE',
         mailingDate,
@@ -143,7 +204,6 @@ export async function POST(
       },
     };
 
-    // ── Call USPS Labels API ─────────────────────────────────────
     const uspsRes = await fetch(`${USPS_BASE}/labels/v3/label`, {
       method: 'POST',
       headers: {
@@ -163,8 +223,6 @@ export async function POST(
       );
     }
 
-    // ── Parse multipart response ─────────────────────────────────
-    // USPS returns multipart/form-data with JSON metadata + PDF binary
     const contentType = uspsRes.headers.get('content-type') ?? '';
     const boundary = contentType.match(/boundary=([^\s;]+)/)?.[1];
 
@@ -191,7 +249,6 @@ export async function POST(
       metadata?.links?.find((l: any) => l.rel?.includes('Tracking URL'))?.href
       ?? `https://tools.usps.com/go/TrackConfirmAction_input?origTrackNum=${trackingNumber}`;
 
-    // ── Save tracking number + label info to order ───────────────
     if (trackingNumber) {
       await supabase
         .from('orders')
@@ -209,15 +266,16 @@ export async function POST(
         .eq('id', params.id);
     }
 
-    // ── Return PDF to browser ────────────────────────────────────
     return new NextResponse(pdfBuffer, {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Disposition': `inline; filename="label-${order.order_number}.pdf"`,
         'X-Tracking-Number': trackingNumber,
-        'X-Postage': String(postage),
-        'X-Tracking-URL': trackingUrl,
+        'X-Postage':         String(postage),
+        'X-Tracking-URL':    trackingUrl,
+        'X-Label-Cached':    'false',
+        'X-Mock-Mode':       'false',
       },
     });
 
@@ -230,10 +288,64 @@ export async function POST(
   }
 }
 
-// ── Multipart parser ─────────────────────────────────────────────
-// USPS returns multipart/form-data. We need to extract:
-//   - labelMetadata (JSON)  → tracking number, postage, etc.
-//   - labelImage (PDF)      → binary PDF data
+// ── GET: reprint stored label from Supabase storage ───────────────
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const supabase = await createServerClient();
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const { data: profile } = await supabase
+      .from('profiles').select('role').eq('id', user.id).single();
+    if (profile?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
+    const { data: order } = await supabase
+      .from('orders')
+      .select('order_number, label_pdf_path, tracking_number, tracking_url, label_postage_cents')
+      .eq('id', params.id)
+      .single();
+
+    if (!order?.label_pdf_path) {
+      return NextResponse.json({ error: 'No stored label for this order' }, { status: 404 });
+    }
+
+    const { data: fileData, error: storageError } = await supabase.storage
+      .from('shipping-labels')
+      .download(order.label_pdf_path);
+
+    if (storageError || !fileData) {
+      return NextResponse.json(
+        { error: 'Failed to fetch label from storage', details: storageError?.message },
+        { status: 500 }
+      );
+    }
+
+    const arrayBuffer = await fileData.arrayBuffer();
+
+    return new NextResponse(arrayBuffer, {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `inline; filename="label-${order.order_number}.pdf"`,
+        'X-Tracking-Number': order.tracking_number ?? '',
+        'X-Tracking-URL':    order.tracking_url ?? '',
+        'X-Postage':         String((order.label_postage_cents ?? 0) / 100),
+        'X-Label-Cached':    'true',
+        'X-Mock-Mode':       'false',
+      },
+    });
+
+  } catch (err: any) {
+    console.error('[USPS Label GET] Error:', err);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+// ── Multipart parser (live USPS response only) ────────────────────
 function parseMultipart(
   buffer: ArrayBuffer,
   boundary: string
@@ -242,7 +354,6 @@ function parseMultipart(
   const decoder = new TextDecoder('utf-8');
   const boundaryBytes = new TextEncoder().encode(`--${boundary}`);
 
-  // Split on boundary
   const parts: Uint8Array[] = [];
   let start = 0;
 
@@ -261,9 +372,8 @@ function parseMultipart(
   let pdfBuffer: ArrayBuffer | null = null;
 
   for (const part of parts) {
-    const partText = decoder.decode(part.slice(0, 512)); // read headers only
+    const partText = decoder.decode(part.slice(0, 512));
 
-    // Find end of headers (double CRLF)
     let headerEnd = -1;
     for (let i = 0; i < part.length - 3; i++) {
       if (part[i] === 13 && part[i+1] === 10 && part[i+2] === 13 && part[i+3] === 10) {
@@ -281,7 +391,6 @@ function parseMultipart(
         metadata = JSON.parse(decoder.decode(body).trim());
       } catch { /* ignore */ }
     } else if (headers.includes('application/pdf') || headers.includes('labelImage')) {
-      // Trim trailing CRLF from PDF body
       const trimmed = body[body.length - 2] === 13 && body[body.length - 1] === 10
         ? body.slice(0, -2)
         : body;

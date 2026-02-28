@@ -2,20 +2,23 @@
 
 // components/orders/Toolbar/index.tsx
 
+import { Search, Printer, CheckCircle2 } from 'lucide-react';
 import { FulfillmentStatus, PaymentStatus } from '@/lib/orders/types';
-import { Printer, CheckCircle2, Search, SlidersHorizontal } from 'lucide-react';
+
+// Extend the customer type filter to include 'pos'
+export type CustomerTypeFilter = 'all' | 'member' | 'guest' | 'pos';
 
 interface OrderToolbarProps {
   selectedCount: number;
   fulfillmentFilter: FulfillmentStatus | 'all';
   paymentFilter: PaymentStatus | 'all';
-  customerTypeFilter: 'all' | 'member' | 'guest';
+  customerTypeFilter: CustomerTypeFilter;
   searchQuery: string;
   onFulfillmentFilter: (v: FulfillmentStatus | 'all') => void;
   onPaymentFilter: (v: PaymentStatus | 'all') => void;
-  onCustomerTypeFilter: (v: 'all' | 'member' | 'guest') => void;
+  onCustomerTypeFilter: (v: CustomerTypeFilter) => void;
   onSearch: (v: string) => void;
-  onBatchAction: (action: string) => void;
+  onBatchAction: (action: 'print' | 'fulfill') => void;
 }
 
 export function OrderToolbar({
@@ -31,23 +34,22 @@ export function OrderToolbar({
   onBatchAction,
 }: OrderToolbarProps) {
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-3 space-y-3 shadow-sm">
+    <div className="space-y-3">
       {/* Search */}
       <div className="relative">
-        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
         <input
-          type="text"
+          type="search"
           placeholder="Search by order #, email, or name…"
           value={searchQuery}
           onChange={(e) => onSearch(e.target.value)}
-          className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-black/10 focus:border-gray-400"
+          className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black/10"
         />
       </div>
 
       {/* Filters row */}
       <div className="flex flex-wrap items-center gap-2">
-        <SlidersHorizontal className="w-4 h-4 text-gray-400 shrink-0" />
-
+        {/* Fulfillment filter */}
         <select
           value={fulfillmentFilter}
           onChange={(e) => onFulfillmentFilter(e.target.value as FulfillmentStatus | 'all')}
@@ -57,9 +59,11 @@ export function OrderToolbar({
           <option value="unfulfilled">Unfulfilled</option>
           <option value="partial">Partial</option>
           <option value="fulfilled">Fulfilled</option>
+          <option value="returned">Returned</option>
           <option value="cancelled">Cancelled</option>
         </select>
 
+        {/* Payment filter */}
         <select
           value={paymentFilter}
           onChange={(e) => onPaymentFilter(e.target.value as PaymentStatus | 'all')}
@@ -67,19 +71,21 @@ export function OrderToolbar({
         >
           <option value="all">All Payments</option>
           <option value="paid">Paid</option>
-          <option value="unpaid">Unpaid</option>
           <option value="pending">Pending</option>
+          <option value="unpaid">Unpaid</option>
           <option value="refunded">Refunded</option>
         </select>
 
+        {/* Customer type filter — now includes POS */}
         <select
           value={customerTypeFilter}
-          onChange={(e) => onCustomerTypeFilter(e.target.value as 'all' | 'member' | 'guest')}
+          onChange={(e) => onCustomerTypeFilter(e.target.value as CustomerTypeFilter)}
           className="text-sm border border-gray-200 rounded-md px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-black/10"
         >
-          <option value="all">All Customers</option>
+          <option value="all">All Orders</option>
           <option value="member">Members ★</option>
           <option value="guest">Guests</option>
+          <option value="pos">In-Person (POS) 🛍</option>
         </select>
 
         {/* Batch actions */}
