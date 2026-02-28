@@ -1,7 +1,7 @@
 // components/POS/index.tsx
 "use client";
 
-import { useCallback, useEffect, useMemo, useReducer } from "react";
+import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import type { POSCartItem, POSProduct, POSState, POSVariant } from "./types";
 import { Library } from "./Library";
 import { Favorites } from "./Favorites";
@@ -10,16 +10,18 @@ import { VariantPicker } from "./VariantPicker";
 import { Cart } from "./Cart";
 import { Checkout } from "./Checkout";
 import { Receipt } from "./Receipt";
+import { CardReader } from "./CardReader";
 import { POSSkeleton } from "./skeleton";
 import { AlertCircle, RotateCcw } from "./icons";
 import "./styles.scss";
 
 // ─── Tab type ─────────────────────────────────────────────────────────────────
-type POSTab = "keypad" | "library" | "favorites";
+type POSTab = "reader" | "keypad" | "library" | "favorites";
 
 // ─── Extended state ───────────────────────────────────────────────────────────
 interface ExtendedPOSState extends POSState {
   activeTab: POSTab;
+  readerConnected: boolean;
 }
 
 type Action =
@@ -37,6 +39,7 @@ type Action =
   | { type: "SET_VIEW"; view: POSState["view"] }
   | { type: "SET_TAB"; tab: POSTab }
   | { type: "SET_PROCESSING"; isProcessing: boolean }
+  | { type: "SET_READER_CONNECTED"; connected: boolean }
   | { type: "SET_PAYMENT_INTENT"; clientSecret: string; order: NonNullable<POSState["lastOrder"]> }
   | { type: "PAYMENT_SUCCESS" }
   | { type: "NEW_SALE" };
@@ -58,56 +61,38 @@ const initial: ExtendedPOSState = {
   paymentIntentClientSecret: null,
   isProcessing: false,
   activeTab: "library",
+  readerConnected: false,
 };
 
 function reducer(state: ExtendedPOSState, action: Action): ExtendedPOSState {
   switch (action.type) {
-    case "SET_PRODUCTS": return { ...state, products: action.products, loading: false };
-    case "SET_LOADING": return { ...state, loading: action.loading };
-    case "SET_ERROR": return { ...state, error: action.error, loading: false };
-    case "SELECT_PRODUCT": return { ...state, selectedProduct: action.product };
-    case "SET_TAB": return { ...state, activeTab: action.tab };
+    case "SET_PRODUCTS":           return { ...state, products: action.products, loading: false };
+    case "SET_LOADING":            return { ...state, loading: action.loading };
+    case "SET_ERROR":              return { ...state, error: action.error, loading: false };
+    case "SELECT_PRODUCT":         return { ...state, selectedProduct: action.product };
+    case "SET_TAB":                return { ...state, activeTab: action.tab };
+    case "SET_READER_CONNECTED":   return { ...state, readerConnected: action.connected };
     case "REMOVE_FROM_CART":
       return { ...state, cart: state.cart.filter((i) => i.key !== action.key) };
     case "SET_ITEM_QTY": {
-      if (action.qty <= 0) {
-        return { ...state, cart: state.cart.filter((i) => i.key !== action.key) };
-      }
-      return {
-        ...state,
-        cart: state.cart.map((i) =>
-          i.key === action.key ? { ...i, quantity: action.qty } : i
-        ),
-      };
+      if (action.qty <= 0) return { ...state, cart: state.cart.filter((i) => i.key !== action.key) };
+      return { ...state, cart: state.cart.map((i) => i.key === action.key ? { ...i, quantity: action.qty } : i) };
     }
     case "ADD_TO_CART": {
       const existing = state.cart.find((i) => i.key === action.item.key);
       if (existing) {
-        return {
-          ...state,
-          cart: state.cart.map((i) =>
-            i.key === action.item.key
-              ? { ...i, quantity: i.quantity + action.item.quantity }
-              : i
-          ),
-        };
+        return { ...state, cart: state.cart.map((i) => i.key === action.item.key ? { ...i, quantity: i.quantity + action.item.quantity } : i) };
       }
       return { ...state, cart: [...state.cart, action.item] };
     }
-    case "CLEAR_CART": return { ...state, cart: [] };
-    case "SET_CUSTOMER_EMAIL": return { ...state, customerEmail: action.email };
-    case "SET_CUSTOMER_FIRST_NAME": return { ...state, customerFirstName: action.name };
+    case "CLEAR_CART":             return { ...state, cart: [] };
+    case "SET_CUSTOMER_EMAIL":     return { ...state, customerEmail: action.email };
+    case "SET_CUSTOMER_FIRST_NAME":return { ...state, customerFirstName: action.name };
     case "SET_CUSTOMER_LAST_NAME": return { ...state, customerLastName: action.name };
-    case "SET_VIEW": return { ...state, view: action.view };
-    case "SET_PROCESSING": return { ...state, isProcessing: action.isProcessing };
+    case "SET_VIEW":               return { ...state, view: action.view };
+    case "SET_PROCESSING":         return { ...state, isProcessing: action.isProcessing };
     case "SET_PAYMENT_INTENT":
-      return {
-        ...state,
-        paymentIntentClientSecret: action.clientSecret,
-        lastOrder: action.order,
-        view: "checkout",
-        isProcessing: false,
-      };
+      return { ...state, paymentIntentClientSecret: action.clientSecret, lastOrder: action.order, view: "checkout", isProcessing: false };
     case "PAYMENT_SUCCESS":
       return { ...state, view: "receipt", isProcessing: false };
     case "NEW_SALE":
@@ -119,6 +104,7 @@ function reducer(state: ExtendedPOSState, action: Action): ExtendedPOSState {
 
 // ─── Tab definitions ──────────────────────────────────────────────────────────
 const TABS: { id: POSTab; label: string }[] = [
+  { id: "reader",    label: "Reader"    },
   { id: "keypad",    label: "Keypad"    },
   { id: "library",   label: "Library"   },
   { id: "favorites", label: "Favorites" },
@@ -127,6 +113,7 @@ const TABS: { id: POSTab; label: string }[] = [
 // ─── Main component ───────────────────────────────────────────────────────────
 export function POS() {
   const [state, dispatch] = useReducer(reducer, initial);
+  const [mobileCartOpen, setMobileCartOpen] = useState(false);
 
   // Load products
   useEffect(() => {
@@ -197,7 +184,6 @@ export function POS() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           items: state.cart
-            // Filter out custom keypad items if they have no real product_id
             .filter((i) => i.product_id !== "custom")
             .map((item) => ({
               product_id: item.product_id,
@@ -208,17 +194,12 @@ export function POS() {
               quantity: item.quantity,
               price_cents: item.price_cents,
             })),
-          // For custom-only carts, pass as note in charge
           custom_items: state.cart
             .filter((i) => i.product_id === "custom")
             .map((i) => ({ label: i.product_title, amount_cents: i.price_cents })),
           customer_email: state.customerEmail.trim() || null,
           customer_first_name: state.customerFirstName.trim() || null,
           customer_last_name: state.customerLastName.trim() || null,
-          note: state.cart
-            .filter((i) => i.product_id === "custom")
-            .map((i) => `${i.product_title}: $${(i.price_cents / 100).toFixed(2)}`)
-            .join(", ") || null,
         }),
       });
 
@@ -280,8 +261,10 @@ export function POS() {
   // ── Main catalog layout ────────────────────────────────────────────────────
   return (
     <div className="pos-root">
+
       {/* ── Left panel: Tabs + content ──────────────────────────────────────── */}
       <div className="pos-root__left">
+
         {/* Tab bar */}
         <nav className="pos-tabs" role="tablist">
           {TABS.map((tab) => (
@@ -290,16 +273,27 @@ export function POS() {
               type="button"
               role="tab"
               aria-selected={state.activeTab === tab.id}
-              className={`pos-tabs__tab ${state.activeTab === tab.id ? "pos-tabs__tab--active" : ""}`}
+              className={`pos-tabs__tab${state.activeTab === tab.id ? " pos-tabs__tab--active" : ""}`}
               onClick={() => dispatch({ type: "SET_TAB", tab: tab.id })}
             >
               {tab.label}
+              {tab.id === "reader" && (
+                <span className={`pos-tabs__reader-dot${state.readerConnected ? " pos-tabs__reader-dot--on" : ""}`} />
+              )}
             </button>
           ))}
         </nav>
 
         {/* Tab content */}
         <div className="pos-root__content">
+          {state.activeTab === "reader" && (
+            <CardReader
+              onConnectionChange={(connected) =>
+                dispatch({ type: "SET_READER_CONNECTED", connected })
+              }
+            />
+          )}
+
           {state.activeTab === "keypad" && (
             <Keypad
               onCharge={handleKeypadCharge}
@@ -324,7 +318,7 @@ export function POS() {
         </div>
       </div>
 
-      {/* ── Right panel: Current Sale / Cart ───────────────────────────────── */}
+      {/* ── Right panel: Cart (desktop/tablet) ─────────────────────────────── */}
       <div className="pos-root__right">
         <Cart
           items={state.cart}
@@ -340,6 +334,67 @@ export function POS() {
           onLastNameChange={(name) => dispatch({ type: "SET_CUSTOMER_LAST_NAME", name })}
           isProcessing={state.isProcessing}
         />
+      </div>
+
+      {/* ── Mobile cart drawer ───────────────────────────────────────────────── */}
+      {/* Backdrop */}
+      {mobileCartOpen && (
+        <div
+          className="pos-mobile-backdrop"
+          aria-hidden
+          onClick={() => setMobileCartOpen(false)}
+        />
+      )}
+
+      {/* Sticky bottom bar — always visible on mobile */}
+      <div className="pos-mobile-bar">
+        <button
+          type="button"
+          className="pos-mobile-bar__btn"
+          onClick={() => setMobileCartOpen((o) => !o)}
+        >
+          <span className="pos-mobile-bar__icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" />
+              <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+            </svg>
+            {state.cart.reduce((s, i) => s + i.quantity, 0) > 0 && (
+              <span className="pos-mobile-bar__badge">
+                {state.cart.reduce((s, i) => s + i.quantity, 0)}
+              </span>
+            )}
+          </span>
+          <span className="pos-mobile-bar__label">
+            {state.cart.length === 0 ? "Cart empty" : `${state.cart.length} item${state.cart.length !== 1 ? "s" : ""}`}
+          </span>
+          <span className="pos-mobile-bar__total">
+            ${(state.cart.reduce((s, i) => s + i.price_cents * i.quantity, 0) / 100).toFixed(2)}
+          </span>
+          <span className="pos-mobile-bar__chevron" style={{ transform: mobileCartOpen ? "rotate(180deg)" : undefined }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="18 15 12 9 6 15" />
+            </svg>
+          </span>
+        </button>
+
+        {/* Drawer — slides up from the bar */}
+        <div className={`pos-mobile-drawer${mobileCartOpen ? " pos-mobile-drawer--open" : ""}`}>
+          <div className="pos-mobile-drawer__handle" onClick={() => setMobileCartOpen(false)} />
+          <Cart
+            items={state.cart}
+            customerEmail={state.customerEmail}
+            customerFirstName={state.customerFirstName}
+            customerLastName={state.customerLastName}
+            onQtyChange={(key, qty) => dispatch({ type: "SET_ITEM_QTY", key, qty })}
+            onRemove={(key) => dispatch({ type: "REMOVE_FROM_CART", key })}
+            onClear={() => dispatch({ type: "CLEAR_CART" })}
+            onCharge={() => { handleCharge(); setMobileCartOpen(false); }}
+            onEmailChange={(email) => dispatch({ type: "SET_CUSTOMER_EMAIL", email })}
+            onFirstNameChange={(name) => dispatch({ type: "SET_CUSTOMER_FIRST_NAME", name })}
+            onLastNameChange={(name) => dispatch({ type: "SET_CUSTOMER_LAST_NAME", name })}
+            isProcessing={state.isProcessing}
+          />
+        </div>
       </div>
 
       {/* Variant picker overlay */}
