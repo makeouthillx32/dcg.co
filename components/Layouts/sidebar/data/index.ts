@@ -13,8 +13,8 @@ export const NAV_DATA = [
         items: [],
       },
       {
-        title: "Calendar",
-        url: "/calendar",
+        title: "PoS",
+        url: "/POS",
         icon: Icons.Calendar,
         items: [],
       },
