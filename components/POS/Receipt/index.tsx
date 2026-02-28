@@ -5,7 +5,7 @@ import type { POSCartItem } from "../types";
 import "./styles.scss";
 
 interface ReceiptProps {
-  orderNumber: number;
+  orderNumber: string;
   items: POSCartItem[];
   totalCents: number;
   customerEmail?: string | null;
@@ -56,7 +56,7 @@ export function Receipt({
         <div className="pos-receipt__card-header">
           <div>
             <p className="pos-receipt__card-label">Desert Cowgirl Co.</p>
-            <p className="pos-receipt__card-sublabel">Order #{orderNumber}</p>
+            <p className="pos-receipt__card-sublabel">{orderNumber}</p>
           </div>
           <p className="pos-receipt__card-date">{fmtDate()}</p>
         </div>

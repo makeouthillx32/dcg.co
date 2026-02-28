@@ -52,7 +52,7 @@ export interface POSState {
   customerLastName: string;
   loading: boolean;
   error: string | null;
-  lastOrder: { id: string; order_number: number; total_cents: number } | null;
+  lastOrder: { id: string; order_number: string; total_cents: number } | null;
   paymentIntentClientSecret: string | null;
   isProcessing: boolean;
 }

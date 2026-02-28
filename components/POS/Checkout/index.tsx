@@ -18,7 +18,7 @@ interface CheckoutProps {
   items: POSCartItem[];
   clientSecret: string;
   orderId: string;
-  orderNumber: number;
+  orderNumber: string;
   totalCents: number;
   onBack: () => void;
   onSuccess: () => void;
@@ -88,7 +88,7 @@ function PaymentForm({
 
       {/* Order summary */}
       <div className="pos-checkout__summary">
-        <p className="pos-checkout__summary-label">Order #{orderNumber}</p>
+        <p className="pos-checkout__summary-label">{orderNumber}</p>
         <div className="pos-checkout__summary-items">
           {items.map((item) => (
             <div key={item.key} className="pos-checkout__summary-row">
