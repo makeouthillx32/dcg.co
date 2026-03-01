@@ -27,6 +27,26 @@ export default function CheckoutPage() {
     }
   }, [itemCount, router]);
 
+  // Restore promo from localStorage on mount (survives refresh)
+  useEffect(() => {
+    const savedCode = localStorage.getItem("dcg_promo_code");
+    const savedDiscount = localStorage.getItem("dcg_discount_cents");
+    const savedPromo = localStorage.getItem("dcg_promo_data");
+
+    if (savedCode && savedDiscount && savedPromo) {
+      try {
+        setPromoCode(savedCode);
+        setPromoApplied(JSON.parse(savedPromo));
+        setDiscountCents(parseInt(savedDiscount, 10));
+      } catch {
+        // Corrupted data — clear it
+        localStorage.removeItem("dcg_promo_code");
+        localStorage.removeItem("dcg_discount_cents");
+        localStorage.removeItem("dcg_promo_data");
+      }
+    }
+  }, []);
+
   const subtotalCents = subtotal;
   const totalCents = subtotalCents - discountCents;
 
@@ -47,6 +67,10 @@ export default function CheckoutPage() {
         setPromoApplied(data.promo_code);
         setDiscountCents(data.discount_cents);
         setPromoError("");
+        // Persist to localStorage so refresh doesn't wipe it
+        localStorage.setItem("dcg_promo_code", promoCode);
+        localStorage.setItem("dcg_discount_cents", data.discount_cents.toString());
+        localStorage.setItem("dcg_promo_data", JSON.stringify(data.promo_code));
       } else {
         setPromoError(data.error);
         setPromoApplied(null);
@@ -64,10 +88,14 @@ export default function CheckoutPage() {
     setPromoApplied(null);
     setDiscountCents(0);
     setPromoError("");
+    localStorage.removeItem("dcg_promo_code");
+    localStorage.removeItem("dcg_discount_cents");
+    localStorage.removeItem("dcg_promo_data");
   };
 
   const handleContinue = () => {
     if (promoApplied) {
+      // Keep localStorage AND write to sessionStorage for the rest of checkout
       sessionStorage.setItem("promo_code", promoCode);
       sessionStorage.setItem("discount_cents", discountCents.toString());
     } else {

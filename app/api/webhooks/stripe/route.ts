@@ -117,7 +117,7 @@ async function handlePaymentSucceeded(
     }
   }
 
-  // Update order
+  // Update order — also select promo_code for usage tracking below
   const { data: order, error } = await supabase
     .from('orders')
     .update({
@@ -129,7 +129,7 @@ async function handlePaymentSucceeded(
       updated_at: new Date().toISOString(),
     })
     .eq('id', orderId)
-    .select('order_number, total_cents, email, customer_first_name, customer_last_name')
+    .select('order_number, total_cents, email, customer_first_name, customer_last_name, promo_code')
     .single();
 
   if (error) {
@@ -138,6 +138,17 @@ async function handlePaymentSucceeded(
   }
 
   console.log(`Order ${orderId} marked as paid`);
+
+  // ── Increment promo code usage count ─────────────────────────
+  if (order?.promo_code) {
+    try {
+      await supabase.rpc('increment_discount_uses', { p_code: order.promo_code });
+      console.log(`[Promo] ✅ Incremented uses_count for code: ${order.promo_code}`);
+    } catch (promoErr) {
+      // Non-fatal — order is paid, don't throw
+      console.error('[Promo] ⚠️ Failed to increment uses_count:', promoErr);
+    }
+  }
 
   // ── New order notification → visible to all admins ────────────
   try {
