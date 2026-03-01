@@ -80,7 +80,6 @@ export default function CheckoutPaymentPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // Load checkout data from session
   const [checkoutData, setCheckoutData] = useState<any>(null);
 
   useEffect(() => {
@@ -88,6 +87,7 @@ export default function CheckoutPaymentPage() {
     const shippingAddress = sessionStorage.getItem('checkout_shipping_address');
     const billingAddress = sessionStorage.getItem('checkout_billing_address');
     const shippingRateId = sessionStorage.getItem('checkout_shipping_rate_id');
+    const shippingRateData = sessionStorage.getItem('checkout_shipping_rate_data');
     const promoCode = sessionStorage.getItem('promo_code');
 
     if (!email || !shippingAddress || !cart?.id) {
@@ -100,14 +100,13 @@ export default function CheckoutPaymentPage() {
       shipping_address: JSON.parse(shippingAddress),
       billing_address: JSON.parse(billingAddress || shippingAddress),
       shipping_rate_id: shippingRateId,
+      shipping_rate_data: shippingRateData ? JSON.parse(shippingRateData) : null,
       promo_code: promoCode,
     });
   }, [cart, router]);
 
-  // Create payment intent when checkout data is ready
   useEffect(() => {
     if (!checkoutData || !cart?.id) return;
-
     createPaymentIntent();
   }, [checkoutData, cart]);
 

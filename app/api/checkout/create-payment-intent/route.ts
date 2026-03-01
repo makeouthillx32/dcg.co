@@ -19,6 +19,7 @@ export async function POST(request: NextRequest) {
       billing_address,
       phone,
       shipping_rate_id,
+      shipping_rate_data, // full rate object passed from client for live USPS rates
     } = body;
 
     console.log("Creating payment intent for:", { cart_id, email });
@@ -32,10 +33,6 @@ export async function POST(request: NextRequest) {
     }
 
     // ── Detect authenticated member (server-side, trusted) ────────
-    // getUser() validates the JWT against Supabase Auth — cannot be
-    // spoofed by the client. If a session exists we use the account
-    // email as the canonical order email and link the order to the
-    // member's profile. Guests get null for both fields.
     const {
       data: { user: authUser },
     } = await supabase.auth.getUser();
@@ -52,14 +49,12 @@ export async function POST(request: NextRequest) {
         : `Guest checkout — email: ${resolvedEmail}`
     );
 
-    // ── Guest key (set by middleware on first visit) ──────────────
-    // Members don't need it for order linkage, but we still read it
-    // so the cookie isn't left dangling on the order row.
+    // ── Guest key ─────────────────────────────────────────────────
     const guestKeyCookie = request.cookies.get("dcg_guest_key")?.value ?? null;
-    const guestKey = guestKeyCookie ?? crypto.randomUUID(); // fallback if cookie somehow missing
+    const guestKey = guestKeyCookie ?? crypto.randomUUID();
     console.log("Guest key:", guestKey);
 
-    // Get cart items
+    // ── Cart items ────────────────────────────────────────────────
     const { data: cartItems, error: cartError } = await supabase
       .from("cart_items")
       .select(`
@@ -90,30 +85,47 @@ export async function POST(request: NextRequest) {
 
     console.log("Cart items:", cartItems);
 
-    // Calculate subtotal
+    // ── Subtotal ──────────────────────────────────────────────────
     const subtotal_cents = cartItems.reduce(
       (sum, item) => sum + item.price_cents * item.quantity,
       0
     );
 
-    // Get shipping rate
-    const { data: shippingRate, error: shippingError } = await supabase
-      .from("shipping_rates")
-      .select("*")
-      .eq("id", shipping_rate_id)
-      .single();
+    // ── Shipping rate ─────────────────────────────────────────────
+    // Live USPS rates have IDs like "usps-usps_ground_advantage" or "usps-ground-free"
+    // Flat DB rates have UUID IDs — look those up in the shipping_rates table
+    let shipping_cents = 0;
+    let shipping_method_name = "Standard Shipping";
 
-    if (shippingError || !shippingRate) {
-      console.error("Shipping rate error:", shippingError);
-      return NextResponse.json(
-        { error: "Invalid shipping rate" },
-        { status: 400 }
-      );
+    const isUSPSRate = shipping_rate_id.startsWith("usps-");
+
+    if (isUSPSRate) {
+      // Price and name were passed directly from the client alongside the rate ID
+      shipping_cents = shipping_rate_data?.price_cents ?? 0;
+      shipping_method_name = shipping_rate_data?.name ?? "Standard Shipping";
+      console.log(`USPS rate: ${shipping_method_name} — $${(shipping_cents / 100).toFixed(2)}`);
+    } else {
+      // Flat DB rate — look up by UUID
+      const { data: shippingRate, error: shippingError } = await supabase
+        .from("shipping_rates")
+        .select("*")
+        .eq("id", shipping_rate_id)
+        .single();
+
+      if (shippingError || !shippingRate) {
+        console.error("Shipping rate error:", shippingError);
+        return NextResponse.json(
+          { error: "Invalid shipping rate" },
+          { status: 400 }
+        );
+      }
+
+      shipping_cents = shippingRate.price_cents || shippingRate.amount_cents || 0;
+      shipping_method_name = shippingRate.name ?? "Standard Shipping";
+      console.log(`DB rate: ${shipping_method_name} — $${(shipping_cents / 100).toFixed(2)}`);
     }
 
-    const shipping_cents = shippingRate.price_cents || 0;
-
-    // Calculate tax
+    // ── Tax ───────────────────────────────────────────────────────
     const { data: taxData } = await supabase
       .from("tax_rates")
       .select("rate")
@@ -126,15 +138,12 @@ export async function POST(request: NextRequest) {
 
     console.log("Order totals:", { subtotal_cents, shipping_cents, tax_cents, total_cents });
 
-    // Generate order number
+    // ── Order number ──────────────────────────────────────────────
     const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
     const random = Math.random().toString(36).substring(2, 6).toUpperCase();
     const order_number = `DCG-${timestamp}-${random}`;
 
-    // ── Upsert customer record ────────────────────────────────────
-    // For guests: find-or-create a customers row keyed to guest_key + email.
-    // For members: they already have a customers row from sign-up — skip this.
-    // Non-fatal either way: order proceeds even if this fails.
+    // ── Upsert guest customer ─────────────────────────────────────
     let customerId: string | null = null;
     if (!authUserId) {
       try {
@@ -160,13 +169,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Create order
+    // ── Create order ──────────────────────────────────────────────
     const { data: order, error: orderError } = await supabase
       .from("orders")
       .insert({
         order_number,
-        profile_id: authUserId,          // member's profile id, null for guests
-        auth_user_id: authUserId,         // used by Orders Manager to classify as member
+        profile_id: authUserId,
+        auth_user_id: authUserId,
         email: resolvedEmail,
         customer_email: resolvedEmail,
         status: "pending",
@@ -176,8 +185,9 @@ export async function POST(request: NextRequest) {
         tax_cents,
         total_cents,
         shipping_address,
-        customer_id: customerId,          // populated for guests; null for members (they have profile_id)
-        guest_key: authUserId ? null : guestKey, // members don't need guest_key
+        shipping_method_name,
+        customer_id: customerId,
+        guest_key: authUserId ? null : guestKey,
       })
       .select()
       .single();
@@ -192,7 +202,7 @@ export async function POST(request: NextRequest) {
 
     console.log("Order created:", order.id);
 
-    // Create order items
+    // ── Create order items ────────────────────────────────────────
     const orderItems = cartItems.map((item) => ({
       order_id: order.id,
       product_id: item.product_id,
@@ -218,7 +228,7 @@ export async function POST(request: NextRequest) {
 
     console.log("Order items created:", orderItems.length);
 
-    // Create Stripe Payment Intent
+    // ── Create Stripe Payment Intent ──────────────────────────────
     const paymentIntent = await stripe.paymentIntents.create({
       amount: total_cents,
       currency: "usd",
@@ -246,7 +256,7 @@ export async function POST(request: NextRequest) {
 
     console.log("Payment intent created:", paymentIntent.id);
 
-    // Link Stripe PI to order
+    // ── Link PI to order ──────────────────────────────────────────
     await supabase
       .from("orders")
       .update({ stripe_payment_intent_id: paymentIntent.id })

@@ -302,6 +302,16 @@ export default function CheckoutShippingPage() {
         JSON.stringify(billingSameAsShipping ? currentShippingAddress : billingAddress)
       );
       sessionStorage.setItem("checkout_shipping_rate_id", selectedShippingRate);
+
+      // Save full rate data so payment intent can resolve price without a DB lookup
+      const rateData = shippingRates.find((r) => r.id === selectedShippingRate);
+      if (rateData) {
+        sessionStorage.setItem("checkout_shipping_rate_data", JSON.stringify({
+          id: rateData.id,
+          name: rateData.name,
+          price_cents: rateData.price_cents,
+        }));
+}
     }
 
     router.push("/checkout/payment");
