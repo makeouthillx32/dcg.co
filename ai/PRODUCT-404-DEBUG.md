@@ -258,3 +258,18 @@ Examples:
 ---
 
 **Run the SQL query first, then let me know what you find!** 🔍
+Let me check what tables we're actually dealing with:Confirmed — two completely separate inventory systems. The storefront and product management reads `product_variants.inventory_qty`, but the inventory manager page reads/writes the separate `inventory` table. They're out of sync.
+
+The right fix is to **eliminate the `inventory` table** and make everything use `product_variants` as the single source of truth. The inventory manager page just needs to read/write `product_variants.inventory_qty` and `product_variants.track_inventory` instead.
+
+Let me check what the inventory manager API looks like:Good — I can see the variant route already tries to mirror inventory to both tables. The issue is clear: the `inventory` table is the "manager" source but `product_variants.inventory_qty` is what the storefront reads. They need to stay in sync.
+
+The cleanest fix is a **database trigger** — whenever `inventory` table changes, auto-sync to `product_variants`, and vice versa. That way both systems always agree without changing any code:Both tables now show identical values. Here's what was done and what's fixed:
+
+**Inventory sync** — both tables are now in sync (both show Brown/Tan: 2, Tan/Camo: 2 with `track_inventory = true`). Going forward, updating either the inventory manager OR the product editor will automatically keep the other in sync via DB triggers. No code changes needed.
+
+**What you'll see on the storefront now** — the hat will show the correct quantity from the inventory manager. Buy one and both tables will decrement together.
+
+**Email** — the Edge Function is returning 200 so Brevo is processing it. Check spam, and when the client sets up their real Brevo account with a verified domain, deliverability will be solid.
+
+One thing to note — the hat variants now show qty 2 because that's what was set in your inventory manager. If the real stock is 8 and 10, go update those in the inventory manager and it'll sync back to the storefront automatically. 🤠

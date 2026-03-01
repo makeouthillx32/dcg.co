@@ -273,14 +273,34 @@ export default function CheckoutPage() {
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Subtotal</span>
-                    <span>${(subtotalCents / 100).toFixed(2)}</span>
+                    {promoApplied ? (
+                      <div className="text-right">
+                        <span className="line-through text-destructive opacity-70">
+                          ${(subtotalCents / 100).toFixed(2)}
+                        </span>
+                        <span className="block font-semibold">
+                          ${(totalCents / 100).toFixed(2)}
+                        </span>
+                      </div>
+                    ) : (
+                      <span>${(subtotalCents / 100).toFixed(2)}</span>
+                    )}
                   </div>
 
                   {promoApplied && (
-                    <div className="flex justify-between text-green-600 dark:text-green-400">
-                      <span>Discount ({promoApplied.code})</span>
-                      <span>−${(discountCents / 100).toFixed(2)}</span>
-                    </div>
+                    <>
+                      <div className="flex justify-between text-green-600 dark:text-green-400">
+                        <span className="flex items-center gap-1">
+                          <Tag className="w-3 h-3" />
+                          {promoApplied.code}
+                        </span>
+                        <span>−${(discountCents / 100).toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between rounded-md bg-green-50 dark:bg-green-950 px-3 py-1.5 text-green-700 dark:text-green-300 font-medium">
+                        <span>🎉 You saved</span>
+                        <span>${(discountCents / 100).toFixed(2)}</span>
+                      </div>
+                    </>
                   )}
 
                   <div className="flex justify-between text-muted-foreground">
