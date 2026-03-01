@@ -108,7 +108,6 @@ export default function CheckoutShippingPage() {
       const resolvedFirst = profile?.first_name ?? "";
       const resolvedLast = profile?.last_name ?? "";
 
-      // Only set if fields are still empty (don't overwrite if user already typed)
       setEmail((prev) => prev || resolvedEmail);
       setShippingAddress((prev) => ({
         ...prev,
@@ -116,7 +115,6 @@ export default function CheckoutShippingPage() {
         lastName: prev.lastName || resolvedLast,
       }));
 
-      // Sync to refs so handleContinue reads the right values
       if (emailRef.current && !emailRef.current.value) {
         emailRef.current.value = resolvedEmail;
       }
@@ -137,7 +135,6 @@ export default function CheckoutShippingPage() {
   }, [itemCount, router]);
 
   // Autofill detection using MutationObserver and polling
-  // Skip email checks when member (email is locked)
   useEffect(() => {
     const checkAutofill = () => {
       if (!isMember && emailRef.current && emailRef.current.value !== email) {
@@ -172,14 +169,10 @@ export default function CheckoutShippingPage() {
       }
     };
 
-    // Check for autofill on mount and periodically
     const timer = setInterval(checkAutofill, 100);
-
-    // Also check after animations (browsers delay autofill)
     setTimeout(checkAutofill, 500);
     setTimeout(checkAutofill, 1000);
 
-    // MutationObserver to detect DOM changes
     const observer = new MutationObserver(checkAutofill);
     if (formRef.current) {
       observer.observe(formRef.current, {
@@ -196,12 +189,12 @@ export default function CheckoutShippingPage() {
     };
   }, [email, isMember, shippingAddress]);
 
-  // Load shipping rates when state is entered
+  // Load shipping rates when state OR zip changes (zip needed for live USPS rates)
   useEffect(() => {
-    if (shippingAddress.state && subtotal > 0) {
+    if (shippingAddress.state && shippingAddress.zip.length === 5 && subtotal > 0) {
       loadShippingRates();
     }
-  }, [shippingAddress.state, subtotal]);
+  }, [shippingAddress.state, shippingAddress.zip, subtotal]);
 
   // Calculate tax when shipping rate is selected
   useEffect(() => {
@@ -210,7 +203,7 @@ export default function CheckoutShippingPage() {
     }
   }, [selectedShippingRate, shippingAddress.state]);
 
-  // Load shipping rates
+  // Load shipping rates — passes zip + cart_id for live USPS rate quoting
   const loadShippingRates = async () => {
     setLoadingRates(true);
     try {
@@ -220,6 +213,8 @@ export default function CheckoutShippingPage() {
         body: JSON.stringify({
           subtotal_cents: subtotal,
           state: shippingAddress.state,
+          zip: shippingAddress.zip,
+          cart_id: cart?.id,
         }),
       });
 
@@ -265,7 +260,6 @@ export default function CheckoutShippingPage() {
 
   // Handle form submission
   const handleContinue = () => {
-    // For members, use locked React state email. For guests, read from DOM.
     const currentEmail = isMember ? email : (emailRef.current?.value || email);
     const currentShippingAddress = {
       firstName: firstNameRef.current?.value || shippingAddress.firstName,
@@ -279,7 +273,6 @@ export default function CheckoutShippingPage() {
       phone: phoneRef.current?.value || shippingAddress.phone,
     };
 
-    // Validation
     if (
       !currentEmail ||
       !currentShippingAddress.firstName ||
@@ -298,7 +291,6 @@ export default function CheckoutShippingPage() {
       return;
     }
 
-    // Store in session storage (client-side only)
     if (typeof window !== "undefined") {
       sessionStorage.setItem("checkout_email", currentEmail);
       sessionStorage.setItem(
@@ -312,7 +304,6 @@ export default function CheckoutShippingPage() {
       sessionStorage.setItem("checkout_shipping_rate_id", selectedShippingRate);
     }
 
-    // Navigate to payment
     router.push("/checkout/payment");
   };
 
@@ -372,8 +363,6 @@ export default function CheckoutShippingPage() {
                   name="email"
                   type="email"
                   autoComplete={isMember ? "off" : "email"}
-                  // Controlled when member (React owns value, blocks autofill override)
-                  // Uncontrolled when guest (browser autofill works normally)
                   value={isMember ? email : undefined}
                   defaultValue={isMember ? undefined : email}
                   readOnly={isMember}
@@ -547,7 +536,19 @@ export default function CheckoutShippingPage() {
             </div>
 
             {/* Shipping Method */}
-            {shippingRates.length > 0 && (
+            {loadingRates && (
+              <div className="space-y-4">
+                <h2 className="text-xl font-semibold flex items-center gap-2">
+                  <Truck className="w-5 h-5" />
+                  Shipping Method
+                </h2>
+                <p className="text-sm text-muted-foreground animate-pulse">
+                  Getting shipping rates...
+                </p>
+              </div>
+            )}
+
+            {!loadingRates && shippingRates.length > 0 && (
               <div className="space-y-4">
                 <h2 className="text-xl font-semibold flex items-center gap-2">
                   <Truck className="w-5 h-5" />
