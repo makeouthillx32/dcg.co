@@ -20,6 +20,7 @@ export async function POST(request: NextRequest) {
       phone,
       shipping_rate_id,
       shipping_rate_data, // full rate object passed from client for live USPS rates
+      promo_code,         // optional promo/discount code
     } = body;
 
     console.log("Creating payment intent for:", { cart_id, email });
@@ -134,9 +135,44 @@ export async function POST(request: NextRequest) {
 
     const taxRate = taxData?.reduce((sum, t) => sum + Number(t.rate), 0) || 0;
     const tax_cents = Math.round((subtotal_cents + shipping_cents) * taxRate);
-    const total_cents = subtotal_cents + shipping_cents + tax_cents;
 
-    console.log("Order totals:", { subtotal_cents, shipping_cents, tax_cents, total_cents });
+    // ── Discount (server-side re-validation) ──────────────────────
+    let discount_cents = 0;
+    let resolved_promo_code: string | null = null;
+
+    if (promo_code) {
+      const { data: discountRow } = await supabase
+        .from("discounts")
+        .select("type, percent_off, amount_off_cents, max_uses, uses_count, is_active, starts_at, ends_at")
+        .eq("code", promo_code.toUpperCase())
+        .eq("is_active", true)
+        .single();
+
+      if (discountRow) {
+        const withinUseLimit = !discountRow.max_uses || discountRow.uses_count < discountRow.max_uses;
+        const notExpired = !discountRow.ends_at || new Date(discountRow.ends_at) > new Date();
+
+        if (withinUseLimit && notExpired) {
+          if (discountRow.type === "percentage" && discountRow.percent_off) {
+            discount_cents = Math.round(subtotal_cents * (discountRow.percent_off / 100));
+          } else if (discountRow.type === "fixed" && discountRow.amount_off_cents) {
+            discount_cents = discountRow.amount_off_cents;
+          }
+          // Never discount more than the subtotal
+          discount_cents = Math.min(discount_cents, subtotal_cents);
+          resolved_promo_code = promo_code.toUpperCase();
+          console.log(`Promo ${resolved_promo_code} applied — discount: $${(discount_cents / 100).toFixed(2)}`);
+        } else {
+          console.log(`Promo ${promo_code} failed re-validation (expired or limit reached)`);
+        }
+      } else {
+        console.log(`Promo ${promo_code} not found or inactive`);
+      }
+    }
+
+    const total_cents = subtotal_cents + shipping_cents + tax_cents - discount_cents;
+
+    console.log("Order totals:", { subtotal_cents, shipping_cents, tax_cents, discount_cents, total_cents });
 
     // ── Order number ──────────────────────────────────────────────
     const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
@@ -183,6 +219,8 @@ export async function POST(request: NextRequest) {
         subtotal_cents,
         shipping_cents,
         tax_cents,
+        discount_cents,
+        promo_code: resolved_promo_code,
         total_cents,
         shipping_address,
         shipping_method_name,
