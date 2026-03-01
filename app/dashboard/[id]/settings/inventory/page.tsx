@@ -1,4 +1,4 @@
-// app/settings/inventory/page.tsx
+// app/dashboard/[id]/settings/inventory/page.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -9,27 +9,29 @@ import "./_components/inventory.scss";
 import { LoadingState } from "./_components/LoadingState";
 import { ErrorAlert } from "./_components/ErrorAlert";
 import { InventoryActionBar } from "./_components/InventoryActionBar";
-import { InventoryTable, type InventoryRow } from "./_components/InventoryTable";
 import { EditInventoryForm } from "./_components/EditInventoryForm";
+import GroupedInventoryTable from "./_components/GroupedInventoryTable";
+import ShippingBoxes from "./_components/ShippingBoxes";
 
-/**
- * Inventory Manager
- * - Reads inventory rows and joins product + variant to show SKU/title
- * - Lets you toggle track_inventory / backorders / quantity
- * - Provides "Seed Missing" (creates inventory rows for variants that don't have one yet)
- *
- * NOTE:
- * This page assumes these columns exist on public.inventory:
- *  - id, variant_id, quantity, track_inventory, allow_backorder, updated_at
- *
- * And these exist on public.product_variants:
- *  - id, product_id, title, sku
- *
- * And these exist on public.products:
- *  - id, title
- *
- * If any naming differs, tell me your actual column names and I’ll adjust.
- */
+export type InventoryRow = {
+  inventory_id: string;
+  variant_id: string;
+  product_id: string | null;
+  product_title: string | null;
+  variant_title: string | null;
+  sku: string | null;
+  quantity: number;
+  track_inventory: boolean;
+  allow_backorder: boolean;
+  updated_at: string | null;
+};
+
+export type ProductGroup = {
+  product_id: string;
+  product_title: string;
+  variants: InventoryRow[];
+};
+
 export default function InventoryPage() {
   const supabase = useMemo(() => {
     return createBrowserClient(
@@ -43,7 +45,6 @@ export default function InventoryPage() {
   const [err, setErr] = useState<string | null>(null);
 
   const [search, setSearch] = useState("");
-
   const [showOnlyTracked, setShowOnlyTracked] = useState(false);
   const [showLowStock, setShowLowStock] = useState(false);
   const [lowStockThreshold, setLowStockThreshold] = useState(5);
@@ -55,9 +56,6 @@ export default function InventoryPage() {
     setErr(null);
     setLoading(true);
 
-    // Join chain: inventory -> product_variants -> products
-    // Supabase nested select syntax:
-    // inventory.select("..., product_variants(..., products(...))")
     const { data, error } = await supabase
       .from("inventory")
       .select(
@@ -89,21 +87,18 @@ export default function InventoryPage() {
       return;
     }
 
-    const mapped: InventoryRow[] =
-      (data ?? []).map((r: any) => ({
-        inventory_id: r.id,
-        variant_id: r.variant_id,
-
-        product_title: r.product_variants?.products?.title ?? null,
-        variant_title: r.product_variants?.title ?? null,
-        sku: r.product_variants?.sku ?? null,
-
-        quantity: r.quantity ?? 0,
-        track_inventory: !!r.track_inventory,
-        allow_backorder: !!r.allow_backorder,
-
-        updated_at: r.updated_at ?? null,
-      })) ?? [];
+    const mapped: InventoryRow[] = (data ?? []).map((r: any) => ({
+      inventory_id: r.id,
+      variant_id: r.variant_id,
+      product_id: r.product_variants?.products?.id ?? null,
+      product_title: r.product_variants?.products?.title ?? null,
+      variant_title: r.product_variants?.title ?? null,
+      sku: r.product_variants?.sku ?? null,
+      quantity: r.quantity ?? 0,
+      track_inventory: !!r.track_inventory,
+      allow_backorder: !!r.allow_backorder,
+      updated_at: r.updated_at ?? null,
+    }));
 
     setRows(mapped);
     setLoading(false);
@@ -114,32 +109,37 @@ export default function InventoryPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const filtered = useMemo(() => {
+  // Filter rows, then group by product
+  const groups = useMemo<ProductGroup[]>(() => {
     const q = search.trim().toLowerCase();
 
-    return rows.filter((r) => {
+    const filtered = rows.filter((r) => {
       if (showOnlyTracked && !r.track_inventory) return false;
-
-      if (showLowStock && r.track_inventory) {
-        const qty = r.quantity ?? 0;
-        if (qty > lowStockThreshold) return false;
-      } else if (showLowStock && !r.track_inventory) {
-        // If "Low stock" is enabled, we ignore non-tracked items by default
-        return false;
+      if (showLowStock) {
+        if (!r.track_inventory) return false;
+        if ((r.quantity ?? 0) > lowStockThreshold) return false;
       }
-
       if (!q) return true;
-
-      const hay = [
-        r.product_title ?? "",
-        r.variant_title ?? "",
-        r.sku ?? "",
-      ]
+      const hay = [r.product_title ?? "", r.variant_title ?? "", r.sku ?? ""]
         .join(" ")
         .toLowerCase();
-
       return hay.includes(q);
     });
+
+    // Group by product_id
+    const map = new Map<string, ProductGroup>();
+    for (const row of filtered) {
+      const pid = row.product_id ?? "__unknown__";
+      if (!map.has(pid)) {
+        map.set(pid, {
+          product_id: pid,
+          product_title: row.product_title ?? "Unknown Product",
+          variants: [],
+        });
+      }
+      map.get(pid)!.variants.push(row);
+    }
+    return Array.from(map.values());
   }, [rows, search, showOnlyTracked, showLowStock, lowStockThreshold]);
 
   const handleEdit = (row: InventoryRow) => {
@@ -154,7 +154,6 @@ export default function InventoryPage() {
     allow_backorder: boolean;
   }) => {
     setErr(null);
-
     const { error } = await supabase
       .from("inventory")
       .update({
@@ -165,22 +164,12 @@ export default function InventoryPage() {
       })
       .eq("id", data.inventory_id);
 
-    if (error) {
-      setErr(error.message);
-      return;
-    }
+    if (error) { setErr(error.message); return; }
 
-    // Optimistic update
     setRows((prev) =>
       prev.map((r) =>
         r.inventory_id === data.inventory_id
-          ? {
-              ...r,
-              quantity: data.quantity,
-              track_inventory: data.track_inventory,
-              allow_backorder: data.allow_backorder,
-              updated_at: new Date().toISOString(),
-            }
+          ? { ...r, ...data, updated_at: new Date().toISOString() }
           : r
       )
     );
@@ -188,17 +177,10 @@ export default function InventoryPage() {
 
   const handleReseedMissing = async () => {
     setErr(null);
-
-    // Create inventory rows for variants missing them
-    // Default stock = 25, tracked = true, backorder = false
     const { data: variants, error: vErr } = await supabase
       .from("product_variants")
       .select("id");
-
-    if (vErr) {
-      setErr(vErr.message);
-      return;
-    }
+    if (vErr) { setErr(vErr.message); return; }
 
     const variantIds: string[] = (variants ?? []).map((v: any) => v.id);
     if (!variantIds.length) return;
@@ -206,19 +188,11 @@ export default function InventoryPage() {
     const { data: existing, error: eErr } = await supabase
       .from("inventory")
       .select("variant_id");
-
-    if (eErr) {
-      setErr(eErr.message);
-      return;
-    }
+    if (eErr) { setErr(eErr.message); return; }
 
     const existingSet = new Set((existing ?? []).map((x: any) => x.variant_id));
     const missing = variantIds.filter((id) => !existingSet.has(id));
-
-    if (!missing.length) {
-      await load();
-      return;
-    }
+    if (!missing.length) { await load(); return; }
 
     const insertRows = missing.map((id) => ({
       variant_id: id,
@@ -228,12 +202,7 @@ export default function InventoryPage() {
     }));
 
     const { error: iErr } = await supabase.from("inventory").insert(insertRows);
-
-    if (iErr) {
-      setErr(iErr.message);
-      return;
-    }
-
+    if (iErr) { setErr(iErr.message); return; }
     await load();
   };
 
@@ -243,7 +212,7 @@ export default function InventoryPage() {
         <div>
           <h1 className="text-xl font-semibold text-[hsl(var(--foreground))]">Inventory</h1>
           <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">
-            Manage stock per variant. Track inventory, allow backorders, and adjust quantities.
+            Manage stock per variant. Products collapse — click to expand variants.
           </p>
         </div>
 
@@ -261,16 +230,17 @@ export default function InventoryPage() {
         />
       </div>
 
-      {err ? <ErrorAlert message={err} onRetry={load} /> : null}
+      {err && <ErrorAlert message={err} onRetry={load} />}
 
       {loading ? (
         <LoadingState />
       ) : (
         <div className="inventory-table">
-          <InventoryTable
-            rows={filtered}
+          <GroupedInventoryTable
+            groups={groups}
             lowStockThreshold={lowStockThreshold}
             onEdit={handleEdit}
+            expandAll={!!search}
           />
         </div>
       )}
@@ -281,6 +251,11 @@ export default function InventoryPage() {
         onClose={() => setEditOpen(false)}
         onSave={handleSave}
       />
+
+      {/* ── Shipping Boxes ── */}
+      <div className="mt-10 border-t pt-8">
+        <ShippingBoxes />
+      </div>
     </div>
   );
 }

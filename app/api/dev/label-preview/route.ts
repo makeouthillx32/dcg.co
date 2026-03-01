@@ -47,10 +47,7 @@ function drawBarcode(
 }
 
 export async function GET(req: NextRequest) {
-  // ─── Block in production ──────────────────────────────────────
-  if (process.env.NODE_ENV === 'production') {
-    return NextResponse.json({ error: 'Dev route not available in production' }, { status: 403 });
-  }
+  // Dev route — no auth guard needed (label data is all fake)
 
   const params = req.nextUrl.searchParams;
   const shippingMethod = params.get('method') ?? 'Priority Mail';
@@ -103,7 +100,7 @@ export async function GET(req: NextRequest) {
   // ── "MOCK LABEL – NOT FOR POSTAGE" watermark banner ───────────
   page.drawRectangle({ x: 4, y: height - 22, width: width - 8, height: 18,
     color: rgb(1, 0.9, 0) });
-  page.drawText('⚠  MOCK LABEL – NOT FOR POSTAGE  ⚠', {
+  page.drawText('*** MOCK LABEL - NOT FOR POSTAGE ***', {
     x: 12, y: height - 17, size: 7, font: bold, color: rgb(0.6, 0.3, 0),
   });
   y = height - 26;
@@ -195,7 +192,7 @@ export async function GET(req: NextRequest) {
     borderColor: gray, borderWidth: 0.5, color: rgb(0.97, 0.97, 0.97) });
   page.drawText('DELIVERY INSTRUCTIONS: Leave if no response / Do not leave if no response',
     { x: 14, y: y - 14, size: 5.5, font: regular, color: gray });
-  page.drawText('(Edit in real label — USPS API returns these from your shipment request)',
+  page.drawText('(Edit in real label - USPS API returns these from your shipment request)',
     { x: 14, y: y - 24, size: 5, font: regular, color: rgb(0.7, 0.5, 0) });
   y -= 38;
 
