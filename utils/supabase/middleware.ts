@@ -1,8 +1,19 @@
+// utils/supabase/middleware.ts
 import { type NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { isAuthRoute, isProtectedRoute } from "@/lib/protectedRoutes";
 
 export async function middleware(req: NextRequest) {
+  const pathname = req.nextUrl.pathname;
+
+  // ── Bypass webhook routes entirely ───────────────────────────
+  // Stripe (and any future webhooks) send raw bodies with signature
+  // headers. If middleware reads/buffers the request first, the body
+  // is consumed and the webhook handler can't verify the signature.
+  if (pathname.startsWith("/api/webhooks/")) {
+    return NextResponse.next();
+  }
+
   let res = NextResponse.next({ request: req });
 
   // ── Invite capture ──────────────────────────────────────────
@@ -21,8 +32,6 @@ export async function middleware(req: NextRequest) {
       secure: process.env.NODE_ENV === "production",
     });
   }
-
-  const pathname = req.nextUrl.pathname;
 
   // ── Skip auth logic on auth pages ───────────────────────────
   if (isAuthRoute(pathname)) return res;
