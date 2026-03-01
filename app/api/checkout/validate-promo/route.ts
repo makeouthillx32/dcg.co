@@ -5,11 +5,10 @@ import { NextRequest, NextResponse } from "next/server";
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createServerClient();
-    
+
     const { data: { user } } = await supabase.auth.getUser();
     const userId = user?.id || null;
 
-    // Parse request body
     const body = await request.json();
     const { code, subtotal_cents } = body;
 
@@ -20,7 +19,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Call database function to validate promo code
+    // Validate and calculate discount via DB function
     const { data, error } = await supabase
       .rpc('apply_promo_code', {
         p_code: code.toUpperCase(),
@@ -40,20 +39,32 @@ export async function POST(request: NextRequest) {
 
     if (!result.is_valid) {
       return NextResponse.json(
-        { 
-          valid: false, 
-          error: result.error_message 
-        },
+        { valid: false, error: result.error_message },
         { status: 200 }
       );
     }
 
-    // Get promo code details for display
-    const { data: promoCode } = await supabase
-      .from('promo_codes')
-      .select('code, description, discount_type, discount_value')
+    // Fetch display details from the discounts table (admin-managed source of truth)
+    const { data: discount } = await supabase
+      .from('discounts')
+      .select('code, type, percent_off, amount_off_cents')
       .eq('code', code.toUpperCase())
       .single();
+
+    // Build a friendly description so the green badge has something to show
+    let description = '';
+    if (discount?.type === 'percentage' && discount?.percent_off) {
+      description = `${discount.percent_off}% off your order`;
+    } else if (discount?.type === 'fixed' && discount?.amount_off_cents) {
+      description = `$${(discount.amount_off_cents / 100).toFixed(2)} off your order`;
+    }
+
+    const promoCode = {
+      code: code.toUpperCase(),
+      description,
+      discount_type: discount?.type ?? 'percentage',
+      discount_value: discount?.percent_off ?? discount?.amount_off_cents ?? 0,
+    };
 
     return NextResponse.json({
       valid: true,
