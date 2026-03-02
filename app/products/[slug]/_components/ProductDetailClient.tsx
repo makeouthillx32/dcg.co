@@ -37,6 +37,8 @@ interface ProductVariant {
   price_cents: number;
   compare_at_price_cents?: number;
   inventory_quantity: number;
+  track_inventory: boolean;
+  allow_backorder: boolean;
   weight_grams?: number;
   position: number;
 }
@@ -242,7 +244,11 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
   const compareAtPrice =
     selectedVariant?.compare_at_price_cents ?? product.compare_at_price_cents;
   const hasDiscount = compareAtPrice && compareAtPrice > displayPrice;
-  const inStock = selectedVariant ? selectedVariant.inventory_quantity > 0 : true;
+  // A variant is "in stock" if it has qty > 0, OR if backorders are allowed
+  // (backorder = always purchasable regardless of qty, e.g. digital / made-to-order)
+  const inStock = selectedVariant
+    ? selectedVariant.allow_backorder || selectedVariant.inventory_quantity > 0
+    : true;
 
   // ── Color selection → auto-jump gallery image ──────────────────────────────
   const handleOptionSelect = (optionName: string, optionValue: any) => {
@@ -532,9 +538,12 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
               {inStock ? (
                 <span className="text-green-600 font-medium">
                   ✓ In Stock
-                  <span className="text-muted-foreground font-normal ml-1">
-                    ({selectedVariant.inventory_quantity} available)
-                  </span>
+                  {/* Hide quantity count when backorders are on — qty is irrelevant */}
+                  {!selectedVariant.allow_backorder && (
+                    <span className="text-muted-foreground font-normal ml-1">
+                      ({selectedVariant.inventory_quantity} available)
+                    </span>
+                  )}
                 </span>
               ) : (
                 <span className="text-red-600 font-medium">✗ Out of Stock</span>
