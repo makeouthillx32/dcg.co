@@ -5,6 +5,7 @@ import { OrdersManager } from '@/components/orders';
 import { OrdersSkeleton } from '@/components/orders/skeleton';
 import { createClient } from '@/utils/supabase/server';
 import { AdminOrder } from '@/lib/orders/types';
+import { resolveFulfillmentStatus } from '@/lib/orders/resolveFulfillmentStatus';
 
 async function fetchOrders(): Promise<AdminOrder[]> {
   const supabase = await createClient();
@@ -62,7 +63,6 @@ async function fetchOrders(): Promise<AdminOrder[]> {
   return (data ?? []).map((o: any): AdminOrder => {
     const source = (o.source ?? 'web') as 'web' | 'pos';
     const isPOS   = source === 'pos';
-    // For web orders: classify by identity columns
     const isMember = !isPOS && !!o.auth_user_id;
     const isGuest  = !isPOS && !isMember && !!o.guest_key;
     const isLegacy = !isPOS && !isMember && !isGuest;
@@ -73,7 +73,7 @@ async function fetchOrders(): Promise<AdminOrder[]> {
       created_at: o.created_at,
       status: o.status,
       payment_status: o.payment_status,
-      fulfillment_status: o.fulfillments?.[0]?.status ?? 'unfulfilled',
+      fulfillment_status: resolveFulfillmentStatus(o.fulfillments?.[0], o.status),
       source,
       is_pos: isPOS,
       subtotal_cents: o.subtotal_cents ?? 0,
@@ -110,18 +110,15 @@ async function fetchOrders(): Promise<AdminOrder[]> {
   });
 }
 
-export default async function OrdersPage({ params }: { params: { id: string } }) {
+export default async function OrdersPage() {
+  const orders = await fetchOrders();
+
   return (
-    <div className="space-y-6">
+    <div>
       <Breadcrumb items={[{ label: 'Orders' }]} />
       <Suspense fallback={<OrdersSkeleton />}>
-        <OrdersData />
+        <OrdersManager initialOrders={orders} />
       </Suspense>
     </div>
   );
-}
-
-async function OrdersData() {
-  const orders = await fetchOrders();
-  return <OrdersManager initialOrders={orders} />;
 }

@@ -5,6 +5,7 @@
 
 import { NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
+import { resolveFulfillmentStatus } from '@/lib/orders/resolveFulfillmentStatus';
 
 export async function GET() {
   const supabase = await createClient();
@@ -58,7 +59,7 @@ export async function GET() {
     created_at: o.created_at,
     status: o.status,
     payment_status: o.payment_status,
-    fulfillment_status: o.fulfillments?.[0]?.status ?? 'unfulfilled',
+    fulfillment_status: resolveFulfillmentStatus(o.fulfillments?.[0], o.status),
     subtotal_cents: o.subtotal_cents ?? 0,
     shipping_cents: o.shipping_cents ?? 0,
     tax_cents: o.tax_cents ?? 0,
