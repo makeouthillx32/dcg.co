@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { PackagePicker } from '../PackagePicker';
 import { printStoredLabel } from '../Print';
+import { ReprintReceipt } from '../ReprintReceipt';
 
 function gramsToOz(g: number) {
   return Math.round((g / 28.3495) * 100) / 100;
@@ -40,7 +41,6 @@ export function OrderDetailsDialog({ order, open, onOpenChange, onFulfill, onPri
     ? [addr.firstName, addr.lastName].filter(Boolean).join(' ')
     : [order.customer_first_name, order.customer_last_name].filter(Boolean).join(' ') || order.email;
 
-  // Weight
   const totalWeightGrams = order.items.reduce(
     (sum, item) => sum + (item.weight_grams ?? 0) * item.quantity, 0
   );
@@ -53,7 +53,6 @@ export function OrderDetailsDialog({ order, open, onOpenChange, onFulfill, onPri
   const isFulfilled     = fulfilled || order.fulfillment_status === 'fulfilled';
   const hasStoredLabel  = !!order.label_pdf_path;
 
-  // ── Reprint stored label ──────────────────────────────────────
   async function handleReprint() {
     setReprinting(true);
     setLabelError(null);
@@ -68,7 +67,6 @@ export function OrderDetailsDialog({ order, open, onOpenChange, onFulfill, onPri
     }
   }
 
-  // ── Label generated via PackagePicker ─────────────────────────
   function handleLabelSuccess(newTracking: string, newTrackingUrl: string) {
     setShowPicker(false);
     setLabelError(null);
@@ -76,7 +74,6 @@ export function OrderDetailsDialog({ order, open, onOpenChange, onFulfill, onPri
     if (newTrackingUrl) setTrackingUrl(newTrackingUrl);
   }
 
-  // ── Fulfill ────────────────────────────────────────────────────
   async function handleFulfill() {
     setFulfilling(true);
     try {
@@ -89,12 +86,10 @@ export function OrderDetailsDialog({ order, open, onOpenChange, onFulfill, onPri
     }
   }
 
-  // ── Header button: label vs POS ───────────────────────────────
   function HeaderActionButton() {
-    // POS orders — no label ever needed
-    if (order.is_pos) return null;
-
-    // Web order with stored label — reprint
+    if (order.is_pos) {
+      return <ReprintReceipt order={order} />;
+    }
     if (hasStoredLabel) {
       return (
         <button
@@ -103,23 +98,13 @@ export function OrderDetailsDialog({ order, open, onOpenChange, onFulfill, onPri
           className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
         >
           {reprinting
-            ? <Loader2 className="w-4 h-4 animate-spin" />
-            : <RefreshCw className="w-4 h-4" />}
-          <span className="hidden sm:inline">Reprint Label</span>
+            ? <><Loader2 className="w-4 h-4 animate-spin" /> Printing…</>
+            : <><RefreshCw className="w-4 h-4" /> Reprint Label</>
+          }
         </button>
       );
     }
-
-    // Web order with no label yet — generate
-    return (
-      <button
-        onClick={() => setShowPicker(true)}
-        className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-      >
-        <Printer className="w-4 h-4" />
-        <span className="hidden sm:inline">Print Label</span>
-      </button>
-    );
+    return null;
   }
 
   return (
@@ -132,16 +117,19 @@ export function OrderDetailsDialog({ order, open, onOpenChange, onFulfill, onPri
         />
       )}
 
-      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4">
-        <div className="w-full sm:max-w-2xl bg-white rounded-t-2xl sm:rounded-xl shadow-2xl max-h-[92vh] overflow-y-auto">
-
-          {/* ── Header ── */}
-          <div className="flex items-center justify-between px-5 py-4 border-b sticky top-0 bg-white z-10">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-black text-lg">#{order.order_number}</span>
-
-                {/* Identity badge */}
+      <div
+        className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
+        onClick={() => onOpenChange(false)}
+      >
+        <div
+          className="relative bg-white w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl shadow-2xl max-h-[92dvh] overflow-y-auto"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="sticky top-0 z-10 bg-white border-b border-gray-100 px-5 py-4 flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-bold font-mono text-base">#{order.order_number}</span>
                 {order.is_pos ? (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold border bg-purple-50 text-purple-700 border-purple-200">
                     <ShoppingBag className="w-3 h-3" /> POS
@@ -162,8 +150,7 @@ export function OrderDetailsDialog({ order, open, onOpenChange, onFulfill, onPri
                 })}
               </div>
             </div>
-
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
               <HeaderActionButton />
               <button
                 onClick={() => onOpenChange(false)}
@@ -177,7 +164,6 @@ export function OrderDetailsDialog({ order, open, onOpenChange, onFulfill, onPri
 
           <div className="p-5 space-y-5">
 
-            {/* Label error */}
             {labelError && (
               <div className="flex items-start gap-2 text-sm text-red-700 bg-red-50 border border-red-100 rounded-lg px-4 py-3">
                 <span>⚠ {labelError}</span>
@@ -185,7 +171,7 @@ export function OrderDetailsDialog({ order, open, onOpenChange, onFulfill, onPri
               </div>
             )}
 
-            {/* ── POS banner ── */}
+            {/* POS banner */}
             {order.is_pos && (
               <div className="flex items-center gap-3 bg-purple-50 border border-purple-100 rounded-lg px-4 py-3">
                 <ShoppingBag className="w-5 h-5 text-purple-500 shrink-0" />
@@ -196,69 +182,41 @@ export function OrderDetailsDialog({ order, open, onOpenChange, onFulfill, onPri
               </div>
             )}
 
-            {/* ── Status badges ── */}
+            {/* Status badges */}
             <div className="flex flex-wrap gap-2">
               <span className={`text-xs font-bold px-3 py-1 rounded-full border ${
-                isFulfilled
-                  ? 'bg-green-50 text-green-700 border-green-200'
-                  : 'bg-amber-50 text-amber-700 border-amber-200'
+                isFulfilled ? 'bg-green-50 text-green-700 border-green-200' : 'bg-amber-50 text-amber-700 border-amber-200'
               }`}>
                 {isFulfilled ? 'Fulfilled' : 'Unfulfilled'}
               </span>
               <span className={`text-xs font-bold px-3 py-1 rounded-full border ${
-                order.payment_status === 'paid'
-                  ? 'bg-green-50 text-green-700 border-green-100'
-                  : 'bg-amber-50 text-amber-700 border-amber-100'
+                order.payment_status === 'paid' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-100 text-gray-500 border-gray-200'
               }`}>
                 {order.payment_status?.toUpperCase()}
               </span>
-              {order.shipping_method_name && !order.is_pos && (
-                <span className="text-xs px-3 py-1 rounded-full border border-gray-200 bg-gray-50 text-gray-600">
-                  {order.shipping_method_name}
-                </span>
-              )}
-              {order.label_postage_cents && order.label_postage_cents > 0 && (
-                <span className="text-xs px-3 py-1 rounded-full border border-blue-100 bg-blue-50 text-blue-700 font-mono">
-                  Label: ${(order.label_postage_cents / 100).toFixed(2)}
-                </span>
-              )}
             </div>
 
-            {/* ── Member points callout (web only) ── */}
-            {order.is_member && !order.is_pos && (
-              <div className="flex items-center gap-3 bg-yellow-50 border border-yellow-100 rounded-lg px-4 py-3">
-                <Star className="w-5 h-5 fill-yellow-400 text-yellow-400 shrink-0" />
-                <div className="text-sm font-semibold text-yellow-800">
-                  {order.points_earned > 0
-                    ? `+${order.points_earned} points earned on this order`
-                    : 'Member order'}
-                </div>
-              </div>
-            )}
-
-            {/* ── Ship To ── */}
+            {/* Ship To — web orders */}
             {!order.is_pos && addr && (
               <section>
                 <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">
                   <MapPin className="w-3 h-3" /> Ship To
                 </div>
                 <div className="text-sm space-y-0.5">
-                  <div className="font-semibold">{customerName}</div>
-                  {addr.address1 && <div className="text-gray-600">{addr.address1}</div>}
-                  {addr.address2 && <div className="text-gray-600">{addr.address2}</div>}
+                  {customerName && <div className="font-semibold">{customerName}</div>}
+                  {addr.address1 && <div>{addr.address1}</div>}
+                  {addr.address2 && <div>{addr.address2}</div>}
                   {(addr.city || addr.state || addr.zip) && (
-                    <div className="text-gray-600">
-                      {[addr.city, addr.state].filter(Boolean).join(', ')} {addr.zip}
-                    </div>
+                    <div>{[addr.city, addr.state, addr.zip].filter(Boolean).join(', ')}</div>
                   )}
-                  {addr.country && addr.country !== 'US' && <div className="text-gray-600">{addr.country}</div>}
-                  {addr.phone && <div className="text-gray-500 text-xs">{addr.phone}</div>}
+                  {addr.country  && <div>{addr.country}</div>}
+                  {addr.phone    && <div className="text-gray-400 pt-1">{addr.phone}</div>}
+                  {order.email   && <div className="text-gray-400 pt-1">{order.email}</div>}
                 </div>
-                <div className="text-xs text-gray-400 pt-1">{order.email}</div>
               </section>
             )}
 
-            {/* POS: just show customer name/email */}
+            {/* Customer — POS orders */}
             {order.is_pos && (
               <section>
                 <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">
@@ -271,7 +229,7 @@ export function OrderDetailsDialog({ order, open, onOpenChange, onFulfill, onPri
               </section>
             )}
 
-            {/* ── Items ── */}
+            {/* Items */}
             <section>
               <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">
                 <Package className="w-3 h-3" /> Items
@@ -298,7 +256,7 @@ export function OrderDetailsDialog({ order, open, onOpenChange, onFulfill, onPri
               </div>
             </section>
 
-            {/* ── Totals ── */}
+            {/* Totals */}
             <section>
               <div className="border-t pt-3 space-y-1 text-sm">
                 {order.subtotal_cents != null && (
@@ -306,74 +264,89 @@ export function OrderDetailsDialog({ order, open, onOpenChange, onFulfill, onPri
                     <span>Subtotal</span><span>${(order.subtotal_cents / 100).toFixed(2)}</span>
                   </div>
                 )}
-                {!order.is_pos && (
-                  (order.shipping_cents ?? 0) > 0 ? (
-                    <div className="flex justify-between text-gray-500">
-                      <span>Shipping</span><span>${(order.shipping_cents! / 100).toFixed(2)}</span>
-                    </div>
-                  ) : (
-                    <div className="flex justify-between text-gray-500">
-                      <span>Shipping</span><span className="text-green-600">FREE</span>
-                    </div>
-                  )
+                {!order.is_pos && (order.shipping_cents ?? 0) > 0 && (
+                  <div className="flex justify-between text-gray-500">
+                    <span>Shipping</span><span>${(order.shipping_cents! / 100).toFixed(2)}</span>
+                  </div>
+                )}
+                {(order.discount_cents ?? 0) > 0 && (
+                  <div className="flex justify-between text-green-600">
+                    <span>Discount</span><span>−${(order.discount_cents! / 100).toFixed(2)}</span>
+                  </div>
                 )}
                 {(order.tax_cents ?? 0) > 0 && (
                   <div className="flex justify-between text-gray-500">
                     <span>Tax</span><span>${(order.tax_cents! / 100).toFixed(2)}</span>
                   </div>
                 )}
-                {(order.discount_cents ?? 0) > 0 && (
-                  <div className="flex justify-between text-green-600">
-                    <span>Discount</span><span>–${(order.discount_cents! / 100).toFixed(2)}</span>
-                  </div>
-                )}
-                <div className="flex justify-between font-black text-base pt-1 border-t">
+                <div className="flex justify-between font-bold text-base pt-1 border-t">
                   <span>Total</span><span>${(order.total_cents / 100).toFixed(2)}</span>
                 </div>
               </div>
             </section>
 
-            {/* ── Package weight — web orders only ── */}
+            {/* Package weight — web orders */}
             {!order.is_pos && (
               <section>
                 <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">
                   <Package className="w-3 h-3" /> Package Weight
                 </div>
-                <div className="flex items-center gap-3">
-                  <span className="font-mono font-semibold text-sm">
-                    {packageWeightOz > 0
-                      ? packageLb > 0 ? `${packageLb} lb ${packageRemOz} oz` : `${packageWeightOz} oz`
-                      : <span className="text-amber-500 font-normal">Weigh manually</span>}
-                  </span>
-                  <div className="flex items-center gap-1.5 ml-auto">
-                    <label className="text-xs text-gray-500">+ packaging oz</label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.1"
-                      placeholder="0"
-                      value={extraWeightOz}
-                      onChange={(e) => setExtraWeightOz(e.target.value)}
-                      className="w-16 border border-gray-200 rounded px-2 py-1 text-xs text-center focus:outline-none focus:ring-1 focus:ring-black/10"
-                    />
+                {hasAllWeights ? (
+                  <div className="space-y-2">
+                    <div className="text-sm text-gray-600">
+                      Items: <span className="font-mono font-semibold">{totalWeightOz} oz</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs text-gray-500 shrink-0">+ Packaging (oz):</label>
+                      <input
+                        type="number" min="0" step="0.1" placeholder="0"
+                        value={extraWeightOz}
+                        onChange={(e) => setExtraWeightOz(e.target.value)}
+                        className="w-20 border border-gray-200 rounded px-2 py-1 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-black/10"
+                      />
+                    </div>
+                    <div className="text-sm font-semibold">
+                      Total: {packageLb > 0 ? `${packageLb} lb ` : ''}{packageRemOz} oz
+                    </div>
                   </div>
-                </div>
-                {!hasAllWeights && (
-                  <div className="text-xs text-amber-600 mt-1">
-                    ⚠ Some items are missing weight data — add them in Products → Variants.
-                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500">Some items are missing weight data — weigh manually.</p>
                 )}
               </section>
             )}
 
-            {/* ── Fulfill ── */}
+            {/* Tracking — web fulfilled orders */}
+            {!order.is_pos && isFulfilled && (trackingNumber || trackingUrl) && (
+              <section>
+                <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">
+                  Tracking
+                </div>
+                <div className="text-sm font-mono">{trackingNumber}</div>
+                {trackingUrl && (
+                  <a href={trackingUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline">
+                    Track package →
+                  </a>
+                )}
+              </section>
+            )}
+
+            {/* ── Receipt reprint — POS orders only ── */}
+            {order.is_pos && (
+              <section>
+                <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">
+                  <Printer className="w-3 h-3" /> Receipt
+                </div>
+                <ReprintReceipt order={order} />
+              </section>
+            )}
+
+            {/* Mark fulfilled */}
             {!isFulfilled && (
               <section>
                 <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">
                   <CheckCircle2 className="w-3 h-3" /> Mark Fulfilled
                 </div>
                 <div className="space-y-3">
-                  {/* Tracking number — only relevant for web (shipped) orders */}
                   {!order.is_pos && (
                     <div>
                       <label htmlFor="tracking" className="block text-xs text-gray-500 mb-1">
@@ -381,8 +354,7 @@ export function OrderDetailsDialog({ order, open, onOpenChange, onFulfill, onPri
                         {trackingNumber && <span className="text-green-600 ml-1">(auto-filled from label)</span>}
                       </label>
                       <input
-                        id="tracking"
-                        type="text"
+                        id="tracking" type="text"
                         placeholder="e.g. 9400111899223397658538"
                         value={trackingNumber}
                         onChange={(e) => setTrackingNumber(e.target.value)}
@@ -390,7 +362,6 @@ export function OrderDetailsDialog({ order, open, onOpenChange, onFulfill, onPri
                       />
                     </div>
                   )}
-                  {/* Prompt to generate label for web orders with no tracking yet */}
                   {!order.is_pos && !hasStoredLabel && !trackingNumber && (
                     <button
                       onClick={() => setShowPicker(true)}
@@ -406,26 +377,28 @@ export function OrderDetailsDialog({ order, open, onOpenChange, onFulfill, onPri
                     className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-black text-white rounded-lg font-semibold text-sm hover:bg-gray-800 disabled:opacity-50 transition-colors"
                   >
                     <CheckCircle2 className="w-4 h-4" />
-                    {fulfilling
-                      ? 'Marking fulfilled…'
-                      : order.is_pos
-                        ? 'Mark as Complete'
-                        : 'Mark as Fulfilled'}
+                    {fulfilling ? 'Marking fulfilled…' : order.is_pos ? 'Mark as Complete' : 'Mark as Fulfilled'}
                   </button>
                 </div>
               </section>
             )}
 
+            {/* Fulfilled confirmation */}
             {isFulfilled && (
               <div className="flex items-center gap-2 bg-green-50 border border-green-100 rounded-lg px-4 py-3 text-sm text-green-700 font-medium">
                 <CheckCircle2 className="w-4 h-4" />
-                {order.is_pos ? 'Sale complete.' : 'This order has been fulfilled.'}
-                {!order.is_pos && (order.tracking_number || trackingNumber) && (
-                  <span className="font-mono text-green-600 ml-1 text-xs">
-                    {order.tracking_number ?? trackingNumber}
-                  </span>
-                )}
+                {order.is_pos ? 'Sale complete.' : `This order has been fulfilled.${trackingNumber ? ` ${trackingNumber}` : ''}`}
               </div>
+            )}
+
+            {/* Internal notes */}
+            {order.internal_notes && (
+              <section>
+                <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">
+                  Notes
+                </div>
+                <p className="text-sm text-gray-600 whitespace-pre-wrap">{order.internal_notes}</p>
+              </section>
             )}
 
           </div>
