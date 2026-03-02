@@ -6,8 +6,19 @@ import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ChevronLeft, ChevronRight, ShoppingCart, Heart, Share2 } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  ShoppingCart,
+  Heart,
+  Share2,
+  ChevronDown,
+  ChevronUp,
+  Ruler,
+} from "lucide-react";
 import { useCart } from "@/components/Layouts/overlays/cart/cart-context";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface ProductImage {
   id: string;
@@ -59,18 +70,20 @@ interface ProductDetailClientProps {
   product: Product;
 }
 
-// Helper to get display value from option (handles both strings and objects like color)
+// ─── Pure Helpers (defined outside component, no hooks) ───────────────────────
+
+/** Extract display string from a variant option value (string or color object) */
 function getOptionDisplayValue(optionValue: any): string {
-  if (typeof optionValue === 'string') return optionValue;
-  if (optionValue && typeof optionValue === 'object' && optionValue.name) {
+  if (typeof optionValue === "string") return optionValue;
+  if (optionValue && typeof optionValue === "object" && optionValue.name) {
     return optionValue.name;
   }
   return String(optionValue);
 }
 
-// Helper to compare option values (handles color objects)
+/** Deep-equal comparison for option values (handles color objects) */
 function optionsMatch(value1: any, value2: any): boolean {
-  if (typeof value1 === 'string' && typeof value2 === 'string') {
+  if (typeof value1 === "string" && typeof value2 === "string") {
     return value1 === value2;
   }
   if (value1?.name && value2?.name) {
@@ -79,30 +92,117 @@ function optionsMatch(value1: any, value2: any): boolean {
   return String(value1) === String(value2);
 }
 
-export default function ProductDetailClient({ product }: ProductDetailClientProps) {
-  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
-  const [selectedOptions, setSelectedOptions] = useState<Record<string, any>>({});
-  
-  // 🛒 Cart integration
-  const { addItem } = useCart();
-  const [isAddingToCart, setIsAddingToCart] = useState(false);
+/**
+ * Returns true if the image alt text contains "SG" as a standalone tag.
+ * Matches: "SG", "SG ", " SG", "[SG]", "(SG)", "SG-", etc.
+ * Will NOT match "MSG" or "DESIGN" — only isolated "SG".
+ */
+function isSizeGuideImage(image: ProductImage): boolean {
+  const alt = image.alt_text || "";
+  return /\bSG\b/i.test(alt);
+}
 
-  // Get image URL from Supabase Storage
+/**
+ * Try to find the first gallery image whose alt text contains the given
+ * color/variant name (case-insensitive substring match).
+ * Returns the index within the galleryImages array, or -1 if not found.
+ */
+function findGalleryImageIndexByHint(
+  galleryImages: ProductImage[],
+  hint: string
+): number {
+  if (!hint) return -1;
+  const lower = hint.toLowerCase();
+  return galleryImages.findIndex((img) =>
+    (img.alt_text || "").toLowerCase().includes(lower)
+  );
+}
+
+// ─── Collapsible Accordion ────────────────────────────────────────────────────
+
+function Accordion({
+  title,
+  children,
+  defaultOpen = false,
+}: {
+  title: string;
+  children: React.ReactNode;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="border-t">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center justify-between py-4 text-sm font-medium text-left hover:text-primary transition-colors"
+      >
+        <span>{title}</span>
+        {open ? (
+          <ChevronUp className="w-4 h-4 text-muted-foreground" />
+        ) : (
+          <ChevronDown className="w-4 h-4 text-muted-foreground" />
+        )}
+      </button>
+      {open && <div className="pb-4">{children}</div>}
+    </div>
+  );
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
+
+export default function ProductDetailClient({ product }: ProductDetailClientProps) {
+  const [selectedOptions, setSelectedOptions] = useState<Record<string, any>>({});
+  const [isAddingToCart, setIsAddingToCart] = useState(false);
+  const [sizeGuideOpen, setSizeGuideOpen] = useState(false);
+  const [sizeGuideImageIndex, setSizeGuideImageIndex] = useState(0);
+
+  const { addItem } = useCart();
+
+  // ── Image URL builder ──────────────────────────────────────────────────────
   const getImageUrl = (image: ProductImage) => {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     return `${supabaseUrl}/storage/v1/object/public/${image.bucket_name}/${image.object_path}`;
   };
 
-  // Check if product has variants
+  // ── Split images: gallery vs size-guide ───────────────────────────────────
+  const { galleryImages, sizeGuideImages } = useMemo(() => {
+    const gallery: ProductImage[] = [];
+    const guide: ProductImage[] = [];
+    for (const img of product.images) {
+      if (isSizeGuideImage(img)) {
+        guide.push(img);
+      } else {
+        gallery.push(img);
+      }
+    }
+    return { galleryImages: gallery, sizeGuideImages: guide };
+  }, [product.images]);
+
+  // ── Gallery index tracks within galleryImages only ─────────────────────────
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+
+  const safeImageIndex = Math.min(selectedImageIndex, Math.max(0, galleryImages.length - 1));
+
+  const previousImage = () => {
+    setSelectedImageIndex((prev) =>
+      prev === 0 ? galleryImages.length - 1 : prev - 1
+    );
+  };
+
+  const nextImage = () => {
+    setSelectedImageIndex((prev) =>
+      prev === galleryImages.length - 1 ? 0 : prev + 1
+    );
+  };
+
+  // ── Variant / option logic ─────────────────────────────────────────────────
   const hasVariants = product.variants && product.variants.length > 0;
-  
-  // Get all unique option names and their values
+
   const optionTypes = useMemo(() => {
     if (!hasVariants) return {};
-    
     const types: Record<string, Set<string>> = {};
     const rawValues: Record<string, any[]> = {};
-    
+
     product.variants.forEach((variant) => {
       Object.entries(variant.options || {}).forEach(([key, value]) => {
         if (!types[key]) {
@@ -116,87 +216,84 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
         }
       });
     });
-    
+
     const result: Record<string, any[]> = {};
-    Object.entries(types).forEach(([key, valueSet]) => {
+    Object.entries(types).forEach(([key]) => {
       result[key] = rawValues[key];
     });
-    
     return result;
   }, [product.variants, hasVariants]);
 
-  // Find matching variant based on selected options
   const selectedVariant = useMemo(() => {
     if (!hasVariants) return null;
     if (product.variants.length === 1) return product.variants[0];
+    if (Object.keys(selectedOptions).length === 0) return product.variants[0];
 
-    if (Object.keys(selectedOptions).length === 0) {
-      return product.variants[0];
-    }
-
-    const match = product.variants.find((v) => {
-      return Object.entries(selectedOptions).every(
-        ([optionKey, optionValue]) => {
-          const variantValue = v.options[optionKey];
-          return optionsMatch(variantValue, optionValue);
-        }
-      );
-    });
-    
-    return match || product.variants[0];
+    return (
+      product.variants.find((v) =>
+        Object.entries(selectedOptions).every(([optionKey, optionValue]) =>
+          optionsMatch(v.options[optionKey], optionValue)
+        )
+      ) || product.variants[0]
+    );
   }, [product.variants, selectedOptions, hasVariants]);
 
-  // Calculate price
   const displayPrice = selectedVariant?.price_cents ?? product.price_cents;
-  const compareAtPrice = selectedVariant?.compare_at_price_cents ?? product.compare_at_price_cents;
+  const compareAtPrice =
+    selectedVariant?.compare_at_price_cents ?? product.compare_at_price_cents;
   const hasDiscount = compareAtPrice && compareAtPrice > displayPrice;
-
-  // Check if product is in stock
   const inStock = selectedVariant ? selectedVariant.inventory_quantity > 0 : true;
 
-  // Navigate gallery
-  const previousImage = () => {
-    setSelectedImageIndex((prev) => (prev === 0 ? product.images.length - 1 : prev - 1));
+  // ── Color selection → auto-jump gallery image ──────────────────────────────
+  const handleOptionSelect = (optionName: string, optionValue: any) => {
+    setSelectedOptions((prev) => ({ ...prev, [optionName]: optionValue }));
+
+    // If this is a color option, try to jump to a matching gallery image
+    if (optionName.toLowerCase() === "color") {
+      const colorHint = getOptionDisplayValue(optionValue);
+      const matchIndex = findGalleryImageIndexByHint(galleryImages, colorHint);
+      if (matchIndex !== -1) {
+        setSelectedImageIndex(matchIndex);
+      }
+    }
   };
 
-  const nextImage = () => {
-    setSelectedImageIndex((prev) => (prev === product.images.length - 1 ? 0 : prev + 1));
-  };
-
-  // 🛒 Add to cart handler
+  // ── Add to cart ────────────────────────────────────────────────────────────
   const handleAddToCart = async () => {
     if (!selectedVariant || !inStock) return;
-    
     setIsAddingToCart(true);
     try {
       await addItem(selectedVariant.id, 1);
-      // Cart drawer will open automatically!
     } catch (error) {
-      console.error('Failed to add to cart:', error);
-      // Optional: Show error toast here
+      console.error("Failed to add to cart:", error);
     } finally {
       setIsAddingToCart(false);
     }
   };
 
-  // Helper to render option button with color swatch if applicable
-  const renderOptionButton = (optionName: string, optionValue: any, isSelected: boolean) => {
+  // ── Option button renderer ─────────────────────────────────────────────────
+  const renderOptionButton = (
+    optionName: string,
+    optionValue: any,
+    isSelected: boolean
+  ) => {
     const displayValue = getOptionDisplayValue(optionValue);
-    const isColor = optionName.toLowerCase() === 'color' && optionValue?.hex;
+    const isColor =
+      optionName.toLowerCase() === "color" && optionValue?.hex;
 
     return (
       <button
         key={displayValue}
-        onClick={() => setSelectedOptions(prev => ({ ...prev, [optionName]: optionValue }))}
-        className={`px-4 py-2 border rounded-md transition-colors ${
+        onClick={() => handleOptionSelect(optionName, optionValue)}
+        className={`inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-md text-sm transition-colors ${
           isSelected
-            ? 'border-primary bg-primary text-primary-foreground'
-            : 'border-input hover:border-primary'
+            ? "border-primary bg-primary text-primary-foreground"
+            : "border-input hover:border-primary"
         }`}
       >
         {isColor && (
-          <span 
-            className="inline-block w-4 h-4 rounded-full mr-2 border border-gray-300"
+          <span
+            className="inline-block w-3.5 h-3.5 rounded-full border border-white/40 shadow-sm"
             style={{ backgroundColor: optionValue.hex }}
           />
         )}
@@ -205,8 +302,10 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
     );
   };
 
+  // ─────────────────────────────────────────────────────────────────────────────
   return (
     <div className="container mx-auto px-4 py-8">
+
       {/* Breadcrumbs */}
       <nav className="flex items-center gap-2 text-sm text-muted-foreground mb-8">
         <Link href="/" className="hover:text-foreground transition-colors">
@@ -215,9 +314,9 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
         <span>/</span>
         {product.categories.length > 0 && (
           <>
-            <Link 
-              href={`/${product.categories[0].slug}`} 
-              className="hover:text-foreground transition-colors"
+            <Link
+              href={`/${product.categories[0].slug}`}
+              className="hover:text-foreground transition-colors capitalize"
             >
               {product.categories[0].name}
             </Link>
@@ -227,45 +326,47 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
         <span className="text-foreground">{product.title}</span>
       </nav>
 
-      {/* Product Detail Grid */}
+      {/* Main Product Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-        {/* Image Gallery */}
+
+        {/* ── LEFT: Image Gallery ─────────────────────────────────────────── */}
         <div className="space-y-4">
+
           {/* Main Image */}
           <div className="relative aspect-square bg-muted rounded-lg overflow-hidden">
-            {product.images.length > 0 ? (
+            {galleryImages.length > 0 ? (
               <>
                 <Image
-                  src={getImageUrl(product.images[selectedImageIndex])}
-                  alt={product.images[selectedImageIndex].alt_text || product.title}
+                  src={getImageUrl(galleryImages[safeImageIndex])}
+                  alt={galleryImages[safeImageIndex].alt_text || product.title}
                   fill
                   className="object-cover"
                   priority
                 />
-                
-                {/* Gallery Navigation */}
-                {product.images.length > 1 && (
+
+                {/* Prev / Next */}
+                {galleryImages.length > 1 && (
                   <>
                     <button
                       onClick={previousImage}
-                      className="absolute left-4 top-1/2 -translate-y-1/2 bg-background/80 hover:bg-background rounded-full p-2 transition-colors"
+                      className="absolute left-3 top-1/2 -translate-y-1/2 bg-background/80 hover:bg-background rounded-full p-2 transition-colors shadow"
                       aria-label="Previous image"
                     >
-                      <ChevronLeft className="w-6 h-6" />
+                      <ChevronLeft className="w-5 h-5" />
                     </button>
                     <button
                       onClick={nextImage}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 bg-background/80 hover:bg-background rounded-full p-2 transition-colors"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 bg-background/80 hover:bg-background rounded-full p-2 transition-colors shadow"
                       aria-label="Next image"
                     >
-                      <ChevronRight className="w-6 h-6" />
+                      <ChevronRight className="w-5 h-5" />
                     </button>
                   </>
                 )}
 
                 {/* Badge */}
                 {product.badge && (
-                  <div className="absolute top-4 left-4">
+                  <div className="absolute top-3 left-3">
                     <Badge className="bg-primary text-primary-foreground">
                       {product.badge}
                     </Badge>
@@ -273,28 +374,28 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
                 )}
               </>
             ) : (
-              <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+              <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm">
                 No image available
               </div>
             )}
           </div>
 
-          {/* Thumbnail Gallery */}
-          {product.images.length > 1 && (
+          {/* Thumbnails (gallery images only — SG excluded) */}
+          {galleryImages.length > 1 && (
             <div className="grid grid-cols-6 gap-2">
-              {product.images.map((image, index) => (
+              {galleryImages.map((image, index) => (
                 <button
                   key={image.id}
                   onClick={() => setSelectedImageIndex(index)}
                   className={`aspect-square relative rounded-lg overflow-hidden border-2 transition-colors ${
-                    index === selectedImageIndex
-                      ? 'border-primary'
-                      : 'border-transparent hover:border-muted-foreground'
+                    index === safeImageIndex
+                      ? "border-primary"
+                      : "border-transparent hover:border-muted-foreground"
                   }`}
                 >
                   <Image
                     src={getImageUrl(image)}
-                    alt={image.alt_text || `${product.title} - Image ${index + 1}`}
+                    alt={image.alt_text || `${product.title} – view ${index + 1}`}
                     fill
                     className="object-cover"
                   />
@@ -304,120 +405,224 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
           )}
         </div>
 
-        {/* Product Info */}
-        <div className="space-y-6">
-          <div>
-            <h1 className="text-4xl font-bold mb-4">{product.title}</h1>
-            
-            {/* Price */}
-            <div className="flex items-center gap-4 mb-6">
-              <span className="text-3xl font-bold">
-                ${(displayPrice / 100).toFixed(2)}
-              </span>
-              {hasDiscount && compareAtPrice && (
-                <span className="text-xl text-muted-foreground line-through">
-                  ${(compareAtPrice / 100).toFixed(2)}
-                </span>
-              )}
-            </div>
+        {/* ── RIGHT: Product Info ─────────────────────────────────────────── */}
+        <div className="flex flex-col gap-5">
 
-            {/* Description */}
-            {product.description && (
-              <div className="prose prose-sm max-w-none mb-6">
-                <p className="text-muted-foreground">{product.description}</p>
-              </div>
+          {/* 1 · Title */}
+          <div>
+            <h1 className="text-3xl font-bold leading-tight">{product.title}</h1>
+          </div>
+
+          {/* 2 · Price */}
+          <div className="flex items-baseline gap-3">
+            <span className="text-2xl font-bold">
+              ${(displayPrice / 100).toFixed(2)}
+            </span>
+            {hasDiscount && compareAtPrice && (
+              <span className="text-lg text-muted-foreground line-through">
+                ${(compareAtPrice / 100).toFixed(2)}
+              </span>
+            )}
+            {hasDiscount && (
+              <Badge variant="destructive" className="text-xs">Sale</Badge>
             )}
           </div>
 
-          {/* Variant Options */}
+          {/* 3 · Variant Options (color first, then size, then others) */}
           {hasVariants && Object.keys(optionTypes).length > 0 && (
             <div className="space-y-4">
-              {Object.entries(optionTypes).map(([optionName, optionValues]) => (
-                <div key={optionName}>
-                  <label className="block text-sm font-medium mb-2 capitalize">
-                    {optionName}
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {optionValues.map((value: any) => {
-                      const displayValue = getOptionDisplayValue(value);
-                      const isSelected = selectedOptions[optionName] 
-                        ? optionsMatch(selectedOptions[optionName], value)
-                        : false;
-                      
-                      return renderOptionButton(optionName, value, isSelected);
-                    })}
+              {/* Render color first */}
+              {Object.entries(optionTypes)
+                .sort(([a], [b]) => {
+                  const order = ["color", "size"];
+                  const ai = order.indexOf(a.toLowerCase());
+                  const bi = order.indexOf(b.toLowerCase());
+                  if (ai === -1 && bi === -1) return 0;
+                  if (ai === -1) return 1;
+                  if (bi === -1) return -1;
+                  return ai - bi;
+                })
+                .map(([optionName, optionValues]) => (
+                  <div key={optionName}>
+                    <label className="block text-sm font-semibold mb-2 capitalize tracking-wide">
+                      {optionName}
+                      {selectedOptions[optionName] && (
+                        <span className="ml-2 font-normal text-muted-foreground">
+                          — {getOptionDisplayValue(selectedOptions[optionName])}
+                        </span>
+                      )}
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {optionValues.map((value: any) => {
+                        const isSelected = selectedOptions[optionName]
+                          ? optionsMatch(selectedOptions[optionName], value)
+                          : false;
+                        return renderOptionButton(optionName, value, isSelected);
+                      })}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
             </div>
           )}
 
-          {/* Stock Status */}
+          {/* 4 · Size & Fit dropdown (only if SG images exist) */}
+          {sizeGuideImages.length > 0 && (
+            <div className="border rounded-lg overflow-hidden">
+              <button
+                onClick={() => setSizeGuideOpen((o) => !o)}
+                className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold hover:bg-muted/50 transition-colors"
+              >
+                <span className="flex items-center gap-2">
+                  <Ruler className="w-4 h-4 text-primary" />
+                  Size &amp; Fit Guide
+                </span>
+                {sizeGuideOpen ? (
+                  <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                ) : (
+                  <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                )}
+              </button>
+
+              {sizeGuideOpen && (
+                <div className="border-t px-4 py-4 space-y-3 bg-muted/20">
+                  {/* Size guide image viewer */}
+                  <div className="relative aspect-[4/3] rounded-md overflow-hidden bg-muted">
+                    <Image
+                      src={getImageUrl(sizeGuideImages[sizeGuideImageIndex])}
+                      alt={
+                        sizeGuideImages[sizeGuideImageIndex].alt_text ||
+                        "Size guide"
+                      }
+                      fill
+                      className="object-contain"
+                    />
+                  </div>
+
+                  {/* Thumbnails if multiple SG images */}
+                  {sizeGuideImages.length > 1 && (
+                    <div className="flex gap-2 flex-wrap">
+                      {sizeGuideImages.map((img, idx) => (
+                        <button
+                          key={img.id}
+                          onClick={() => setSizeGuideImageIndex(idx)}
+                          className={`relative w-14 h-14 rounded border-2 overflow-hidden transition-colors ${
+                            idx === sizeGuideImageIndex
+                              ? "border-primary"
+                              : "border-transparent hover:border-muted-foreground"
+                          }`}
+                        >
+                          <Image
+                            src={getImageUrl(img)}
+                            alt={img.alt_text || `Size guide ${idx + 1}`}
+                            fill
+                            className="object-cover"
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 5 · Stock Status */}
           {selectedVariant && (
             <div className="text-sm">
               {inStock ? (
                 <span className="text-green-600 font-medium">
-                  ✓ In Stock ({selectedVariant.inventory_quantity} available)
+                  ✓ In Stock
+                  <span className="text-muted-foreground font-normal ml-1">
+                    ({selectedVariant.inventory_quantity} available)
+                  </span>
                 </span>
               ) : (
-                <span className="text-red-600 font-medium">
-                  Out of Stock
-                </span>
+                <span className="text-red-600 font-medium">✗ Out of Stock</span>
               )}
             </div>
           )}
 
-          {/* Add to Cart */}
-          <div className="flex gap-3">
-            <Button 
-              size="lg" 
+          {/* 6 · Add to Cart */}
+          <div className="flex gap-2">
+            <Button
+              size="lg"
               className="flex-1"
               onClick={handleAddToCart}
               disabled={!inStock || isAddingToCart}
             >
               <ShoppingCart className="w-5 h-5 mr-2" />
-              {isAddingToCart ? 'Adding...' : 'Add to Cart'}
+              {isAddingToCart ? "Adding…" : "Add to Cart"}
             </Button>
-            <Button size="lg" variant="outline">
+            <Button size="lg" variant="outline" aria-label="Wishlist">
               <Heart className="w-5 h-5" />
             </Button>
-            <Button size="lg" variant="outline">
+            <Button size="lg" variant="outline" aria-label="Share">
               <Share2 className="w-5 h-5" />
             </Button>
           </div>
 
-          {/* Product Details */}
-          <div className="border-t pt-6 space-y-2 text-sm">
-            {selectedVariant?.sku && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">SKU:</span>
-                <span className="font-medium">{selectedVariant.sku}</span>
-              </div>
+          {/* 7 · Collapsible Accordions */}
+          <div className="mt-2">
+
+            {/* Description */}
+            {product.description && (
+              <Accordion title="Description" defaultOpen={true}>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  {product.description}
+                </p>
+              </Accordion>
             )}
-            {product.brand && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Brand:</span>
-                <span className="font-medium">{product.brand}</span>
-              </div>
+
+            {/* Materials & Details */}
+            {(product.material || product.made_in || product.brand) && (
+              <Accordion title="Materials &amp; Details">
+                <div className="space-y-2 text-sm">
+                  {product.brand && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Brand</span>
+                      <span className="font-medium">{product.brand}</span>
+                    </div>
+                  )}
+                  {product.material && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Material</span>
+                      <span className="font-medium">{product.material}</span>
+                    </div>
+                  )}
+                  {product.made_in && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Made In</span>
+                      <span className="font-medium">{product.made_in}</span>
+                    </div>
+                  )}
+                </div>
+              </Accordion>
             )}
-            {product.material && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Material:</span>
-                <span className="font-medium">{product.material}</span>
-              </div>
+
+            {/* SKU & Shipping Info */}
+            {(selectedVariant?.sku || selectedVariant?.weight_grams) && (
+              <Accordion title="SKU &amp; Shipping">
+                <div className="space-y-2 text-sm">
+                  {selectedVariant?.sku && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">SKU</span>
+                      <span className="font-medium font-mono text-xs">
+                        {selectedVariant.sku}
+                      </span>
+                    </div>
+                  )}
+                  {selectedVariant?.weight_grams && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Weight</span>
+                      <span className="font-medium">
+                        {selectedVariant.weight_grams}g
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </Accordion>
             )}
-            {product.made_in && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Made In:</span>
-                <span className="font-medium">{product.made_in}</span>
-              </div>
-            )}
-            {selectedVariant?.weight_grams && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Weight:</span>
-                <span className="font-medium">{selectedVariant.weight_grams}g</span>
-              </div>
-            )}
+
           </div>
         </div>
       </div>
