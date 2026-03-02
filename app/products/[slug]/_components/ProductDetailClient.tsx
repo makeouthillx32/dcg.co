@@ -200,6 +200,15 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
   // ── Variant / option logic ─────────────────────────────────────────────────
   const hasVariants = product.variants && product.variants.length > 0;
 
+  // Keys that live in variant.options as descriptive metadata, NOT as user-selectable
+  // choices. These are surfaced in the Details accordion instead.
+  const DESCRIPTOR_OPTION_KEYS = new Set([
+    "material",
+    "made_in",
+    "dimensions",
+    "weight",
+  ]);
+
   const optionTypes = useMemo(() => {
     if (!hasVariants) return {};
     const types: Record<string, Set<string>> = {};
@@ -207,6 +216,9 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
 
     product.variants.forEach((variant) => {
       Object.entries(variant.options || {}).forEach(([key, value]) => {
+        // Skip descriptor keys — they describe the product, not a variant choice
+        if (DESCRIPTOR_OPTION_KEYS.has(key.toLowerCase())) return;
+
         if (!types[key]) {
           types[key] = new Set();
           rawValues[key] = [];
