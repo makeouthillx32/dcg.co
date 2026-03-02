@@ -95,6 +95,10 @@ async function handlePaymentSucceeded(
     return;
   }
 
+  // ── POS orders are fulfilled immediately; web orders go to processing ──
+  const isPOS = paymentIntent.metadata.order_source === 'pos';
+  const newStatus = isPOS ? 'fulfilled' : 'processing';
+
   // Get payment method details
   let paymentMethodDetails: any = {};
   if (paymentIntent.payment_method) {
@@ -122,14 +126,14 @@ async function handlePaymentSucceeded(
     .from('orders')
     .update({
       payment_status: 'paid',
-      status: 'processing',
+      status: newStatus,
       payment_succeeded_at: new Date().toISOString(),
       checkout_step: 'complete',
       ...paymentMethodDetails,
       updated_at: new Date().toISOString(),
     })
     .eq('id', orderId)
-    .select('order_number, total_cents, email, customer_first_name, customer_last_name, promo_code')
+    .select('order_number, total_cents, email, customer_first_name, customer_last_name, promo_code, order_source')
     .single();
 
   if (error) {
@@ -137,9 +141,9 @@ async function handlePaymentSucceeded(
     return;
   }
 
-  console.log(`Order ${orderId} marked as paid`);
+  console.log(`Order ${orderId} marked as paid + ${newStatus}${isPOS ? ' (POS — auto-fulfilled)' : ''}`);
 
-  // ── Increment promo code usage count ─────────────────────────
+  // ── Increment promo code usage count (web orders only — POS has no promos) ──
   if (order?.promo_code) {
     try {
       await supabase.rpc('increment_discount_uses', { p_code: order.promo_code });
@@ -150,21 +154,31 @@ async function handlePaymentSucceeded(
     }
   }
 
-  // ── New order notification → visible to all admins ────────────
+  // ── Notification ──────────────────────────────────────────────
   try {
     const total = order ? `$${(order.total_cents / 100).toFixed(2)}` : '';
     const orderNum = order?.order_number ?? orderId;
-    const customerName = [order?.customer_first_name, order?.customer_last_name]
-      .filter(Boolean).join(' ') || order?.email || 'Guest';
+
+    const title = isPOS
+      ? `POS sale ${orderNum}`
+      : `New order ${orderNum}`;
+
+    const customerName = isPOS
+      ? [order?.customer_first_name, order?.customer_last_name].filter(Boolean).join(' ') || 'Walk-in'
+      : [order?.customer_first_name, order?.customer_last_name].filter(Boolean).join(' ') || order?.email || 'Guest';
+
+    const subtitle = isPOS
+      ? `${total} — in-person, fulfilled`
+      : `${customerName} — ${total}`;
 
     await sendNotification({
-      title: `New order ${orderNum}`,
-      subtitle: `${customerName} — ${total}`,
+      title,
+      subtitle,
       actionUrl: `/dashboard/orders`,
       role_admin: true,
     });
 
-    console.log(`[Notifications] ✅ New order notification sent for ${orderNum}`);
+    console.log(`[Notifications] ✅ Notification sent for ${orderNum}`);
   } catch (notifErr) {
     // Non-fatal — order is already marked paid, don't throw
     console.error('[Notifications] ⚠️ Failed to send new order notification:', notifErr);

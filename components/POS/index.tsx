@@ -22,6 +22,7 @@ type POSTab = "reader" | "keypad" | "library" | "favorites";
 interface ExtendedPOSState extends POSState {
   activeTab: POSTab;
   readerConnected: boolean;
+  chargeError: string | null;
 }
 
 type Action =
@@ -40,6 +41,7 @@ type Action =
   | { type: "SET_TAB"; tab: POSTab }
   | { type: "SET_PROCESSING"; isProcessing: boolean }
   | { type: "SET_READER_CONNECTED"; connected: boolean }
+  | { type: "SET_CHARGE_ERROR"; error: string | null }
   | { type: "SET_PAYMENT_INTENT"; clientSecret: string; order: NonNullable<POSState["lastOrder"]> }
   | { type: "PAYMENT_SUCCESS" }
   | { type: "NEW_SALE" };
@@ -62,6 +64,7 @@ const initial: ExtendedPOSState = {
   isProcessing: false,
   activeTab: "library",
   readerConnected: false,
+  chargeError: null,
 };
 
 function reducer(state: ExtendedPOSState, action: Action): ExtendedPOSState {
@@ -72,6 +75,7 @@ function reducer(state: ExtendedPOSState, action: Action): ExtendedPOSState {
     case "SELECT_PRODUCT":         return { ...state, selectedProduct: action.product };
     case "SET_TAB":                return { ...state, activeTab: action.tab };
     case "SET_READER_CONNECTED":   return { ...state, readerConnected: action.connected };
+    case "SET_CHARGE_ERROR":        return { ...state, chargeError: action.error };
     case "REMOVE_FROM_CART":
       return { ...state, cart: state.cart.filter((i) => i.key !== action.key) };
     case "SET_ITEM_QTY": {
@@ -204,8 +208,16 @@ export function POS() {
       });
 
       const json = await res.json();
-      if (!res.ok || !json.ok) throw new Error(json.error ?? "Charge failed");
+      if (!res.ok || !json.ok) {
+        // json.error may be a string or { code, message } object
+        const msg =
+          typeof json.error === "string"
+            ? json.error
+            : json.error?.message ?? "Charge failed";
+        throw new Error(msg);
+      }
 
+      dispatch({ type: "SET_CHARGE_ERROR", error: null });
       dispatch({
         type: "SET_PAYMENT_INTENT",
         clientSecret: json.payment_intent.client_secret,
@@ -213,7 +225,8 @@ export function POS() {
       });
     } catch (err: any) {
       dispatch({ type: "SET_PROCESSING", isProcessing: false });
-      alert(`Error: ${err.message}`);
+      const msg = typeof err?.message === "string" ? err.message : JSON.stringify(err);
+      dispatch({ type: "SET_CHARGE_ERROR", error: msg });
     }
   }, [state.cart, state.customerEmail, state.customerFirstName, state.customerLastName]);
 
@@ -333,6 +346,7 @@ export function POS() {
           onFirstNameChange={(name) => dispatch({ type: "SET_CUSTOMER_FIRST_NAME", name })}
           onLastNameChange={(name) => dispatch({ type: "SET_CUSTOMER_LAST_NAME", name })}
           isProcessing={state.isProcessing}
+          chargeError={state.chargeError}
         />
       </div>
 
@@ -393,6 +407,7 @@ export function POS() {
             onFirstNameChange={(name) => dispatch({ type: "SET_CUSTOMER_FIRST_NAME", name })}
             onLastNameChange={(name) => dispatch({ type: "SET_CUSTOMER_LAST_NAME", name })}
             isProcessing={state.isProcessing}
+            chargeError={state.chargeError}
           />
         </div>
       </div>

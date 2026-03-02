@@ -142,11 +142,28 @@ export function VariantPicker({ product, onAdd, onClose }: VariantPickerProps) {
             <section className="vp__section">
               <h3 className="vp__section-label">Details</h3>
               <div className="vp__options">
-                {Object.entries(selected.options).map(([k, v]) => (
-                  <span key={k} className="vp__option-pill">
-                    <span className="vp__option-key">{k}:</span> {v}
-                  </span>
-                ))}
+                {Object.entries(selected.options).map(([k, v]) => {
+                  // Option values may be plain strings OR objects like {hex, name}
+                  const label =
+                    typeof v === "string"
+                      ? v
+                      : typeof v === "object" && v !== null
+                        ? (v as any).name ?? (v as any).label ?? JSON.stringify(v)
+                        : String(v);
+                  const hex =
+                    typeof v === "object" && v !== null ? (v as any).hex ?? null : null;
+                  return (
+                    <span key={k} className="vp__option-pill">
+                      {hex && (
+                        <span
+                          className="vp__option-swatch"
+                          style={{ background: hex }}
+                        />
+                      )}
+                      <span className="vp__option-key">{k}:</span> {label}
+                    </span>
+                  );
+                })}
               </div>
             </section>
           )}
