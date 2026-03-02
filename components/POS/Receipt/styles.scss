@@ -274,3 +274,133 @@
     box-shadow: none;
   }
 }
+
+/* ── New action button variants ───────────────────────────────────────────── */
+.pos-receipt__btn--thermal {
+  background: hsl(var(--foreground));
+  color: hsl(var(--background));
+  border: none;
+
+  &:hover:not(:disabled) { opacity: 0.85; }
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
+}
+
+.pos-receipt__btn--success {
+  background: hsl(142 71% 40%);
+}
+
+.pos-receipt__spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: receipt-spin 0.7s linear infinite;
+}
+
+@keyframes receipt-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Totals section on receipt card ──────────────────────────────────────── */
+.pos-receipt__totals {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.pos-receipt__total-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  color: hsl(var(--muted-foreground));
+
+  &--discount {
+    color: hsl(142 72% 35%);
+  }
+}
+
+.pos-receipt__total--grand {
+  display: flex;
+  justify-content: space-between;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: hsl(var(--foreground));
+  padding-top: 0.25rem;
+}
+
+/* ── Footer text on card ─────────────────────────────────────────────────── */
+.pos-receipt__footer-text {
+  text-align: center;
+  font-size: 0.75rem;
+  color: hsl(var(--muted-foreground));
+  margin-top: 0.5rem;
+  line-height: 1.6;
+}
+
+/* ── Print error ─────────────────────────────────────────────────────────── */
+.pos-receipt__print-error {
+  font-size: 0.78rem;
+  color: hsl(var(--destructive));
+  text-align: center;
+  margin: 0;
+}
+
+/* ── Print-only element: hidden on screen ────────────────────────────────── */
+.pos-receipt-print {
+  display: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   @media print — clean receipt layout for Save as PDF / system print dialog
+   ═══════════════════════════════════════════════════════════════════════════ */
+@media print {
+  /* Hide everything except the print receipt */
+  body > * { display: none !important; }
+
+  .pos-receipt-print {
+    display: block !important;
+    font-family: "Courier New", Courier, monospace;
+    font-size: 11pt;
+    width: 72mm;          /* fits both 58mm and 80mm paper */
+    margin: 0 auto;
+    color: #000;
+    background: #fff;
+  }
+
+  /* Hide the screen receipt */
+  #pos-receipt-screen { display: none !important; }
+
+  .pos-receipt-print__header {
+    text-align: center;
+    line-height: 1.6;
+    margin-bottom: 6pt;
+  }
+
+  hr {
+    border: none;
+    border-top: 1px dashed #000;
+    margin: 6pt 0;
+  }
+
+  .pos-receipt-print__row {
+    display: flex;
+    justify-content: space-between;
+    margin: 3pt 0;
+    font-size: 10pt;
+
+    &--total {
+      margin-top: 6pt;
+      font-size: 12pt;
+    }
+  }
+
+  .pos-receipt-print__footer {
+    text-align: center;
+    margin-top: 6pt;
+    line-height: 1.8;
+    font-size: 10pt;
+  }
+}

@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import type { POSCartItem, POSProduct, POSState, POSVariant } from "./types";
 import type { POSDiscount } from "./DiscountPicker";
+import type { PrinterConnection } from "@/lib/thermalPrinter";
 import { Library } from "./Library";
 import { Favorites } from "./Favorites";
 import { Keypad } from "./Keypad";
@@ -25,6 +26,8 @@ interface ExtendedPOSState extends POSState {
   readerConnected: boolean;
   chargeError: string | null;
   selectedDiscount: POSDiscount | null;
+  printerConnection: PrinterConnection | null;
+  paperWidth: 58 | 80;
 }
 
 type Action =
@@ -45,6 +48,8 @@ type Action =
   | { type: "SET_READER_CONNECTED"; connected: boolean }
   | { type: "SET_CHARGE_ERROR"; error: string | null }
   | { type: "SET_DISCOUNT"; discount: POSDiscount | null }
+  | { type: "SET_PRINTER_CONNECTION"; connection: PrinterConnection | null }
+  | { type: "SET_PAPER_WIDTH"; width: 58 | 80 }
   | { type: "SET_PAYMENT_INTENT"; clientSecret: string; order: NonNullable<POSState["lastOrder"]> }
   | { type: "PAYMENT_SUCCESS" }
   | { type: "NEW_SALE" };
@@ -69,6 +74,8 @@ const initial: ExtendedPOSState = {
   readerConnected: false,
   chargeError: null,
   selectedDiscount: null,
+  printerConnection: null,
+  paperWidth: 58 as const,
 };
 
 function reducer(state: ExtendedPOSState, action: Action): ExtendedPOSState {
@@ -81,6 +88,8 @@ function reducer(state: ExtendedPOSState, action: Action): ExtendedPOSState {
     case "SET_READER_CONNECTED":   return { ...state, readerConnected: action.connected };
     case "SET_CHARGE_ERROR":        return { ...state, chargeError: action.error };
     case "SET_DISCOUNT":            return { ...state, selectedDiscount: action.discount };
+    case "SET_PRINTER_CONNECTION":  return { ...state, printerConnection: action.connection };
+    case "SET_PAPER_WIDTH":         return { ...state, paperWidth: action.width };
     case "REMOVE_FROM_CART":
       return { ...state, cart: state.cart.filter((i) => i.key !== action.key) };
     case "SET_ITEM_QTY": {
@@ -228,7 +237,7 @@ export function POS() {
       dispatch({
         type: "SET_PAYMENT_INTENT",
         clientSecret: json.payment_intent.client_secret,
-        order: json.order,
+        order: { ...json.order, discount_cents: json.order.discount_cents ?? 0 },
       });
     } catch (err: any) {
       dispatch({ type: "SET_PROCESSING", isProcessing: false });
@@ -257,9 +266,17 @@ export function POS() {
       <Receipt
         orderNumber={state.lastOrder.order_number}
         items={state.cart}
+        subtotalCents={state.cart.reduce((s, i) => s + i.price_cents * i.quantity, 0)}
+        discountCents={state.lastOrder.discount_cents ?? 0}
         totalCents={state.lastOrder.total_cents}
+        discountLabel={state.selectedDiscount?.label ?? state.selectedDiscount?.code ?? null}
+        customerName={[state.customerFirstName, state.customerLastName].filter(Boolean).join(" ") || null}
         customerEmail={state.customerEmail || null}
         onNewSale={() => dispatch({ type: "NEW_SALE" })}
+        printerConnection={state.printerConnection}
+        onPrinterConnectionChange={(conn) => dispatch({ type: "SET_PRINTER_CONNECTION", connection: conn })}
+        paperWidth={state.paperWidth}
+        onPaperWidthChange={(w) => dispatch({ type: "SET_PAPER_WIDTH", width: w })}
       />
     );
   }
