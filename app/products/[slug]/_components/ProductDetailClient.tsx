@@ -595,54 +595,37 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
             )}
 
             {/* Materials & Details */}
-            {(product.material || product.made_in || product.brand) && (
-              <Accordion title="Materials &amp; Details">
-                <div className="space-y-2 text-sm">
-                  {product.brand && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Brand</span>
-                      <span className="font-medium">{product.brand}</span>
-                    </div>
-                  )}
-                  {product.material && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Material</span>
-                      <span className="font-medium">{product.material}</span>
-                    </div>
-                  )}
-                  {product.made_in && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Made In</span>
-                      <span className="font-medium">{product.made_in}</span>
-                    </div>
-                  )}
-                </div>
-              </Accordion>
-            )}
+            {(() => {
+              // Fallback: pull material/made_in from variant options if not on product level
+              const material = product.material || (selectedVariant?.options?.material as string) || null;
+              const madeIn = product.made_in || (selectedVariant?.options?.made_in as string) || null;
+              if (!material && !madeIn && !product.brand) return null;
+              return (
+                <Accordion title="Materials &amp; Details">
+                  <div className="space-y-2 text-sm">
+                    {product.brand && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Brand</span>
+                        <span className="font-medium">{product.brand}</span>
+                      </div>
+                    )}
+                    {material && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Material</span>
+                        <span className="font-medium">{material}</span>
+                      </div>
+                    )}
+                    {madeIn && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Made In</span>
+                        <span className="font-medium">{madeIn}</span>
+                      </div>
+                    )}
+                  </div>
+                </Accordion>
+              );
+            })()}
 
-            {/* SKU & Shipping Info */}
-            {(selectedVariant?.sku || selectedVariant?.weight_grams) && (
-              <Accordion title="SKU &amp; Shipping">
-                <div className="space-y-2 text-sm">
-                  {selectedVariant?.sku && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">SKU</span>
-                      <span className="font-medium font-mono text-xs">
-                        {selectedVariant.sku}
-                      </span>
-                    </div>
-                  )}
-                  {selectedVariant?.weight_grams && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Weight</span>
-                      <span className="font-medium">
-                        {selectedVariant.weight_grams}g
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </Accordion>
-            )}
 
           </div>
         </div>
