@@ -4,6 +4,8 @@
 import type { POSCartItem } from "../types";
 import { CartItem } from "../CartItem";
 import { CustomerEmail } from "../CustomerEmail";
+import { DiscountPicker, discountCents } from "../DiscountPicker";
+import type { POSDiscount } from "../DiscountPicker";
 import "./styles.scss";
 
 interface CartProps {
@@ -21,6 +23,8 @@ interface CartProps {
   isProcessing: boolean;
   isDemo?: boolean;
   chargeError?: string | null;
+  selectedDiscount: POSDiscount | null;
+  onDiscountChange: (d: POSDiscount | null) => void;
 }
 
 function fmtPrice(cents: number) {
@@ -42,10 +46,14 @@ export function Cart({
   isProcessing,
   isDemo = false,
   chargeError = null,
+  selectedDiscount,
+  onDiscountChange,
 }: CartProps) {
   const subtotal = items.reduce((s, i) => s + i.price_cents * i.quantity, 0);
   const itemCount = items.reduce((s, i) => s + i.quantity, 0);
   const isEmpty = items.length === 0;
+  const discount = discountCents(selectedDiscount, subtotal);
+  const total = Math.max(0, subtotal - discount);
 
   return (
     <div className="pos-cart">
@@ -120,19 +128,32 @@ export function Cart({
             onLastNameChange={onLastNameChange}
           />
 
+          {/* Discount picker */}
+          <DiscountPicker
+            subtotalCents={subtotal}
+            selectedDiscount={selectedDiscount}
+            onSelect={onDiscountChange}
+          />
+
           {/* Totals */}
           <div className="pos-cart__totals">
             <div className="pos-cart__total-row">
               <span>Subtotal</span>
               <span>{fmtPrice(subtotal)}</span>
             </div>
+            {discount > 0 && (
+              <div className="pos-cart__total-row pos-cart__total-row--discount">
+                <span>Discount</span>
+                <span className="pos-cart__discount-value">−{fmtPrice(discount)}</span>
+              </div>
+            )}
             <div className="pos-cart__total-row">
               <span>Shipping</span>
               <span className="pos-cart__free">Free</span>
             </div>
             <div className="pos-cart__total-row pos-cart__total-row--grand">
               <span>Total</span>
-              <span>{fmtPrice(subtotal)}</span>
+              <span>{fmtPrice(total)}</span>
             </div>
           </div>
 
@@ -161,7 +182,7 @@ export function Cart({
                   <rect x="1" y="4" width="22" height="16" rx="2" ry="2" />
                   <line x1="1" y1="10" x2="23" y2="10" />
                 </svg>
-                Charge {fmtPrice(subtotal)}
+                Charge {fmtPrice(total)}
               </>
             )}
           </button>

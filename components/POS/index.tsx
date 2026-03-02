@@ -3,6 +3,7 @@
 
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import type { POSCartItem, POSProduct, POSState, POSVariant } from "./types";
+import type { POSDiscount } from "./DiscountPicker";
 import { Library } from "./Library";
 import { Favorites } from "./Favorites";
 import { Keypad } from "./Keypad";
@@ -23,6 +24,7 @@ interface ExtendedPOSState extends POSState {
   activeTab: POSTab;
   readerConnected: boolean;
   chargeError: string | null;
+  selectedDiscount: POSDiscount | null;
 }
 
 type Action =
@@ -42,6 +44,7 @@ type Action =
   | { type: "SET_PROCESSING"; isProcessing: boolean }
   | { type: "SET_READER_CONNECTED"; connected: boolean }
   | { type: "SET_CHARGE_ERROR"; error: string | null }
+  | { type: "SET_DISCOUNT"; discount: POSDiscount | null }
   | { type: "SET_PAYMENT_INTENT"; clientSecret: string; order: NonNullable<POSState["lastOrder"]> }
   | { type: "PAYMENT_SUCCESS" }
   | { type: "NEW_SALE" };
@@ -65,6 +68,7 @@ const initial: ExtendedPOSState = {
   activeTab: "library",
   readerConnected: false,
   chargeError: null,
+  selectedDiscount: null,
 };
 
 function reducer(state: ExtendedPOSState, action: Action): ExtendedPOSState {
@@ -76,6 +80,7 @@ function reducer(state: ExtendedPOSState, action: Action): ExtendedPOSState {
     case "SET_TAB":                return { ...state, activeTab: action.tab };
     case "SET_READER_CONNECTED":   return { ...state, readerConnected: action.connected };
     case "SET_CHARGE_ERROR":        return { ...state, chargeError: action.error };
+    case "SET_DISCOUNT":            return { ...state, selectedDiscount: action.discount };
     case "REMOVE_FROM_CART":
       return { ...state, cart: state.cart.filter((i) => i.key !== action.key) };
     case "SET_ITEM_QTY": {
@@ -204,6 +209,8 @@ export function POS() {
           customer_email: state.customerEmail.trim() || null,
           customer_first_name: state.customerFirstName.trim() || null,
           customer_last_name: state.customerLastName.trim() || null,
+          discount_code: state.selectedDiscount?.code ?? null,
+          discount_id: state.selectedDiscount?.id ?? null,
         }),
       });
 
@@ -347,6 +354,8 @@ export function POS() {
           onLastNameChange={(name) => dispatch({ type: "SET_CUSTOMER_LAST_NAME", name })}
           isProcessing={state.isProcessing}
           chargeError={state.chargeError}
+          selectedDiscount={state.selectedDiscount}
+          onDiscountChange={(d) => dispatch({ type: "SET_DISCOUNT", discount: d })}
         />
       </div>
 
@@ -408,6 +417,8 @@ export function POS() {
             onLastNameChange={(name) => dispatch({ type: "SET_CUSTOMER_LAST_NAME", name })}
             isProcessing={state.isProcessing}
             chargeError={state.chargeError}
+            selectedDiscount={state.selectedDiscount}
+            onDiscountChange={(d) => dispatch({ type: "SET_DISCOUNT", discount: d })}
           />
         </div>
       </div>

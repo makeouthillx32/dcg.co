@@ -49,6 +49,8 @@ export async function POST(req: NextRequest) {
       customer_email,
       customer_first_name,
       customer_last_name,
+      discount_code,
+      discount_id,
     } = body;
 
     if (!items.length && !custom_items.length) {
@@ -67,6 +69,27 @@ export async function POST(req: NextRequest) {
     const total_cents = itemsTotal + customTotal;
 
     if (total_cents <= 0) return jsonError(400, "INVALID_TOTAL", "Total must be > 0");
+
+    // Apply discount if provided
+    let discount_cents = 0;
+    if (discount_id) {
+      const { data: disc } = await supabase
+        .from("discounts")
+        .select("type, percent_off, amount_off_cents")
+        .eq("id", discount_id)
+        .eq("is_active", true)
+        .single();
+
+      if (disc) {
+        if (disc.percent_off) {
+          discount_cents = Math.round(total_cents * disc.percent_off / 100);
+        } else if (disc.amount_off_cents) {
+          discount_cents = Math.min(disc.amount_off_cents, total_cents);
+        }
+      }
+    }
+    const charged_total = Math.max(0, total_cents - discount_cents);
+    if (charged_total <= 0) return jsonError(400, "INVALID_TOTAL", "Total after discount must be > 0");
 
     // Build notes for custom items (can't be FK'd in order_items)
     const customNotes = custom_items.length
@@ -89,8 +112,9 @@ export async function POST(req: NextRequest) {
         subtotal_cents:     total_cents,
         shipping_cents:     0,
         tax_cents:          0,
-        discount_cents:     0,
-        total_cents,
+        discount_cents:     discount_cents,
+        promo_code:         discount_code ?? null,
+        total_cents:        charged_total,
         currency:           "USD",
         customer_email:     customer_email ?? null,
         customer_first_name: customer_first_name ?? null,
@@ -133,7 +157,7 @@ export async function POST(req: NextRequest) {
     let paymentIntent: Stripe.PaymentIntent;
     try {
       paymentIntent = await stripe.paymentIntents.create({
-        amount:   total_cents,
+        amount:   charged_total,
         currency: "usd",
         automatic_payment_methods: { enabled: true },
         metadata: {
@@ -159,9 +183,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       ok: true,
       order: {
-        id:          order.id,
-        order_number: order.order_number,
-        total_cents:  order.total_cents,
+        id:           order.id,
+        order_number:  order.order_number,
+        total_cents:   order.total_cents,
+        discount_cents,
       },
       payment_intent: {
         id:            paymentIntent.id,
