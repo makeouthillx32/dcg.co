@@ -577,7 +577,27 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
             <Button size="lg" variant="outline" aria-label="Wishlist">
               <Heart className="w-5 h-5" />
             </Button>
-            <Button size="lg" variant="outline" aria-label="Share">
+            <Button
+              size="lg"
+              variant="outline"
+              aria-label="Share"
+              onClick={async () => {
+                const url = window.location.href;
+                if (navigator.share) {
+                  try {
+                    await navigator.share({
+                      title: product.title,
+                      url,
+                    });
+                  } catch {
+                    // user cancelled — do nothing
+                  }
+                } else {
+                  // Fallback: copy to clipboard
+                  await navigator.clipboard.writeText(url);
+                }
+              }}
+            >
               <Share2 className="w-5 h-5" />
             </Button>
           </div>
