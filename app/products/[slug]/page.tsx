@@ -71,7 +71,7 @@ export async function generateStaticParams() {
   return products?.map((p) => ({ slug: p.slug })) ?? [];
 }
 
-// ─── Metadata + OpenGraph ─────────────────────────────────────────────────────
+// ─── Metadata ─────────────────────────────────────────────────────────────────
 
 export async function generateMetadata({
   params,
@@ -83,39 +83,20 @@ export async function generateMetadata({
 
   const { data: product } = await supabase
     .from("products")
-    .select(`
-      title,
-      slug,
-      description,
-      price_cents,
-      badge,
-      product_images (
-        bucket_name,
-        object_path,
-        is_primary,
-        is_public,
-        sort_order,
-        position
-      )
-    `)
+    .select("title, description, product_images(bucket_name, object_path, is_primary, is_public, sort_order, position)")
     .eq("slug", slug)
     .eq("status", "active")
-    .maybeSingle();
+    .single();
 
-  if (!product) {
-    return { title: "Product Not Found" };
-  }
+  if (!product) return { title: "Product Not Found | Desert Cowgirl Co." };
 
-  const title = product.title;
-  const ogTitle = `${title} | Desert Cowgirl`;
+  const title = `${product.title} | Desert Cowgirl Co.`;
+  const ogTitle = product.title;
   const description =
-    product.description?.slice(0, 155) ??
-    `Shop ${title} at Desert Cowgirl — western-inspired boutique fashion.`;
+    product.description ??
+    `Shop ${product.title} at Desert Cowgirl — western-inspired boutique fashion.`;
   const url = `${SITE_URL}/products/${slug}`;
 
-  // Pull the primary product image as the og:image / twitter:image
-  // next/og's opengraph-image.tsx generates the branded card automatically.
-  // This raw URL is a supplemental fallback for platforms that don't render dynamic OG images.
   const primaryImg = pickPrimaryImage(product.product_images ?? []);
   const rawImageUrl = buildStorageUrl(primaryImg);
 
@@ -129,14 +110,7 @@ export async function generateMetadata({
       siteName: "Desert Cowgirl",
       type: "website",
       ...(rawImageUrl && {
-        images: [
-          {
-            url: rawImageUrl,
-            width: 1200,
-            height: 630,
-            alt: title,
-          },
-        ],
+        images: [{ url: rawImageUrl, width: 1200, height: 630, alt: product.title }],
       }),
     },
     twitter: {
@@ -194,6 +168,8 @@ export default async function ProductPage({
         price_cents,
         compare_at_price_cents,
         inventory_qty,
+        track_inventory,
+        allow_backorder,
         weight_grams,
         position,
         is_active
@@ -237,6 +213,8 @@ export default async function ProductPage({
         price_cents: v.price_cents,
         compare_at_price_cents: v.compare_at_price_cents,
         inventory_quantity: v.inventory_qty || 0,
+        track_inventory: v.track_inventory ?? true,
+        allow_backorder: v.allow_backorder ?? false,
         weight_grams: v.weight_grams,
         position: v.position,
       })),
