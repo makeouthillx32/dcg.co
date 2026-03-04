@@ -88,10 +88,9 @@
   }
 
   /* ✅ right side icon area with a vertical divider */
-  .menu-toggle,
-  .menu-icon-slot {
+  .menu-toggle {
     margin-left: 0.75rem;
-    padding-left: 0.85rem; /* space after divider */
+    padding-left: 0.85rem;
     display: inline-flex;
     align-items: center;
     background: none;
@@ -106,6 +105,10 @@
       outline-offset: 2px;
       border-radius: 0.25rem;
     }
+  }
+
+  .menu-icon-slot {
+    display: none;
   }
 }
 

@@ -1,47 +1,29 @@
-// app/dashboard/[id]/settings/categories/_components/CreateCategoryModal.tsx
 "use client";
 
-import { useMemo, useState, useRef } from "react";
-import { CategoryModal } from "./CategoryModal";
-import type { CategoryRow } from "./CategoriesTable";
-import { createClient } from "@/utils/supabase/client";
-import { Upload, X, Image as ImageIcon } from "lucide-react";
-import Image from "next/image";
+import React, { useState, useEffect } from "react";
+import { X } from "lucide-react";
 
-type Props = {
-  open: boolean;
-  categories: CategoryRow[];
-  onClose: () => void;
-  onCreate: (data: {
-    name: string;
-    slug: string;
-    parent_id: string | null;
-  }) => Promise<void> | void;
+type Category = {
+  id: string;
+  name: string;
+  slug: string;
+  parent_id: string | null;
 };
 
-function slugify(v: string) {
-  return v
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "");
+interface CreateCategoryModalProps {
+  open: boolean;
+  categories: Category[];
+  onClose: () => void;
+  onCreate: (data: { name: string; slug: string; parent_id: string | null }) => Promise<void>;
 }
 
-// Build "Parent → Child" labels for selects
-function buildLabelMap(categories: CategoryRow[]) {
-  const map = new Map<string, CategoryRow>();
-  categories.forEach((c) => map.set(c.id, c));
-
-  const labelFor = (cat: CategoryRow): string => {
-    if (!cat.parent_id) return cat.name;
-    const parent = map.get(cat.parent_id);
-    return parent ? `${labelFor(parent)} → ${cat.name}` : cat.name;
-  };
-
-  return categories.map((c) => ({
-    id: c.id,
-    label: labelFor(c),
-  }));
+function slugify(str: string) {
+  return str
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-");
 }
 
 export function CreateCategoryModal({
@@ -49,319 +31,150 @@ export function CreateCategoryModal({
   categories,
   onClose,
   onCreate,
-}: Props) {
+}: CreateCategoryModalProps) {
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
-  const [parentId, setParentId] = useState<string | null>(null);
-  
-  // Cover image state
-  const [coverImageFile, setCoverImageFile] = useState<File | null>(null);
-  const [coverImagePreview, setCoverImagePreview] = useState<string | null>(null);
-  const [coverImageAlt, setCoverImageAlt] = useState("");
-  
-  const [submitting, setSubmitting] = useState(false);
+  const [slugManual, setSlugManual] = useState(false);
+  const [parentId, setParentId] = useState<string>("");
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const supabase = createClient();
 
-  const slugExists = useMemo(() => {
-    const s = slug.trim().toLowerCase();
-    if (!s) return false;
-    return categories.some((c) => c.slug === s);
-  }, [slug, categories]);
+  useEffect(() => {
+    if (!slugManual) setSlug(slugify(name));
+  }, [name, slugManual]);
 
-  const parents = useMemo(
-    () => buildLabelMap(categories),
-    [categories]
-  );
-
-  const canSubmit =
-    name.trim().length > 0 &&
-    slug.trim().length > 0 &&
-    !slugExists &&
-    !submitting;
-
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!file.type.startsWith("image/")) {
-      setError("Please select an image file");
-      return;
+  useEffect(() => {
+    if (open) {
+      setName("");
+      setSlug("");
+      setSlugManual(false);
+      setParentId("");
+      setError(null);
     }
+  }, [open]);
 
-    if (file.size > 5 * 1024 * 1024) {
-      setError("Image must be less than 5MB");
-      return;
-    }
-
-    setCoverImageFile(file);
-    setError(null);
-    
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setCoverImagePreview(reader.result as string);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleRemoveImage = () => {
-    setCoverImageFile(null);
-    setCoverImagePreview(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-  };
-
-  const uploadCoverImage = async (categoryId: string): Promise<{ path: string; bucket: string } | null> => {
-    if (!coverImageFile) return null;
-
-    const fileExt = coverImageFile.name.split(".").pop();
-    const fileName = `${categoryId}-${Date.now()}.${fileExt}`;
-    const filePath = `covers/${fileName}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from("category-covers")
-      .upload(filePath, coverImageFile, {
-        upsert: true,
-      });
-
-    if (uploadError) {
-      throw new Error(`Image upload failed: ${uploadError.message}`);
-    }
-
-    return { path: filePath, bucket: "category-covers" };
+  const handleSlugChange = (val: string) => {
+    setSlugManual(true);
+    setSlug(slugify(val));
   };
 
   const handleSubmit = async () => {
-    if (!canSubmit) return;
+    if (!name.trim()) { setError("Name is required."); return; }
+    if (!slug.trim()) { setError("Slug is required."); return; }
+    setSaving(true);
     setError(null);
-
     try {
-      setSubmitting(true);
-      
-      // Create the category first
-      const { data: newCategory, error: insertError } = await supabase
-        .from("categories")
-        .insert({
-          name: name.trim(),
-          slug: slug.trim(),
-          parent_id: parentId,
-          position: 0, // Will be set by the parent component
-        })
-        .select("id")
-        .single();
-
-      if (insertError) throw insertError;
-
-      // Upload cover image if provided
-      if (coverImageFile && newCategory) {
-        const coverImageData = await uploadCoverImage(newCategory.id);
-        
-        if (coverImageData) {
-          const { error: updateError } = await supabase
-            .from("categories")
-            .update({
-              cover_image_bucket: coverImageData.bucket,
-              cover_image_path: coverImageData.path,
-              cover_image_alt: coverImageAlt.trim() || name.trim(),
-            })
-            .eq("id", newCategory.id);
-
-          if (updateError) throw updateError;
-        }
-      }
-
-      // Call the original onCreate callback
-      await onCreate({
-        name: name.trim(),
-        slug: slug.trim(),
-        parent_id: parentId,
-      });
-
-      // Reset form
-      setName("");
-      setSlug("");
-      setParentId(null);
-      setCoverImageFile(null);
-      setCoverImagePreview(null);
-      setCoverImageAlt("");
-      onClose();
-    } catch (err: any) {
-      console.error("Create error:", err);
-      setError(err.message || "Failed to create category");
+      await onCreate({ name: name.trim(), slug: slug.trim(), parent_id: parentId || null });
+    } catch (e: any) {
+      setError(e?.message ?? "Unexpected error.");
     } finally {
-      setSubmitting(false);
+      setSaving(false);
     }
   };
 
+  if (!open) return null;
+
+  const getOptionLabel = (cat: Category): string => {
+    if (!cat.parent_id) return cat.name;
+    const parent = categories.find((c) => c.id === cat.parent_id);
+    return parent ? `${parent.name} › ${cat.name}` : cat.name;
+  };
+
+  const selectedParentName = categories.find((c) => c.id === parentId)?.name;
+
   return (
-    <CategoryModal
-      open={open}
-      title="Create category"
-      description="Add a new category to your storefront navigation."
-      onClose={onClose}
-    >
-      <div className="space-y-4">
-        {error && (
-          <div className="rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-800">
-            {error}
-          </div>
-        )}
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
 
-        {/* Cover Image Upload */}
-        <div>
-          <label className="block text-sm font-medium text-[hsl(var(--foreground))] mb-2">
-            Cover Image
-          </label>
-          
-          <div className="space-y-3">
-            <div
-              onClick={() => !coverImagePreview && fileInputRef.current?.click()}
-              className={`
-                relative border-2 border-dashed rounded-lg overflow-hidden
-                ${coverImagePreview ? 'border-[hsl(var(--border))]' : 'border-[hsl(var(--border))] hover:border-[hsl(var(--primary))] cursor-pointer'}
-                ${!coverImagePreview ? 'bg-[hsl(var(--muted))]' : ''}
-              `}
-            >
-              {coverImagePreview ? (
-                <div className="relative aspect-[4/5] w-full max-w-xs">
-                  <Image
-                    src={coverImagePreview}
-                    alt={coverImageAlt || name || "Category cover"}
-                    fill
-                    className="object-cover"
-                  />
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleRemoveImage();
-                    }}
-                    className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-              ) : (
-                <div className="aspect-[4/5] w-full max-w-xs flex flex-col items-center justify-center p-6 text-center">
-                  <ImageIcon className="h-12 w-12 text-[hsl(var(--muted-foreground))] mb-3" />
-                  <p className="text-sm font-medium text-[hsl(var(--foreground))] mb-1">
-                    Click to upload cover image
-                  </p>
-                  <p className="text-xs text-[hsl(var(--muted-foreground))]">
-                    PNG, JPG, WEBP up to 5MB<br />
-                    Recommended: 800x1000px
-                  </p>
-                </div>
-              )}
-            </div>
-
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleImageSelect}
-              className="hidden"
-            />
-
-            {coverImagePreview && (
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium border border-[hsl(var(--border))] rounded-md hover:bg-[hsl(var(--muted))] transition-colors"
-              >
-                <Upload className="h-4 w-4" />
-                Change Image
-              </button>
-            )}
-
-            <div>
-              <label className="block text-sm font-medium text-[hsl(var(--foreground))] mb-1">
-                Image Alt Text
-              </label>
-              <input
-                type="text"
-                value={coverImageAlt}
-                onChange={(e) => setCoverImageAlt(e.target.value)}
-                placeholder={name || "Describe the image"}
-                className="w-full rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2 text-sm"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Name */}
-        <div>
-          <label className="text-sm font-medium text-[hsl(var(--foreground))]">Name</label>
-          <input
-            value={name}
-            onChange={(e) => {
-              const v = e.target.value;
-              setName(v);
-              setSlug(slugify(v));
-            }}
-            className="mt-1 h-10 w-full rounded-[var(--radius)] border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 text-sm"
-          />
-        </div>
-
-        {/* Slug */}
-        <div>
-          <label className="text-sm font-medium text-[hsl(var(--foreground))]">Slug</label>
-          <input
-            value={slug}
-            onChange={(e) => setSlug(slugify(e.target.value))}
-            className="mt-1 h-10 w-full rounded-[var(--radius)] border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 text-sm"
-          />
-          <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
-            URL: /{slug || "your-slug"}
-          </p>
-          {slugExists && (
-            <p className="mt-1 text-xs text-red-500">
-              This slug already exists. Please choose a different one.
-            </p>
-          )}
-        </div>
-
-        {/* Parent Category */}
-        <div>
-          <label className="text-sm font-medium text-[hsl(var(--foreground))]">
-            Parent Category
-          </label>
-          <select
-            value={parentId ?? ""}
-            onChange={(e) => setParentId(e.target.value || null)}
-            className="mt-1 h-10 w-full rounded-[var(--radius)] border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 text-sm"
-          >
-            <option value="">None (top-level)</option>
-            {parents.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.label}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Actions */}
-        <div className="flex justify-end gap-2 pt-2">
+      <div className="relative z-10 w-full max-w-md bg-[hsl(var(--background))] border border-[hsl(var(--border))] rounded-xl shadow-xl">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[hsl(var(--border))]">
+          <h2 className="text-base font-semibold text-[hsl(var(--foreground))]">New Category</h2>
           <button
             type="button"
             onClick={onClose}
-            className="h-9 rounded-[var(--radius)] border border-[hsl(var(--border))] px-4 text-sm"
+            className="p-1.5 rounded hover:bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] transition-colors"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          {error && (
+            <p className="text-sm text-red-600 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 px-3 py-2 rounded-md">
+              {error}
+            </p>
+          )}
+
+          <div className="space-y-1.5">
+            <label className="block text-sm font-medium text-[hsl(var(--foreground))]">
+              Name <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Graphic Tees"
+              className="w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))]/30"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="block text-sm font-medium text-[hsl(var(--foreground))]">
+              Slug <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={slug}
+              onChange={(e) => handleSlugChange(e.target.value)}
+              placeholder="graphic-tees"
+              className="w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm text-[hsl(var(--foreground))] font-mono placeholder:text-[hsl(var(--muted-foreground))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))]/30"
+            />
+            <p className="text-xs text-[hsl(var(--muted-foreground))]">/shop/{slug || "…"}</p>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="block text-sm font-medium text-[hsl(var(--foreground))]">
+              Parent Category
+            </label>
+            <select
+              value={parentId}
+              onChange={(e) => setParentId(e.target.value)}
+              className="w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm text-[hsl(var(--foreground))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))]/30"
+            >
+              <option value="">— None (top-level) —</option>
+              {categories.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {getOptionLabel(cat)}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-[hsl(var(--muted-foreground))]">
+              {parentId
+                ? `Sub-link under "${selectedParentName}" in the nav dropdown.`
+                : "Top-level — appears directly in the navigation bar."}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-[hsl(var(--border))]">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={saving}
+            className="px-4 py-2 text-sm rounded-md border border-[hsl(var(--border))] text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))] transition-colors disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             type="button"
-            disabled={!canSubmit}
             onClick={handleSubmit}
-            className="h-9 rounded-[var(--radius)] bg-[hsl(var(--primary))] px-4 text-sm text-[hsl(var(--primary-foreground))] disabled:opacity-50"
+            disabled={saving || !name.trim() || !slug.trim()}
+            className="px-4 py-2 text-sm rounded-md bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 transition-opacity disabled:opacity-50 font-medium"
           >
-            {submitting ? "Creating..." : "Create"}
+            {saving ? "Creating…" : "Create Category"}
           </button>
         </div>
       </div>
-    </CategoryModal>
+    </div>
   );
 }
