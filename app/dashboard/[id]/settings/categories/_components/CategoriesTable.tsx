@@ -137,7 +137,7 @@ function CategoryRowItem({
 
         {/* Actions */}
         <td className="py-2.5 px-4 text-right">
-          <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="flex items-center justify-end gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
             <button
               type="button"
               onClick={() => onEdit(category)}
@@ -202,6 +202,7 @@ export function CategoriesTable({ categories, onEdit, onDelete }: CategoriesTabl
 
   return (
     <div className="rounded-lg border border-[hsl(var(--border))] overflow-hidden">
+      <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
           <tr className="bg-[hsl(var(--muted))/60] border-b border-[hsl(var(--border))]">
@@ -232,6 +233,7 @@ export function CategoriesTable({ categories, onEdit, onDelete }: CategoriesTabl
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }
