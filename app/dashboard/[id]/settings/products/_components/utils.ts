@@ -73,3 +73,52 @@ export function randId() {
 export function generateId() {
   return Math.random().toString(36).substring(7);
 }
+
+// Image conversion
+/**
+ * Converts any image File to WebP format using the browser Canvas API.
+ * Falls back to the original file if conversion fails or isn't supported.
+ * Quality 0.85 gives excellent visual fidelity at ~30-50% smaller size than JPEG/PNG.
+ */
+export async function convertToWebP(file: File, quality = 0.85): Promise<File> {
+  return new Promise((resolve) => {
+    // Already WebP — skip
+    if (file.type === "image/webp") {
+      resolve(file);
+      return;
+    }
+
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const canvas = document.createElement("canvas");
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { resolve(file); return; }
+      ctx.drawImage(img, 0, 0);
+
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) { resolve(file); return; }
+          const converted = new File([blob], file.name.replace(/\.[^.]+$/, ".webp"), {
+            type: "image/webp",
+            lastModified: Date.now(),
+          });
+          resolve(converted);
+        },
+        "image/webp",
+        quality
+      );
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve(file); // fallback: upload original
+    };
+
+    img.src = url;
+  });
+}

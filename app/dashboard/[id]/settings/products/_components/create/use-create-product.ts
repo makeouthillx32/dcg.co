@@ -2,22 +2,22 @@ import { useState, useMemo } from "react";
 import { toast } from "react-hot-toast";
 import { createBrowserClient } from "@/utils/supabase/client";
 import { PRODUCT_IMAGE_BUCKET } from "@/lib/images";
-import { 
-  slugify, 
-  safeReadJson, 
-  moneyToCents, 
-  safeExtFromFile, 
-  buildObjectPath 
+import {
+  slugify,
+  safeReadJson,
+  moneyToCents,
+  buildObjectPath,
+  convertToWebP,
 } from "../utils";
-import { 
-  CategoryNode, 
-  CollectionRow, 
-  ImageWithAlt, 
-  SizeOption, 
-  ColorOption, 
-  MaterialOption, 
-  MadeInOption, 
-  VariantInput 
+import {
+  CategoryNode,
+  CollectionRow,
+  ImageWithAlt,
+  SizeOption,
+  ColorOption,
+  MaterialOption,
+  MadeInOption,
+  VariantInput
 } from "../types";
 
 // ✅ Add OptionGroup type
@@ -57,24 +57,24 @@ export function useCreateProduct(onOpenChange: (v: boolean) => void, onCreated: 
   const cents = useMemo(() => moneyToCents(price), [price]);
   const autoSlug = () => setSlug(slugify(title));
   const autoBaseSku = () => {
-  const words = title
-    .replace(/['']/g, "")
-    .toUpperCase()
-    .split(/\s+/)
-    .filter(Boolean);
+    const words = title
+      .replace(/['']/g, "")
+      .toUpperCase()
+      .split(/\s+/)
+      .filter(Boolean);
 
-  const prefix = words.includes("SWEATSHIRT") || words.includes("CREWNECK")
-    ? "WSP"
-    : "PRD";
+    const prefix = words.includes("SWEATSHIRT") || words.includes("CREWNECK")
+      ? "WSP"
+      : "PRD";
 
-  const shortWords = words
-    .filter(w => !["THE","A","AN","AND","OF","WITH","COUNTRY","WESTERN","GRAPHIC"].includes(w))
-    .slice(0, 2);
+    const shortWords = words
+      .filter(w => !["THE", "A", "AN", "AND", "OF", "WITH", "COUNTRY", "WESTERN", "GRAPHIC"].includes(w))
+      .slice(0, 2);
 
-  const code = shortWords.map(w => w.substring(0, 3)).join("-");
+    const code = shortWords.map(w => w.substring(0, 3)).join("-");
 
-  setBaseSku(`${prefix}-${code}`);
-};
+    setBaseSku(`${prefix}-${code}`);
+  };
 
 
   // Reusable ID generator that works in all browser contexts
@@ -111,7 +111,7 @@ export function useCreateProduct(onOpenChange: (v: boolean) => void, onCreated: 
     const colorObj = colorId ? availableColors.find(c => c.id === colorId) : null;
     if (colorObj?.name) {
       const colorName = colorObj.name.trim();
-      
+
       // Extract meaningful identifier from color name
       // Handles cases like "Steerhead", "Wild West", "Brushed Silver", etc.
       const cleanColor = colorName
@@ -121,7 +121,7 @@ export function useCreateProduct(onOpenChange: (v: boolean) => void, onCreated: 
         .map(word => word.substring(0, 4).toUpperCase()) // Take first 4 chars of each word
         .join("") // Join without separator
         .substring(0, 6); // Max 6 chars total for color identifier
-      
+
       if (cleanColor) parts.push(cleanColor);
     }
 
@@ -130,18 +130,18 @@ export function useCreateProduct(onOpenChange: (v: boolean) => void, onCreated: 
       customGroups.forEach(group => {
         const selectionKey = `group_${group.id}_selection`;
         const selectedIds = (variant.customOptions[selectionKey] as string[]) || [];
-        
+
         if (selectedIds.length > 0) {
           const selectedValues = selectedIds
             .map(id => group.options.find(opt => opt.id === id)?.value)
             .filter(Boolean);
-          
+
           if (selectedValues.length > 0) {
             // Use first 3-4 chars of each selected value
             const identifier = selectedValues
               .map(val => val.replace(/[^a-zA-Z0-9]/g, "").substring(0, 4).toUpperCase())
               .join("");
-            
+
             if (identifier) parts.push(identifier);
           }
         }
@@ -165,7 +165,7 @@ export function useCreateProduct(onOpenChange: (v: boolean) => void, onCreated: 
         .map(word => word.substring(0, 3).toUpperCase())
         .join("")
         .substring(0, 6);
-      
+
       if (titleIdentifier) parts.push(titleIdentifier);
     }
 
@@ -244,7 +244,7 @@ export function useCreateProduct(onOpenChange: (v: boolean) => void, onCreated: 
       customOptions: { ...last.customOptions },
       weight_grams: last.weight_grams,
       price_override: last.price_override,
-      initial_stock: last.initial_stock, 
+      initial_stock: last.initial_stock,
     } : {
       id: generateId(),
       title: "", sku: "", selectedSizes: [], selectedColors: [], selectedMaterials: [],
@@ -258,20 +258,20 @@ export function useCreateProduct(onOpenChange: (v: boolean) => void, onCreated: 
 
   const buildVariantOptions = (variant: VariantInput, customGroups?: Array<{ id: string; name: string; options: Array<{ id: string; value: string }> }>) => {
     const options: Record<string, any> = {};
-    
+
     // Size from variant selections
     if (variant.selectedSizes.length > 0) {
       const vals = variant.selectedSizes.map(id => availableSizes.find(s => s.id === id)?.value).filter(Boolean);
       options.size = vals.length === 1 ? vals[0] : vals.join(", ");
     }
-    
+
     // Color from variant selections
     if (variant.selectedColors.length > 0) {
       const objs = variant.selectedColors.map(id => availableColors.find(c => c.id === id)).filter(Boolean);
       if (objs.length === 1) options.color = { name: objs[0]!.name, hex: objs[0]!.hex };
       else options.colors = objs.map(c => ({ name: c!.name, hex: c!.hex }));
     }
-    
+
     // ✅ Add product-level material and made_in to variant options
     if (material.trim()) {
       options.material = material.trim();
@@ -279,18 +279,18 @@ export function useCreateProduct(onOpenChange: (v: boolean) => void, onCreated: 
     if (madeIn.trim()) {
       options.made_in = madeIn.trim();
     }
-    
+
     // ✅ Custom option groups (convert selection arrays to readable values)
     if (customGroups) {
       customGroups.forEach(group => {
         const selectionKey = `group_${group.id}_selection`;
         const selectedIds = (variant.customOptions[selectionKey] as string[]) || [];
-        
+
         if (selectedIds.length > 0) {
           const selectedValues = selectedIds
             .map(id => group.options.find(opt => opt.id === id)?.value)
             .filter(Boolean);
-          
+
           if (selectedValues.length > 0) {
             // Use the group name (lowercased) as the key in options
             const optionKey = group.name.toLowerCase().replace(/\s+/g, '_');
@@ -299,16 +299,16 @@ export function useCreateProduct(onOpenChange: (v: boolean) => void, onCreated: 
         }
       });
     }
-    
+
     // ✅ Legacy custom options (string key-value pairs)
     Object.entries(variant.customOptions).forEach(([k, v]) => {
       // Skip custom group selections (they're handled above)
       if (k.startsWith('group_') && k.endsWith('_selection')) return;
-      
+
       const val = typeof v === "string" ? v.trim() : "";
       if (val) options[k] = val;
     });
-    
+
     return options;
   };
 
@@ -321,25 +321,25 @@ export function useCreateProduct(onOpenChange: (v: boolean) => void, onCreated: 
     // ✅ PRE-FLIGHT VALIDATION: Only validate variants if they exist
     if (variants.length > 0) {
       const generatedSkus = new Set<string>();
-      
+
       for (const variant of variants) {
         let finalSku: string;
-        
+
         if (variant.sku.trim()) {
           finalSku = variant.sku.trim();
         } else {
           finalSku = generateVariantSku(variant, customGroups);
         }
-        
+
         // ✅ For simple products (no sizes, colors, or custom groups), SKU can equal base SKU
         if (!finalSku) {
           return toast.error(`Variant "${variant.title}" has invalid SKU. Each variant needs a unique identifier (size, color, or custom SKU).`);
         }
-        
+
         if (generatedSkus.has(finalSku)) {
           return toast.error(`Duplicate SKU detected: "${finalSku}". Each variant must have a unique combination of attributes.`);
         }
-        
+
         generatedSkus.add(finalSku);
       }
 
@@ -359,14 +359,14 @@ export function useCreateProduct(onOpenChange: (v: boolean) => void, onCreated: 
       const res = await fetch("/api/products/admin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          title: title.trim(), 
-          slug: finalSlug, 
-          description: description.trim() || null, 
+        body: JSON.stringify({
+          title: title.trim(),
+          slug: finalSlug,
+          description: description.trim() || null,
           material: material.trim() || null,
           made_in: madeIn.trim() || null,
-          price_cents: cents, 
-          status: "draft" 
+          price_cents: cents,
+          status: "draft"
         }),
       });
 
@@ -457,9 +457,13 @@ export function useCreateProduct(onOpenChange: (v: boolean) => void, onCreated: 
         const supabase = createBrowserClient();
         for (let i = 0; i < images.length; i++) {
           const img = images[i];
-          const ext = safeExtFromFile(img.file);
-          const path = buildObjectPath(productId, i + 1, ext);
-          const { error } = await supabase.storage.from(PRODUCT_IMAGE_BUCKET).upload(path, img.file);
+          const webpFile = await convertToWebP(img.file);
+          const path = buildObjectPath(productId!, i + 1, "webp");
+          const { error } = await supabase.storage.from(PRODUCT_IMAGE_BUCKET).upload(path, webpFile, {
+            upsert: false,
+            cacheControl: "3600",
+            contentType: "image/webp",
+          });
           if (error) throw error;
 
           await fetch(`/api/products/admin/${productId}/images`, {

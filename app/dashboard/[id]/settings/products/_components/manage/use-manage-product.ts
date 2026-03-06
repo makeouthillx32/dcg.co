@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { toast } from "react-hot-toast";
 import { createBrowserClient } from "@/utils/supabase/client";
 import { PRODUCT_IMAGE_BUCKET } from "@/lib/images";
-import { safeReadJson, moneyToCents, slugify, fileExt, randId } from "../utils";
+import { safeReadJson, moneyToCents, slugify, randId, convertToWebP } from "../utils";
 import type { ProductRow } from "../types";
 
 export function useManageProduct(
@@ -131,13 +131,13 @@ export function useManageProduct(
 
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        const ext = fileExt(file.name);
-        const object_path = `products/${detail.id}/${randId()}.${ext}`;
+        const webpFile = await convertToWebP(file);
+        const object_path = `products/${detail.id}/${randId()}.webp`;
 
-        const up = await supabase.storage.from(PRODUCT_IMAGE_BUCKET).upload(object_path, file, {
+        const up = await supabase.storage.from(PRODUCT_IMAGE_BUCKET).upload(object_path, webpFile, {
           upsert: false,
           cacheControl: "3600",
-          contentType: file.type || "application/octet-stream",
+          contentType: "image/webp",
         });
 
         if (up.error) throw new Error(up.error.message);
