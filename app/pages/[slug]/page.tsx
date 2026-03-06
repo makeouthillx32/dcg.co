@@ -28,8 +28,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     keywords: page.meta_keywords || undefined,
     openGraph: page.og_image_url
       ? {
-          images: [page.og_image_url],
-        }
+        images: [page.og_image_url],
+      }
       : undefined,
   };
 }
@@ -54,6 +54,15 @@ function extractHtmlParts(html: string): { styles: string; body: string } | null
   return { styles, body };
 }
 
+function stripInlineWidths(html: string): string {
+  return html
+    // Remove width="600" style attributes on elements
+    .replace(/\s+width=["']\d+["']/gi, '')
+    // Remove width:Xpx from inline style attributes
+    .replace(/(style=["'][^"']*)width\s*:\s*\d+px\s*;?/gi, '$1')
+    .replace(/(style=["'][^"']*)max-width\s*:\s*\d+px\s*;?/gi, '$1');
+}
+
 // Render content based on format
 function renderContent(page: { content: string; content_format: 'html' | 'markdown' }) {
   if (page.content_format === 'html') {
@@ -63,13 +72,10 @@ function renderContent(page: { content: string; content_format: 'html' | 'markdo
       // Full HTML document — render styles scoped + body content isolated
       return (
         <div className="static-page-content w-full overflow-x-hidden">
-          {/* Scoped styles: injected inside a <style> tag within the content div */}
           <style
             dangerouslySetInnerHTML={{
               __html: `
-                /* Scope all rules from the page's own stylesheet to .static-page-content */
                 .static-page-content {
-                  /* Reset body-level styles the HTML doc may have set */
                   display: block !important;
                   align-items: unset !important;
                   flex-direction: unset !important;
@@ -78,16 +84,25 @@ function renderContent(page: { content: string; content_format: 'html' | 'markdo
                 .static-page-content html {
                   display: block;
                 }
-                /* Inject the page's own styles, lightly scoped */
                 ${extracted.styles
                   .replace(/\bbody\b/g, '.static-page-content')
                   .replace(/\bhtml\b/g, '.static-page-content')}
-                /* Mobile safety overrides */
+                .static-page-content *,
+                .static-page-content *::before,
+                .static-page-content *::after {
+                  box-sizing: border-box !important;
+                  max-width: 100% !important;
+                }
+                .static-page-content table,
+                .static-page-content div,
                 .static-page-content main,
                 .static-page-content article,
-                .static-page-content section {
+                .static-page-content section,
+                .static-page-content center,
+                .static-page-content td,
+                .static-page-content tr {
                   max-width: 100% !important;
-                  width: 100% !important;
+                  width: auto !important;
                   box-sizing: border-box !important;
                 }
                 .static-page-content img {
@@ -102,27 +117,56 @@ function renderContent(page: { content: string; content_format: 'html' | 'markdo
       );
     }
 
-    // Partial HTML (no full doc wrapper) — render as-is with prose
+    // Partial HTML — apply the same width-busting overrides via a scoped style tag
     return (
-      <div
-        className="
-          prose prose-slate max-w-none dark:prose-invert
-          overflow-x-hidden
-          prose-headings:text-[hsl(var(--foreground))]
-          prose-p:text-[hsl(var(--foreground))]
-          prose-a:text-[hsl(var(--primary))]
-          prose-strong:text-[hsl(var(--foreground))]
-          prose-ul:text-[hsl(var(--foreground))]
-          prose-ol:text-[hsl(var(--foreground))]
-          prose-li:text-[hsl(var(--foreground))]
-          [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-md
-          [&_table]:w-full [&_table]:overflow-x-auto [&_table]:block [&_table]:whitespace-nowrap sm:[&_table]:whitespace-normal
-          [&_pre]:overflow-x-auto [&_pre]:text-sm
-          [&_iframe]:max-w-full [&_iframe]:w-full
-          [&_video]:max-w-full [&_video]:w-full
-        "
-        dangerouslySetInnerHTML={{ __html: page.content }}
-      />
+      <div className="static-page-content w-full overflow-x-hidden">
+        <style
+          dangerouslySetInnerHTML={{
+            __html: `
+              .static-page-content *,
+              .static-page-content *::before,
+              .static-page-content *::after {
+                box-sizing: border-box !important;
+                max-width: 100% !important;
+              }
+              .static-page-content table,
+              .static-page-content div,
+              .static-page-content main,
+              .static-page-content article,
+              .static-page-content section,
+              .static-page-content center,
+              .static-page-content td,
+              .static-page-content tr {
+                max-width: 100% !important;
+                width: auto !important;
+                box-sizing: border-box !important;
+              }
+              .static-page-content img {
+                max-width: 100% !important;
+                height: auto !important;
+              }
+            `,
+          }}
+        />
+        <div
+          className="
+            prose prose-slate max-w-none dark:prose-invert
+            prose-headings:text-[hsl(var(--foreground))]
+            prose-p:text-[hsl(var(--foreground))]
+            prose-a:text-[hsl(var(--primary))]
+            prose-strong:text-[hsl(var(--foreground))]
+            prose-ul:text-[hsl(var(--foreground))]
+            prose-ol:text-[hsl(var(--foreground))]
+            prose-li:text-[hsl(var(--foreground))]
+            [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-md
+            [&_table]:w-full [&_table]:overflow-x-auto [&_table]:block
+            [&_pre]:overflow-x-auto [&_pre]:text-sm
+            [&_iframe]:max-w-full [&_iframe]:w-full
+            [&_video]:max-w-full [&_video]:w-full
+          "
+          dangerouslySetInnerHTML={{ __html: stripInlineWidths(page.content) }}
+        />
+      </div>
     );
   }
 
@@ -140,11 +184,8 @@ function renderContent(page: { content: string; content_format: 'html' | 'markdo
             </Tag>
           );
         }
-
         return line.trim() ? (
-          <p key={i} className="text-[hsl(var(--foreground))]">
-            {line}
-          </p>
+          <p key={i} className="text-[hsl(var(--foreground))]">{line}</p>
         ) : (
           <br key={i} />
         );
