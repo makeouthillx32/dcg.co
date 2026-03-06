@@ -84,10 +84,6 @@ function InternalAuthProvider({
     if (nextUserId) setUser(session!.user);
     else setUser(null);
 
-    // Only refresh the app tree when auth identity actually changes:
-    // - signed in (null -> uuid)
-    // - signed out (uuid -> null)
-    // Not on token refresh or repeated session checks.
     if (lastUserIdRef.current !== nextUserId) {
       lastUserIdRef.current = nextUserId;
       router.refresh();
@@ -97,10 +93,6 @@ function InternalAuthProvider({
   useEffect(() => {
     if (isLoading) return;
 
-    // ## Guest Contract v1
-    // Source of truth: lib/protectedRoutes.ts (also consumed by middleware.ts).
-    // Guest CAN access: shop browsing, product pages, collections/categories, cart, checkout, static pages.
-    // Guest CANNOT access: /profile/*, /dashboard/*, /settings/*, /protected/*
     if (!session && isProtectedRoute(pathname) && !isAuthRoute(pathname)) {
       const target = pathname + (location.search || "");
       console.log(`[Provider] Redirecting guest to sign-in from protected route: ${pathname}`);
@@ -122,12 +114,18 @@ export function useIOSSessionRefresh() {
   return { refreshSession };
 }
 
+// ─── Dismiss the preloader overlay (idempotent) ──────────────────────────────
+function dismissPreloader() {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event("dcg-theme-ready"));
+}
+
 export const Providers: React.FC<{ children: React.ReactNode; session?: Session | null }> = ({
   children,
   session,
 }) => {
   // -------------------------
-  // THEME STATE (unchanged)
+  // THEME STATE
   // -------------------------
   const [themeType, setThemeType] = useState<"light" | "dark">("light");
   const [themeId, setThemeIdState] = useState<string>(defaultThemeId);
@@ -229,6 +227,7 @@ export const Providers: React.FC<{ children: React.ReactNode; session?: Session 
         const theme = await getTheme();
         if (!theme) {
           console.error("❌ No theme available to apply");
+          dismissPreloader();
           return;
         }
 
@@ -260,9 +259,23 @@ export const Providers: React.FC<{ children: React.ReactNode; session?: Session 
         localStorage.setItem("theme", themeType);
         setCookie("theme", themeType, { path: "/", maxAge: 31536000 });
 
+        // Cache the resolved bg + primary HSL values so the preloader inline script
+        // can read them synchronously on the next page load (before React runs).
+        try {
+          const bgValue = variables["--background"];
+          const primaryValue = variables["--primary"];
+          if (bgValue) localStorage.setItem(`dcg-preloader-bg-${themeType}`, bgValue);
+          if (primaryValue) localStorage.setItem("dcg-preloader-primary", primaryValue);
+        } catch (_) { /* non-critical */ }
+
         console.log(`✅ Theme applied: ${theme.name} (${themeType})`);
+
+        // Signal the preloader to fade out — colours are now live on the page.
+        dismissPreloader();
       } catch (error) {
         console.error("❌ Error applying theme:", error);
+        // Always clear the preloader even on error so the user isn't stuck.
+        dismissPreloader();
       }
     };
 
@@ -286,9 +299,6 @@ export const Providers: React.FC<{ children: React.ReactNode; session?: Session 
 
   const isAuthLoading = !sessionFetched;
 
-  // ✅ FIX: Tracks when we're in a post-login ?refresh=true window.
-  // Prevents a null INITIAL_SESSION fired by onAuthStateChange from clobbering
-  // the session we're about to fetch via forceRefreshSession() after the 200ms delay.
   const pendingRefreshRef = useRef(false);
 
   const forceRefreshSession = () => {
@@ -308,23 +318,15 @@ export const Providers: React.FC<{ children: React.ReactNode; session?: Session 
       .catch((e) => console.error("[Provider] ❌ Forced session fetch failed:", e));
   };
 
-  // ✅ FIX: After email sign-in, signInAction redirects with ?refresh=true.
-  // We strip the param immediately, then wait 200ms before calling forceRefreshSession()
-  // so the Supabase browser client has time to finish parsing the sb-* auth cookies.
-  // Without the delay, getSession() races against cookie initialization and returns null.
-  // The pendingRefreshRef prevents a null INITIAL_SESSION from onAuthStateChange from
-  // overwriting state during this window.
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     if (params.get("refresh") === "true") {
       console.log("[Provider] 🔑 ?refresh=true detected — forcing immediate session sync");
       pendingRefreshRef.current = true;
-      // Strip the param immediately so it doesn't show in the URL
       params.delete("refresh");
       const newUrl = window.location.pathname + (params.toString() ? "?" + params.toString() : "");
       window.history.replaceState({}, "", newUrl);
-      // Delay gives the Supabase browser client time to parse cookies before getSession() is called
       setTimeout(() => {
         pendingRefreshRef.current = false;
         forceRefreshSession();
@@ -346,9 +348,6 @@ export const Providers: React.FC<{ children: React.ReactNode; session?: Session 
     } = supabase.auth.onAuthStateChange((event, newSession) => {
       console.log("[Provider] 🔄 Auth state changed:", event, newSession ? "authenticated" : "not authenticated");
 
-      // ✅ FIX: Don't let a null INITIAL_SESSION overwrite state during a post-login
-      // ?refresh=true window. The Supabase client fires INITIAL_SESSION before it has
-      // fully parsed the auth cookies, so we wait for forceRefreshSession() to resolve instead.
       if (event === "INITIAL_SESSION" && !newSession && pendingRefreshRef.current) {
         console.log("[Provider] ⏳ Skipping null INITIAL_SESSION — post-login refresh pending");
         return;

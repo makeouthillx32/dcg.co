@@ -10,6 +10,7 @@ import { classifyRoute } from "@/components/Layouts/routeClassifier";
 import { useScreenSize } from "@/components/Layouts/hooks/useScreenSize";
 import { useMetaThemeColor } from "@/components/Layouts/hooks/useMetaThemeColor";
 import { DashboardLayout, AuthLayout, ShopLayout } from "@/components/Layouts/LayoutBranches";
+import PullToRefresh from "@/components/Layouts/shop/PullToRefresh";
 import { setCookie } from "@/lib/cookieUtils";
 import analytics from "@/lib/analytics";
 
@@ -107,14 +108,19 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   }
 
   return (
-    <ShopLayout
-      screenSize={screenSize}
-      sessionUserId={session?.user?.id}
-      useAppHeader={route.useAppHeader}
-      showNav={!route.isAuthPage && (route.isShopRoute || route.useAppHeader)}
-      showFooter={!route.isAuthPage && route.isShopRoute}
-    >
-      {children}
-    </ShopLayout>
+    <>
+      {/* Pull-to-refresh — shop & app routes only, mobile touch only */}
+      <PullToRefresh />
+
+      <ShopLayout
+        screenSize={screenSize}
+        sessionUserId={session?.user?.id}
+        useAppHeader={route.useAppHeader}
+        showNav={!route.isAuthPage && (route.isShopRoute || route.useAppHeader)}
+        showFooter={!route.isAuthPage && route.isShopRoute}
+      >
+        {children}
+      </ShopLayout>
+    </>
   );
 }
