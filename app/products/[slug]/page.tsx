@@ -13,51 +13,8 @@ import ProductDetailClient from "./_components/ProductDetailClient";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const SUPABASE_URL =
-  process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://efglhzzageijqhfwvsub.supabase.co";
 const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL ?? "https://desertcowgirl.co";
-
-// ─── Image helpers ────────────────────────────────────────────────────────────
-
-type RawImage = {
-  bucket_name: string | null;
-  object_path: string | null;
-  is_primary?: boolean | null;
-  is_public?: boolean | null;
-  sort_order?: number | null;
-  position?: number | null;
-};
-
-/** Builds a Supabase public storage URL from a product_images row. */
-function buildStorageUrl(img: RawImage | null): string | null {
-  if (!img?.bucket_name || !img?.object_path) return null;
-  const encodedPath = img.object_path
-    .split("/")
-    .filter(Boolean)
-    .map((seg) => encodeURIComponent(seg))
-    .join("/");
-  return `${SUPABASE_URL}/storage/v1/object/public/${img.bucket_name}/${encodedPath}`;
-}
-
-/**
- * Picks the best image to use for OG/Twitter:
- *   1. is_primary = true
- *   2. lowest sort_order
- *   3. lowest position
- */
-function pickPrimaryImage(images: RawImage[]): RawImage | null {
-  if (!images?.length) return null;
-  const pub = images.filter((i) => i.is_public ?? true);
-  const arr = pub.length ? pub : images;
-  const primary = arr.find((i) => i.is_primary);
-  if (primary) return primary;
-  return [...arr].sort((a, b) => {
-    const as = a.sort_order ?? a.position ?? 999999;
-    const bs = b.sort_order ?? b.position ?? 999999;
-    return as - bs;
-  })[0] ?? null;
-}
 
 // ─── Static params ────────────────────────────────────────────────────────────
 
@@ -83,12 +40,14 @@ export async function generateMetadata({
 
   const { data: product } = await supabase
     .from("products")
-    .select("title, description, product_images(bucket_name, object_path, is_primary, is_public, sort_order, position)")
+    .select("title, description, updated_at")
     .eq("slug", slug)
     .eq("status", "active")
     .single();
 
-  if (!product) return { title: "Product Not Found | Desert Cowgirl Co." };
+  if (!product) {
+    return { title: "Product Not Found | Desert Cowgirl Co." };
+  }
 
   const title = `${product.title} | Desert Cowgirl Co.`;
   const ogTitle = product.title;
@@ -96,9 +55,8 @@ export async function generateMetadata({
     product.description ??
     `Shop ${product.title} at Desert Cowgirl — western-inspired boutique fashion.`;
   const url = `${SITE_URL}/products/${slug}`;
-
-  const primaryImg = pickPrimaryImage(product.product_images ?? []);
-  const rawImageUrl = buildStorageUrl(primaryImg);
+  const ogImageVersion = encodeURIComponent(product.updated_at ?? product.title);
+  const ogImageUrl = `${SITE_URL}/products/${slug}/opengraph-image?v=${ogImageVersion}`;
 
   return {
     title,
@@ -109,15 +67,20 @@ export async function generateMetadata({
       url,
       siteName: "Desert Cowgirl",
       type: "website",
-      ...(rawImageUrl && {
-        images: [{ url: rawImageUrl, width: 1200, height: 630, alt: product.title }],
-      }),
+      images: [
+        {
+          url: ogImageUrl,
+          width: 1200,
+          height: 630,
+          alt: product.title,
+        },
+      ],
     },
     twitter: {
       card: "summary_large_image",
       title: ogTitle,
       description,
-      ...(rawImageUrl && { images: [rawImageUrl] }),
+      images: [ogImageUrl],
     },
   };
 }
@@ -197,7 +160,6 @@ export default async function ProductPage({
 
   const formattedProduct = {
     ...product,
-    // Sort images by sort_order, then position
     images: (product.product_images || []).sort(
       (a: any, b: any) =>
         (a.sort_order ?? a.position ?? 0) - (b.sort_order ?? b.position ?? 0)
