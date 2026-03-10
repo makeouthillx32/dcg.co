@@ -1,9 +1,4 @@
 // app/products/[slug]/opengraph-image.tsx
-//
-// ✅ VERIFIED against descowgrl Supabase (efglhzzageijqhfwvsub)
-//    - product_images.bucket_name = "product-images"
-//    - product_images.object_path = "products/{id}/{n}.webp"
-//    - is_primary, sort_order, position, is_public confirmed in live schema
 
 import { ImageResponse } from "next/og";
 import { createServerClient } from "@/utils/supabase/server";
@@ -17,8 +12,6 @@ export const size = {
 
 export const contentType = "image/png";
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
 const SUPABASE_URL =
   process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://efglhzzageijqhfwvsub.supabase.co";
 
@@ -31,30 +24,55 @@ type RawImage = {
   position: number | null;
 };
 
-function buildStorageUrl(img: RawImage | null): string | null {
-  if (!img?.bucket_name || !img?.object_path) return null;
-  const encodedPath = img.object_path
+function encodeStoragePath(path: string) {
+  return path
     .split("/")
     .filter(Boolean)
     .map((seg) => encodeURIComponent(seg))
     .join("/");
+}
+
+function buildStorageUrl(img: RawImage | null): string | null {
+  if (!img?.bucket_name || !img?.object_path) return null;
+
+  const encodedPath = encodeStoragePath(img.object_path);
+
   return `${SUPABASE_URL}/storage/v1/object/public/${img.bucket_name}/${encodedPath}`;
+}
+
+function buildTransformedOgImageUrl(img: RawImage | null): string | null {
+  if (!img?.bucket_name || !img?.object_path) return null;
+
+  const encodedPath = encodeStoragePath(img.object_path);
+
+  const params = new URLSearchParams({
+    width: "1200",
+    height: "1200",
+    resize: "contain",
+    quality: "70",
+    format: "origin",
+  });
+
+  return `${SUPABASE_URL}/storage/v1/render/image/public/${img.bucket_name}/${encodedPath}?${params.toString()}`;
 }
 
 function pickPrimaryImage(images: RawImage[]): RawImage | null {
   if (!images?.length) return null;
+
   const pub = images.filter((i) => i.is_public ?? true);
   const arr = pub.length ? pub : images;
+
   const primary = arr.find((i) => i.is_primary);
   if (primary) return primary;
-  return [...arr].sort((a, b) => {
-    const as = a.sort_order ?? a.position ?? 999999;
-    const bs = b.sort_order ?? b.position ?? 999999;
-    return as - bs;
-  })[0] ?? null;
-}
 
-// ─── OG Image ─────────────────────────────────────────────────────────────────
+  return (
+    [...arr].sort((a, b) => {
+      const as = a.sort_order ?? a.position ?? 999999;
+      const bs = b.sort_order ?? b.position ?? 999999;
+      return as - bs;
+    })[0] ?? null
+  );
+}
 
 export default async function Image({
   params,
@@ -91,9 +109,11 @@ export default async function Image({
   const badge = product?.badge ?? null;
 
   const primaryImg = pickPrimaryImage(product?.product_images ?? []);
-  const imageUrl = buildStorageUrl(primaryImg);
 
-  // Brand palette
+  // Use transformed image first for reliability in OG rendering.
+  const imageUrl =
+    buildTransformedOgImageUrl(primaryImg) ?? buildStorageUrl(primaryImg);
+
   const sand = "#F5E6C8";
   const rust = "#C0522A";
   const darkBrown = "#2C1810";
@@ -112,7 +132,6 @@ export default async function Image({
           fontFamily: "Georgia, serif",
         }}
       >
-        {/* Subtle diagonal stripe texture */}
         <div
           style={{
             position: "absolute",
@@ -128,7 +147,6 @@ export default async function Image({
           }}
         />
 
-        {/* Left panel: brand + product info */}
         <div
           style={{
             display: "flex",
@@ -139,7 +157,6 @@ export default async function Image({
             zIndex: 1,
           }}
         >
-          {/* Brand header */}
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <div
@@ -186,7 +203,6 @@ export default async function Image({
             />
           </div>
 
-          {/* Product info */}
           <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
             {badge && (
               <div style={{ display: "flex" }}>
@@ -230,7 +246,6 @@ export default async function Image({
             )}
           </div>
 
-          {/* CTA */}
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             <div
               style={{
@@ -261,7 +276,6 @@ export default async function Image({
           </div>
         </div>
 
-        {/* Right panel: product image */}
         {imageUrl && (
           <div
             style={{
@@ -271,7 +285,6 @@ export default async function Image({
               overflow: "hidden",
             }}
           >
-            {/* Left-edge fade so the image blends into the panel */}
             <div
               style={{
                 position: "absolute",
@@ -296,7 +309,6 @@ export default async function Image({
           </div>
         )}
 
-        {/* Brand accent bar at bottom */}
         <div
           style={{
             position: "absolute",
